@@ -1,0 +1,31 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Olympiad {
+  id       String   @id @default(uuid())
+  name     String
+  timezone String
+  rounds   Round[]
+}
+
+model Round {
+  id         String   @id @default(uuid())
+  olympiad   Olympiad @relation(fields: [olympiadId], references: [id])
+  olympiadId String
+  name       String
+  openTime   DateTime
+  closeTime  DateTime
+  state      String   @default("scheduled")
+}
