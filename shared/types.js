@@ -18,4 +18,14 @@
  * @property {string} idempotencyKey
  */
 
+/**
+ * @typedef {Object} Paper
+ * @property {string} id
+ * @property {string} roundId
+ * @property {string} fileUrl
+ * @property {string|null} memoUrl
+ * @property {boolean} isArchived
+ * @property {string} uploadedAt
+ */
+
 module.exports = {};
