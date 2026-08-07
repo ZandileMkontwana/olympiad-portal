@@ -1,26 +1,32 @@
 {
-  "name": "backend",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "multer": "^2.2.0"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/multer": "^2.2.0",
-    "@types/node": "^26.1.2",
-    "nodemon": "^3.1.14",
-    "typescript": "^7.0.2"
-  }
+    "name": "backend",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "commonjs",
+    "dependencies": {
+        "cors": "^2.8.6",
+        "dotenv": "^17.4.2",
+        "express": "^5.2.1",
+        "multer": "^2.2.0",
+        "@prisma/client": "^5.22.0"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.6",
+        "@types/multer": "^2.2.0",
+        "@types/node": "^26.1.2",
+        "nodemon": "^3.1.14",
+        "typescript": "^7.0.2",
+        "prisma": "^5.22.0"
+    },
+    "allowScripts": {
+        "prisma@5.22.0": true,
+        "@prisma/engines@5.22.0": true
+    }
 }
