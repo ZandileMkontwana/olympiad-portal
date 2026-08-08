@@ -1,6 +1,5 @@
 const cron = require('node-cron');
-const { PrismaClient } = require('./generated/prisma');
-const prisma = new PrismaClient();
+const prisma = require('./lib/prisma');
 
 function startScheduler() {
   cron.schedule('*/30 * * * * *', async () => {

@@ -1,27 +1,14 @@
 const express = require('express');
-const { PrismaClient } = require('./generated/prisma');
-const { startScheduler } = require('./scheduler');
+const router = express.Router();
+const prisma = require('../lib/prisma');
 
-const app = express();
-const prisma = new PrismaClient();
-const PORT = 3001;
-
-app.use(express.json());
-
-app.get('/', (req, res) => {
-  res.send('Backend is running');
-});
-
-// POST /olympiads — create a new olympiad
-app.post('/olympiads', async (req, res) => {
+router.post('/olympiads', async (req, res) => {
   try {
     const { name, timezone } = req.body;
     if (!name || !timezone) {
       return res.status(400).json({ error: 'name and timezone are required' });
     }
-    const olympiad = await prisma.olympiad.create({
-      data: { name, timezone },
-    });
+    const olympiad = await prisma.olympiad.create({ data: { name, timezone } });
     res.status(201).json(olympiad);
   } catch (err) {
     console.error(err);
@@ -29,8 +16,7 @@ app.post('/olympiads', async (req, res) => {
   }
 });
 
-// POST /rounds — create a new round under an olympiad
-app.post('/rounds', async (req, res) => {
+router.post('/rounds', async (req, res) => {
   try {
     const { olympiadId, name, openTime, closeTime } = req.body;
     if (!olympiadId || !name || !openTime || !closeTime) {
@@ -40,12 +26,7 @@ app.post('/rounds', async (req, res) => {
       return res.status(400).json({ error: 'closeTime must be after openTime' });
     }
     const round = await prisma.round.create({
-      data: {
-        olympiadId,
-        name,
-        openTime: new Date(openTime),
-        closeTime: new Date(closeTime),
-      },
+      data: { olympiadId, name, openTime: new Date(openTime), closeTime: new Date(closeTime) },
     });
     res.status(201).json(round);
   } catch (err) {
@@ -54,15 +35,10 @@ app.post('/rounds', async (req, res) => {
   }
 });
 
-// GET /rounds/:id — get a single round's current state
-app.get('/rounds/:id', async (req, res) => {
+router.get('/rounds/:id', async (req, res) => {
   try {
-    const round = await prisma.round.findUnique({
-      where: { id: req.params.id },
-    });
-    if (!round) {
-      return res.status(404).json({ error: 'Round not found' });
-    }
+    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    if (!round) return res.status(404).json({ error: 'Round not found' });
     res.json(round);
   } catch (err) {
     console.error(err);
@@ -70,8 +46,7 @@ app.get('/rounds/:id', async (req, res) => {
   }
 });
 
-// GET /olympiads/:id/rounds — list all rounds for an olympiad
-app.get('/olympiads/:id/rounds', async (req, res) => {
+router.get('/olympiads/:id/rounds', async (req, res) => {
   try {
     const rounds = await prisma.round.findMany({
       where: { olympiadId: req.params.id },
@@ -84,7 +59,4 @@ app.get('/olympiads/:id/rounds', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  startScheduler();
-});
+module.exports = router;
