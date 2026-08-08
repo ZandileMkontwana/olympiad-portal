@@ -1,6 +1,6 @@
 const express = require('express');
 const { PrismaClient } = require('./generated/prisma');
-//const { startScheduler } = require('./scheduler');
+const { startScheduler } = require('./scheduler');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -86,4 +86,5 @@ app.get('/olympiads/:id/rounds', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  startScheduler();
 });
