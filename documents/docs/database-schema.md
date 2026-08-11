@@ -57,6 +57,7 @@ erDiagram
     string roundId FK
     string fileUrl
     string memoUrl
+    json memoAnswers "optional"
   }
   SUBMISSION {
     string id PK
@@ -95,7 +96,7 @@ Links a `User` account to a `School`. Educators upload results on behalf of thei
 A competing student, registered against a school.
 
 ### Paper
-A round's uploaded test and memo. Download is gated by the round's current state — not accessible before `open`.
+A round's uploaded test and memo. Download is gated by the round's current state — not accessible before `open`. `memoAnswers` stores the answer key as structured JSON (question number -> correct answer), separate from the memo PDF, since automarking needs data it can read programmatically.
 
 ### Submission
 An educator's results for their entrants. `idempotencyKey` prevents the same submission being recorded twice on retry.
