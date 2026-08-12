@@ -68,12 +68,13 @@ model Entrant {
 }
 
 model Paper {
-  id         String   @id @default(uuid())
-  round      Round    @relation(fields: [roundId], references: [id])
-  roundId    String   @unique
-  fileUrl    String
-  memoUrl    String
-  uploadedAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  round        Round    @relation(fields: [roundId], references: [id])
+  roundId      String   @unique
+  fileUrl      String
+  memoUrl      String
+  memoAnswers  Json?
+  uploadedAt   DateTime @default(now())
 }
 
 model Submission {
