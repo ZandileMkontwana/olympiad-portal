@@ -40,12 +40,22 @@ router.post(
         const paperFile = req.files.paper[0];
         const memoFile = req.files.memo[0];
 
+        let memoAnswers = null;
+        if (req.body.memoAnswers) {
+            try {
+                memoAnswers = JSON.parse(req.body.memoAnswers);
+            } catch (err) {
+                return res.status(400).json({ error: 'memoAnswers must be valid JSON' });
+            }
+        }
+
         try {
             const paper = await prisma.paper.create({
                 data: {
                     roundId,
                     fileUrl: `/uploads/papers/${paperFile.filename}`,
-                    memoUrl: `/uploads/papers/${memoFile.filename}`
+                    memoUrl: `/uploads/papers/${memoFile.filename}`,
+                    memoAnswers
                 }
             });
             res.status(201).json(paper);
