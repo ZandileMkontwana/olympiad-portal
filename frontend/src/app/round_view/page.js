@@ -10,6 +10,7 @@ export default function RoundView() {
   const [round, setRound] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [downloadError, setDownloadError] = useState("");
 
   useEffect(() => {
     if (!roundId) {
@@ -45,6 +46,24 @@ export default function RoundView() {
 
     return () => clearInterval(interval);
   }, [roundId]);
+
+  async function handleDownload() {
+    setDownloadError("");
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/papers`
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch paper");
+      }
+
+      window.location.href = `${process.env.NEXT_PUBLIC_API_URL}${data.fileUrl}`;
+    } catch (error) {
+      setDownloadError(error.message);
+    }
+  }
 
   if (loading) {
     return (
@@ -89,14 +108,15 @@ export default function RoundView() {
           This round is currently {round.state}.
         </p>
 
-       {round.state === "open" && round.paper && (
-          <a href={`${process.env.NEXT_PUBLIC_API_URL}${round.paper.fileUrl}`} className="button" download>Download Paper</a>
-        )}
-
-        {round.state === "open" && !round.paper && (
-          <p className="message">
-            No paper has been uploaded for this round yet.
-          </p>
+        {round.state === "open" && (
+          <>
+            <button className="button" onClick={handleDownload}>
+              Download Paper
+            </button>
+            {downloadError && (
+              <p className="message">{downloadError}</p>
+            )}
+          </>
         )}
       </div>
     </main>

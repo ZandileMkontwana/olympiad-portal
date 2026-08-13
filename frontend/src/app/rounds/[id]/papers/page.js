@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-//import { uploadPaper, ApiError } from '@/lib/api';
+import { uploadPaper, ApiError } from '@/lib/api';
 
 const MAX_FILE_SIZE_MB = 20;
 const ACCEPTED_EXTENSIONS = '.pdf,.doc,.docx';
