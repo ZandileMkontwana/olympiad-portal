@@ -16,6 +16,18 @@ router.post('/olympiads', async (req, res) => {
   }
 });
 
+router.get('/olympiads', async (req, res) => {
+  try {
+    const olympiads = await prisma.olympiad.findMany({
+      orderBy: { name: 'asc' },
+    });
+    res.json(olympiads);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch olympiads' });
+  }
+});
+
 router.post('/rounds', async (req, res) => {
   try {
     const { olympiadId, name, openTime, closeTime } = req.body;
@@ -32,6 +44,18 @@ router.post('/rounds', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to create round' });
+  }
+});
+
+router.get('/rounds', async (req, res) => {
+  try {
+    const rounds = await prisma.round.findMany({
+      orderBy: { openTime: 'asc' },
+    });
+    res.json(rounds);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch rounds' });
   }
 });
 
