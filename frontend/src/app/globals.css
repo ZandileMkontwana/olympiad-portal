@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-<<<<<<< HEAD
 :root {
   --background: #faf7fd;
   --foreground: #3f3151;
@@ -8,6 +7,22 @@
   --dark-lavender: #85649f;
   --light-lavender: #f5effa;
   --border-lavender: #d8c9e8;
+}
+
+@theme inline {
+  --color-paper: #f7f5fb;
+  --color-surface: #ffffff;
+  --color-ink: #211b33;
+  --color-ink-soft: #6b6480;
+  --color-lavender: #6c5ca6;
+  --color-lavender-deep: #4c3f82;
+  --color-gold: #b08a4e;
+  --color-sage: #4c8065;
+  --color-slate: #8b879c;
+
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-plex-mono);
 }
 
 body {
@@ -141,48 +156,8 @@ body {
   .round-information {
     grid-template-columns: 1fr;
   }
-=======
-/*
- * Organiser console palette — a touch of lavender against a warm,
- * professional neutral base. See docs/design-notes if we write one up;
- * for now, the short version:
- *   - paper/ink        -> base background + primary text
- *   - lavender(-deep)  -> brand accent; -deep is for anything with text on it
- *                          (buttons, links) since it holds AA/AAA contrast,
- *                          plain `lavender` is for borders/rings/fills only
- *   - gold              -> warm complement, used sparingly (required marks,
- *                          the certificate-corner signature on success states)
- *   - sage / slate      -> reserved for round-state colour coding (open /
- *                          scheduled) on the dashboard, kept here for
- *                          consistency across the app
- */
-@theme inline {
-  --color-paper: #f7f5fb;
-  --color-surface: #ffffff;
-  --color-ink: #211b33;
-  --color-ink-soft: #6b6480;
-  --color-lavender: #6c5ca6;
-  --color-lavender-deep: #4c3f82;
-  --color-gold: #b08a4e;
-  --color-sage: #4c8065;
-  --color-slate: #8b879c;
-
-  --font-display: var(--font-fraunces);
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-plex-mono);
 }
 
-body {
-  background: var(--color-paper);
-  color: var(--color-ink);
-  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-}
-
-/*
- * Signature element: a folded corner, like a stamped certificate,
- * used once — on the paper-upload success state. Keep it to that one
- * spot so it stays a moment rather than becoming decoration.
- */
 .certificate-card {
   position: relative;
   overflow: hidden;
@@ -198,5 +173,4 @@ body {
   border-style: solid;
   border-width: 0 42px 42px 0;
   border-color: transparent var(--color-gold) transparent transparent;
->>>>>>> origin/main
 }

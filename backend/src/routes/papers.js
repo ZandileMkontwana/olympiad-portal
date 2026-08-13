@@ -1,97 +1,124 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const router = express.Router();
-const prisma = require('../lib/prisma');
+"use client";
 
-const UPLOAD_DIR = path.join(__dirname, '../../uploads/papers');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-    filename: (req, file, cb) => {
-        const unique = `${Date.now()}-${file.originalname}`;
-        cb(null, unique);
+export default function RoundView() {
+  const searchParams = useSearchParams();
+  const roundId = searchParams.get("id");
+
+  const [round, setRound] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+
+  useEffect(() => {
+    if (!roundId) {
+      setError("No round ID was provided.");
+      setLoading(false);
+      return;
     }
-});
 
-const upload = multer({ storage });
+    async function fetchRound() {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}`
+        );
 
-function requireOrganiser(req, res, next) {
-    if (req.headers['x-user-role'] !== 'organiser') {
-        return res.status(403).json({ error: 'Organiser access required' });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch round");
+        }
+
+        setRound(data);
+        setError("");
+      } catch (error) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
     }
-    next();
+
+    fetchRound();
+
+    const interval = setInterval(fetchRound, 15000);
+
+    return () => clearInterval(interval);
+  }, [roundId]);
+
+  async function handleDownload() {
+    setDownloadError("");
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/papers`
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch paper");
+      }
+
+      window.location.href = `${process.env.NEXT_PUBLIC_API_URL}${data.fileUrl}`;
+    } catch (error) {
+      setDownloadError(error.message);
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="round-page">
+        <p>Loading round...</p>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="round-page">
+        <div className="message">{error}</div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="round-page">
+      <div className="round-header">
+        <h1>{round.name}</h1>
+
+        <span className={`status ${round.state}`}>{round.state}</span>
+      </div>
+
+      <div className="round-information">
+        <div>
+          <strong>Opening Time</strong>
+          <p>{new Date(round.openTime).toLocaleString()}</p>
+        </div>
+
+        <div>
+          <strong>Closing Time</strong>
+          <p>{new Date(round.closeTime).toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Round Details</h2>
+
+        <p className="description">
+          This round is currently {round.state}.
+        </p>
+
+        {round.state === "open" && (
+          <>
+            <button className="button" onClick={handleDownload}>
+              Download Paper
+            </button>
+            {downloadError && (
+              <p className="message">{downloadError}</p>
+            )}
+          </>
+        )}
+      </div>
+    </main>
+  );
 }
-
-// POST /rounds/:id/papers
-router.post(
-    '/rounds/:id/papers',
-    requireOrganiser,
-    upload.fields([{ name: 'paper', maxCount: 1 }, { name: 'memo', maxCount: 1 }]),
-    async(req, res) => {
-        const roundId = req.params.id;
-
-        if (!req.files || !req.files.paper || !req.files.memo) {
-            return res.status(400).json({ error: 'Both paper and memo files are required' });
-        }
-
-        const paperFile = req.files.paper[0];
-        const memoFile = req.files.memo[0];
-
-        let memoAnswers = null;
-        if (req.body.memoAnswers) {
-            try {
-                memoAnswers = JSON.parse(req.body.memoAnswers);
-            } catch (err) {
-                return res.status(400).json({ error: 'memoAnswers must be valid JSON' });
-            }
-        }
-
-        try {
-            const paper = await prisma.paper.create({
-                data: {
-                    roundId,
-                    fileUrl: `/uploads/papers/${paperFile.filename}`,
-                    memoUrl: `/uploads/papers/${memoFile.filename}`,
-                    memoAnswers
-                }
-            });
-            res.status(201).json(paper);
-        } catch (err) {
-            console.error(err);
-            res.status(500).json({ error: 'Could not save paper record' });
-        }
-    }
-);
-
-// GET /rounds/:id/papers
-router.get('/rounds/:id/papers', async(req, res) => {
-    const roundId = req.params.id;
-
-    const round = await prisma.round.findUnique({
-        where: { id: roundId },
-        include: { paper: true }
-    });
-
-    if (!round) {
-        return res.status(404).json({ error: 'Round not found' });
-    }
-
-    const downloadable = round.state === 'open' || round.state === 'released';
-
-    if (!downloadable) {
-        return res.status(403).json({
-            error: `Paper not available — round is currently '${round.state}'`
-        });
-    }
-
-    if (!round.paper) {
-        return res.status(404).json({ error: 'No paper uploaded for this round yet' });
-    }
-
-    res.status(200).json(round.paper);
-});
-
-module.exports = router;
