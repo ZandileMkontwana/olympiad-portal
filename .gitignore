@@ -1,0 +1,3 @@
+backend/.env
+# Local Netlify folder
+.netlify
