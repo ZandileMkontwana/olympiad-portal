@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
+const { sendSubmissionReceipt } = require('../lib/email');
 
 // POST /rounds/:id/submissions
 router.post('/rounds/:id/submissions', ...requireRole('educator'), async(req, res) => {
@@ -57,6 +58,19 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async(req, re
         }
 
         res.status(201).json({ submission, result });
+
+        const requester = await prisma.user.findUnique({ where: { id: req.user.userId } });
+        const entrant = await prisma.entrant.findUnique({ where: { id: entrantId } });
+
+        if (requester) {
+            sendSubmissionReceipt({
+                toEmail: requester.email,
+                entrantName: entrant ? entrant.name : 'Unknown entrant',
+                roundName: round.name,
+                submittedAt: submission.submittedAt
+            });
+        }
+
     } catch (err) {
         if (err.code === 'P2002' && err.meta && err.meta.target && err.meta.target.includes('idempotencyKey')) {
             const existing = await prisma.submission.findUnique({
