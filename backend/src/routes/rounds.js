@@ -32,7 +32,9 @@ router.post('/rounds', async (req, res) => {
   try {
     const { olympiadId, name, openTime, closeTime } = req.body;
     if (!olympiadId || !name || !openTime || !closeTime) {
-      return res.status(400).json({ error: 'olympiadId, name, openTime, and closeTime are required' });
+      return res
+        .status(400)
+        .json({ error: 'olympiadId, name, openTime, and closeTime are required' });
     }
     if (new Date(closeTime) <= new Date(openTime)) {
       return res.status(400).json({ error: 'closeTime must be after openTime' });
@@ -80,6 +82,41 @@ router.get('/olympiads/:id/rounds', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch rounds' });
+  }
+});
+
+router.get('/rounds/:id/entrants', async (req, res) => {
+  try {
+    const roundEntrants = await prisma.roundEntrant.findMany({
+      where: { roundId: req.params.id },
+      include: { entrant: true },
+    });
+    res.json(roundEntrants.map((re) => re.entrant));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch entrants for round' });
+  }
+});
+
+router.post('/rounds/:id/entrants', async (req, res) => {
+  try {
+    const { entrantId } = req.body;
+    if (!entrantId) {
+      return res.status(400).json({ error: 'entrantId is required' });
+    }
+    const roundEntrant = await prisma.roundEntrant.create({
+      data: {
+        roundId: req.params.id,
+        entrantId,
+      },
+    });
+    res.status(201).json(roundEntrant);
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'Entrant is already registered for this round' });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Failed to register entrant for round' });
   }
 });
 
