@@ -45,7 +45,7 @@ Used for storing paper and memo PDFs, kept separate from the database — Postgr
 Used for round reminders and submission receipts, satisfying the course's requirement to integrate with a relevant external API service.
 
 ## Version control
-**Gitea (self-hosted)**, with **Conventional Commits** and a **feature-branch + pull request** workflow, enforced via branch protection requiring review and (once configured) passing CI checks.
+**Gitea**, with **Conventional Commits** and a **feature-branch + pull request** workflow, enforced via branch protection requiring review and (once configured) passing CI checks.
 
 ## CI/CD
 **Gitea Actions** — see [Git Methodology](./git-methodology) for details on our merge and versioning process.
