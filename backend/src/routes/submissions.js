@@ -1,16 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
-
-function requireEducator(req, res, next) {
-    if (req.headers['x-user-role'] !== 'educator') {
-        return res.status(403).json({ error: 'Educator access required' });
-    }
-    next();
-}
+const { requireRole } = require('../middleware/auth');
 
 // POST /rounds/:id/submissions
-router.post('/rounds/:id/submissions', requireEducator, async(req, res) => {
+router.post('/rounds/:id/submissions', ...requireRole('educator'), async(req, res) => {
     const roundId = req.params.id;
     const { entrantId, answers, idempotencyKey } = req.body;
 
@@ -29,7 +23,7 @@ router.post('/rounds/:id/submissions', requireEducator, async(req, res) => {
 
     if (round.state !== 'open') {
         return res.status(403).json({
-            error: `Submissions not accepted — round is currently '${round.state}'`
+            error: `Submissions not accepted - round is currently '${round.state}'`
         });
     }
 
@@ -40,6 +34,7 @@ router.post('/rounds/:id/submissions', requireEducator, async(req, res) => {
 
         // Automark immediately if this round's paper has a memo answer key
         let result = null;
+
         if (round.paper && round.paper.memoAnswers) {
             const memo = round.paper.memoAnswers;
             const totalQuestions = Object.keys(memo).length;
