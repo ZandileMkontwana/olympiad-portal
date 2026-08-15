@@ -11,10 +11,12 @@ erDiagram
   OLYMPIAD ||--o{ ROUND : has
   ROUND ||--o| PAPER : uses
   ROUND ||--o{ SUBMISSION : receives
+  ROUND ||--o{ ROUNDENTRANT : has
   SCHOOL ||--o{ EDUCATOR : employs
   SCHOOL ||--o{ ENTRANT : registers
   USER ||--o| EDUCATOR : is
   ENTRANT ||--o{ SUBMISSION : makes
+  ENTRANT ||--o{ ROUNDENTRANT : has
   SUBMISSION ||--|| RESULT : produces
 
   OLYMPIAD {
@@ -73,6 +75,12 @@ erDiagram
     float score
     datetime releasedAt
   }
+  ROUNDENTRANT {
+    string id PK
+    string roundId FK
+    string entrantId FK
+    datetime registeredAt
+  }
 ```
 
 ## Tables
@@ -96,10 +104,13 @@ Links a `User` account to a `School`. Educators upload results on behalf of thei
 A competing student, registered against a school.
 
 ### Paper
-A round's uploaded test and memo. Download is gated by the round's current state — not accessible before `open`. `memoAnswers` stores the answer key as structured JSON (question number -> correct answer), separate from the memo PDF, since automarking needs data it can read programmatically.
+A round's uploaded test and memo. Download is gated by the round's current state — not accessible before `open`. `memoAnswers` stores the answer key as structured JSON (question number → correct answer), separate from the memo PDF, since automarking needs data it can read programmatically.
 
 ### Submission
 An educator's results for their entrants. `idempotencyKey` prevents the same submission being recorded twice on retry.
+
+### RoundEntrant
+Tracks which entrants are registered to sit a specific round — required since the brief specifies entrants are put forward and registered against individual rounds, not just against the olympiad generally. A unique constraint on `(roundId, entrantId)` prevents duplicate registration. This table is what powers the "Submit Results" flow — an educator's submission page lists only entrants registered for that round.
 
 ### Result
 The mark for a submission. `releasedAt` stays empty until the round closes, so scores aren't visible to schools early.
