@@ -30,6 +30,7 @@ model Round {
   state       String       @default("scheduled")
   paper       Paper?
   submissions Submission[]
+  roundEntrants RoundEntrant[]
 }
 
 model User {
@@ -65,6 +66,7 @@ model Entrant {
   name        String
   grade       String
   submissions Submission[]
+  roundEntrants RoundEntrant[]
 }
 
 model Paper {
@@ -95,4 +97,15 @@ model Result {
   submissionId String    @unique
   score        Float
   releasedAt   DateTime?
+}
+
+model RoundEntrant {
+  id           String   @id @default(uuid())
+  round        Round    @relation(fields: [roundId], references: [id])
+  roundId      String
+  entrant      Entrant  @relation(fields: [entrantId], references: [id])
+  entrantId    String
+  registeredAt DateTime @default(now())
+
+  @@unique([roundId, entrantId])
 }

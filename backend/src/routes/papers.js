@@ -14,7 +14,7 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => {
         const unique = `${Date.now()}-${file.originalname}`;
         cb(null, unique);
-    }
+    },
 });
 
 const upload = multer({ storage });
@@ -23,7 +23,10 @@ const upload = multer({ storage });
 router.post(
     '/rounds/:id/papers',
     ...requireRole('organiser'),
-    upload.fields([{ name: 'paper', maxCount: 1 }, { name: 'memo', maxCount: 1 }]),
+    upload.fields([
+        { name: 'paper', maxCount: 1 },
+        { name: 'memo', maxCount: 1 },
+    ]),
     async(req, res) => {
         const roundId = req.params.id;
 
@@ -39,6 +42,7 @@ router.post(
             try {
                 memoAnswers = JSON.parse(req.body.memoAnswers);
             } catch (err) {
+                console.error('Invalid memoAnswers JSON:', err.message);
                 return res.status(400).json({ error: 'memoAnswers must be valid JSON' });
             }
         }
@@ -49,8 +53,8 @@ router.post(
                     roundId,
                     fileUrl: `/uploads/papers/${paperFile.filename}`,
                     memoUrl: `/uploads/papers/${memoFile.filename}`,
-                    memoAnswers
-                }
+                    memoAnswers,
+                },
             });
             res.status(201).json(paper);
         } catch (err) {
@@ -66,7 +70,7 @@ router.get('/rounds/:id/papers', async(req, res) => {
 
     const round = await prisma.round.findUnique({
         where: { id: roundId },
-        include: { paper: true }
+        include: { paper: true },
     });
 
     if (!round) {
@@ -77,7 +81,7 @@ router.get('/rounds/:id/papers', async(req, res) => {
 
     if (!downloadable) {
         return res.status(403).json({
-            error: `Paper not available — round is currently '${round.state}'`
+            error: `Paper not available — round is currently '${round.state}'`,
         });
     }
 

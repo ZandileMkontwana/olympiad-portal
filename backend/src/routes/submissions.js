@@ -32,7 +32,9 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async(req, re
             data: { roundId, entrantId, answers, idempotencyKey }
         });
 
+        // Automark immediately if this round's paper has a memo answer key
         let result = null;
+
         if (round.paper && round.paper.memoAnswers) {
             const memo = round.paper.memoAnswers;
             const totalQuestions = Object.keys(memo).length;
