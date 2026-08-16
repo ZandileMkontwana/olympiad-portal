@@ -16,6 +16,7 @@ model Olympiad {
 }
 
 model Round {
+<<<<<<< HEAD
   id           String         @id @default(uuid())
   olympiadId   String
   name         String
@@ -26,6 +27,18 @@ model Round {
   olympiad     Olympiad       @relation(fields: [olympiadId], references: [id])
   RoundEntrant RoundEntrant[]
   submissions  Submission[]
+=======
+  id          String       @id @default(uuid())
+  olympiad    Olympiad     @relation(fields: [olympiadId], references: [id])
+  olympiadId  String
+  name        String
+  openTime    DateTime
+  closeTime   DateTime
+  state       String       @default("scheduled")
+  paper       Paper?
+  submissions Submission[]
+  roundEntrants RoundEntrant[]
+>>>>>>> 137dbaecdb6a960d1c44ef9fa95f798836261d6d
 }
 
 model User {
@@ -55,6 +68,7 @@ model Educator {
 }
 
 model Entrant {
+<<<<<<< HEAD
   id           String         @id @default(uuid())
   schoolId     String
   name         String
@@ -62,6 +76,15 @@ model Entrant {
   school       School         @relation(fields: [schoolId], references: [id])
   RoundEntrant RoundEntrant[]
   submissions  Submission[]
+=======
+  id          String       @id @default(uuid())
+  school      School       @relation(fields: [schoolId], references: [id])
+  schoolId    String
+  name        String
+  grade       String
+  submissions Submission[]
+  roundEntrants RoundEntrant[]
+>>>>>>> 137dbaecdb6a960d1c44ef9fa95f798836261d6d
 }
 
 model Paper {
@@ -101,6 +124,17 @@ model RoundEntrant {
   registeredAt DateTime @default(now())
   Entrant      Entrant  @relation(fields: [entrantId], references: [id])
   Round        Round    @relation(fields: [roundId], references: [id])
+
+  @@unique([roundId, entrantId])
+}
+
+model RoundEntrant {
+  id           String   @id @default(uuid())
+  round        Round    @relation(fields: [roundId], references: [id])
+  roundId      String
+  entrant      Entrant  @relation(fields: [entrantId], references: [id])
+  entrantId    String
+  registeredAt DateTime @default(now())
 
   @@unique([roundId, entrantId])
 }

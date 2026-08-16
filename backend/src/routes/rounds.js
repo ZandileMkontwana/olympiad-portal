@@ -32,7 +32,9 @@ router.post('/rounds', async (req, res) => {
   try {
     const { olympiadId, name, openTime, closeTime } = req.body;
     if (!olympiadId || !name || !openTime || !closeTime) {
-      return res.status(400).json({ error: 'olympiadId, name, openTime, and closeTime are required' });
+      return res
+        .status(400)
+        .json({ error: 'olympiadId, name, openTime, and closeTime are required' });
     }
     if (new Date(closeTime) <= new Date(openTime)) {
       return res.status(400).json({ error: 'closeTime must be after openTime' });
