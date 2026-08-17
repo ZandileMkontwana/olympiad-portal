@@ -16,18 +16,6 @@ model Olympiad {
 }
 
 model Round {
-<<<<<<< HEAD
-  id           String         @id @default(uuid())
-  olympiadId   String
-  name         String
-  openTime     DateTime
-  closeTime    DateTime
-  state        String         @default("scheduled")
-  paper        Paper?
-  olympiad     Olympiad       @relation(fields: [olympiadId], references: [id])
-  RoundEntrant RoundEntrant[]
-  submissions  Submission[]
-=======
   id          String       @id @default(uuid())
   olympiad    Olympiad     @relation(fields: [olympiadId], references: [id])
   olympiadId  String
@@ -38,7 +26,6 @@ model Round {
   paper       Paper?
   submissions Submission[]
   roundEntrants RoundEntrant[]
->>>>>>> 137dbaecdb6a960d1c44ef9fa95f798836261d6d
 }
 
 model User {
@@ -68,15 +55,6 @@ model Educator {
 }
 
 model Entrant {
-<<<<<<< HEAD
-  id           String         @id @default(uuid())
-  schoolId     String
-  name         String
-  grade        String
-  school       School         @relation(fields: [schoolId], references: [id])
-  RoundEntrant RoundEntrant[]
-  submissions  Submission[]
-=======
   id          String       @id @default(uuid())
   school      School       @relation(fields: [schoolId], references: [id])
   schoolId    String
@@ -84,7 +62,6 @@ model Entrant {
   grade       String
   submissions Submission[]
   roundEntrants RoundEntrant[]
->>>>>>> 137dbaecdb6a960d1c44ef9fa95f798836261d6d
 }
 
 model Paper {
