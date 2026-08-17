@@ -100,6 +100,16 @@ export function listOlympiadRounds(olympiadId) {
 }
 
 /**
+ * Lists all rounds, across all olympiads.
+ * Wired to GET /api/rounds (backend/src/routes/rounds.js).
+ *
+ * @returns {Promise<import('../../../shared/types').Round[]>}
+ */
+export function listRounds() {
+  return requestJson('/api/rounds');
+}
+
+/**
  * Uploads a paper (and optional memo) for a round.
  * Wired to POST /api/rounds/:id/papers (backend/src/routes/papers.js).
  *
@@ -142,4 +152,6 @@ export async function uploadPaper(roundId, { paperFile, memoFile }) {
   }
 
   return data;
+
+  
 }

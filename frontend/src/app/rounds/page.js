@@ -1,44 +1,33 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { listRounds, ApiError} from '@/lib/api';
 
-// Temporary mock data — swap this for a real GET /rounds call once
-// Zandile's endpoint exists. Everything below this line stays the same.
-const MOCK_ROUNDS = [
-  {
-    id: 'mock-1',
-    name: 'Round 1 — Qualifying',
-    state: 'open',
-    openTime: '2026-08-10T09:00:00.000Z',
-    closeTime: '2026-08-20T17:00:00.000Z',
-  },
-  {
-    id: 'mock-2',
-    name: 'Round 2 — Final',
-    state: 'scheduled',
-    openTime: '2026-09-01T09:00:00.000Z',
-    closeTime: '2026-09-10T17:00:00.000Z',
-  },
-];
+
 
 export default function RoundsDashboardPage() {
   const [status, setStatus] = useState('loading');
   const [rounds, setRounds] = useState([]);
 
   useEffect(() => {
-    // setTimeout here just simulates a real network delay, so you can
-    // actually see the loading state before data appears.
-    const timer = setTimeout(() => {
-      if (MOCK_ROUNDS.length === 0) {
-        setStatus('empty');
-      } else {
-        setRounds(MOCK_ROUNDS);
-        setStatus('ready');
+    async function fetchRounds() {
+      try {
+        const data = await listRounds();
+        if (data.length === 0) {
+          setStatus('empty');
+        } else {
+          setRounds(data);
+          setStatus('ready');
+        }
+      } catch (err) {
+        setStatus('error');
       }
-    }, 800);
+    }
 
-    return () => clearTimeout(timer);
+    fetchRounds();
   }, []);
+
+
 
   return (
     <main className="mx-auto max-w-3xl px-8 py-12">
