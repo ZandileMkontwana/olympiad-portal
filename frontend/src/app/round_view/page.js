@@ -2,6 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+
+function formatRemaining(ms) {
+  if (ms <= 0) return "closing any moment";
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
 
 export default function RoundView() {
   const searchParams = useSearchParams();
@@ -11,6 +24,7 @@ export default function RoundView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [downloadError, setDownloadError] = useState("");
+  const [timeRemaining, setTimeRemaining] = useState("");
 
   useEffect(() => {
     if (!roundId) {
@@ -46,6 +60,20 @@ export default function RoundView() {
 
     return () => clearInterval(interval);
   }, [roundId]);
+
+  // Live countdown to closeTime, ticking every second independent of the 15s poll
+  useEffect(() => {
+    if (!round?.closeTime) return;
+
+    function tick() {
+      const remainingMs = new Date(round.closeTime).getTime() - Date.now();
+      setTimeRemaining(formatRemaining(remainingMs));
+    }
+
+    tick();
+    const countdownInterval = setInterval(tick, 1000);
+    return () => clearInterval(countdownInterval);
+  }, [round?.closeTime]);
 
   async function handleDownload() {
     setDownloadError("");
@@ -116,8 +144,17 @@ export default function RoundView() {
             {downloadError && (
               <p className="message">{downloadError}</p>
             )}
+
+            <p className="description">
+              Submissions are open. Closes in {timeRemaining}.
+            </p>
+
+            <Link href={`/rounds/${roundId}/submit`} className="button">
+              Submit Results
+            </Link>
           </>
         )}
+
       </div>
     </main>
   );
