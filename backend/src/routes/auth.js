@@ -100,6 +100,11 @@ router.post('/auth/reset-password', requireAuth, async(req, res) => {
     res.status(200).json({ message: 'Password updated successfully' });
 });
 
+//POST /auth/logout
+router.post('/auth/logout', requireAuth, async(req, res) => {
+    res.status(200).json({ message: 'Logged out successfully' });
+})
+
 // DELETE /auth/account
 router.delete('/auth/account', requireAuth, async(req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
