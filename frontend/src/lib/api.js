@@ -11,11 +11,15 @@ export class ApiError extends Error {
   }
 }
 
-// TODO: replace with a real auth token once real auth exists.
-// The backend currently only checks this placeholder header — see
-// backend/src/routes/papers.js -> requireOrganiser() and rounds.js.
+// TODO(auth): there is no sign-in flow in the frontend yet, so this will
+// always return no token until one exists. Once a sign-in page is built,
+// have it store the JWT from POST /api/auth/signin here (localStorage key
+// 'authToken', or wherever the sign-in page ends up putting it — update
+// both places together).
 function authHeaders() {
-  return { 'x-user-role': 'organiser' };
+  if (typeof window === 'undefined') return {};
+  const token = window.localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 /**

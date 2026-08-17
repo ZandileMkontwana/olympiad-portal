@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { requireRole } = require('../middleware/auth');
 
 const UPLOAD_DIR = path.join(__dirname, '../../uploads/papers');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -13,23 +14,19 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => {
         const unique = `${Date.now()}-${file.originalname}`;
         cb(null, unique);
-    }
+    },
 });
 
 const upload = multer({ storage });
 
-function requireOrganiser(req, res, next) {
-    if (req.headers['x-user-role'] !== 'organiser') {
-        return res.status(403).json({ error: 'Organiser access required' });
-    }
-    next();
-}
-
 // POST /rounds/:id/papers
 router.post(
     '/rounds/:id/papers',
-    requireOrganiser,
-    upload.fields([{ name: 'paper', maxCount: 1 }, { name: 'memo', maxCount: 1 }]),
+    ...requireRole('organiser'),
+    upload.fields([
+        { name: 'paper', maxCount: 1 },
+        { name: 'memo', maxCount: 1 },
+    ]),
     async(req, res) => {
         const roundId = req.params.id;
 
@@ -40,13 +37,24 @@ router.post(
         const paperFile = req.files.paper[0];
         const memoFile = req.files.memo[0];
 
+        let memoAnswers = null;
+        if (req.body.memoAnswers) {
+            try {
+                memoAnswers = JSON.parse(req.body.memoAnswers);
+            } catch (err) {
+                console.error('Invalid memoAnswers JSON:', err.message);
+                return res.status(400).json({ error: 'memoAnswers must be valid JSON' });
+            }
+        }
+
         try {
             const paper = await prisma.paper.create({
                 data: {
                     roundId,
                     fileUrl: `/uploads/papers/${paperFile.filename}`,
-                    memoUrl: `/uploads/papers/${memoFile.filename}`
-                }
+                    memoUrl: `/uploads/papers/${memoFile.filename}`,
+                    memoAnswers,
+                },
             });
             res.status(201).json(paper);
         } catch (err) {
@@ -62,7 +70,7 @@ router.get('/rounds/:id/papers', async(req, res) => {
 
     const round = await prisma.round.findUnique({
         where: { id: roundId },
-        include: { paper: true }
+        include: { paper: true },
     });
 
     if (!round) {
@@ -73,7 +81,7 @@ router.get('/rounds/:id/papers', async(req, res) => {
 
     if (!downloadable) {
         return res.status(403).json({
-            error: `Paper not available — round is currently '${round.state}'`
+            error: `Paper not available — round is currently '${round.state}'`,
         });
     }
 

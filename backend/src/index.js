@@ -7,6 +7,7 @@ const papersRouter = require('./routes/papers');
 const roundsRouter = require('./routes/rounds');
 const submissionsRouter = require('./routes/submissions');
 const { startScheduler } = require('./scheduler');
+const authRouter = require('./routes/auth');
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api', papersRouter);
 app.use('/api', roundsRouter);
 app.use('/api', submissionsRouter);
+app.use('/api', authRouter);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
