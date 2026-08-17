@@ -1,4 +1,11 @@
 /**
+ * @typedef {Object} Olympiad
+ * @property {string} id
+ * @property {string} name
+ * @property {string} timezone
+ */
+
+/**
  * @typedef {Object} Round
  * @property {string} id
  * @property {string} olympiadId
