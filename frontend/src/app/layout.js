@@ -1,5 +1,7 @@
 import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import Link from "next/link";
+import SiteHeader from "@/components/SiteHeader";
 
 // Display face — headings only, used with restraint.
 const fraunces = Fraunces({
@@ -33,7 +35,10 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SiteHeader /> 
+  {children}
+</body>
     </html>
   );
 }

@@ -1,6 +1,4 @@
 // Shared API client for the organiser console.
-// Centralised here so #23 (round/olympiad form) and #24 (dashboard) can reuse
-// the same base URL, error handling, and auth header pattern as this ticket.
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
@@ -13,11 +11,102 @@ export class ApiError extends Error {
   }
 }
 
-// TODO: replace with a real auth token once real auth exists.
-// The backend currently only checks this placeholder header — see
-// backend/src/routes/papers.js -> requireOrganiser().
+// TODO(auth): there is no sign-in flow in the frontend yet, so this will
+// always return no token until one exists. Once a sign-in page is built,
+// have it store the JWT from POST /api/auth/signin here (localStorage key
+// 'authToken', or wherever the sign-in page ends up putting it — update
+// both places together).
 function authHeaders() {
-  return { 'x-user-role': 'organiser' };
+  if (typeof window === 'undefined') return {};
+  const token = window.localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Shared JSON request helper — handles network failures, non-JSON error
+ * bodies, and non-2xx responses the same way everywhere they're called.
+ */
+async function requestJson(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+        ...options.headers,
+      },
+    });
+  } catch (networkError) {
+    throw new ApiError(
+      'Could not reach the server. Is the backend running on :5000?',
+      0
+    );
+  }
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    // Response wasn't JSON — fall through to response.ok check below.
+  }
+
+  if (!response.ok) {
+    const message =
+      (data && data.error) || `Request failed with status ${response.status}`;
+    throw new ApiError(message, response.status);
+  }
+
+  return data;
+}
+
+/**
+ * Creates an olympiad.
+ * Wired to POST /api/olympiads (backend/src/routes/rounds.js).
+ *
+ * @param {{ name: string, timezone: string }} input
+ * @returns {Promise<import('../../../shared/types').Olympiad>}
+ */
+export function createOlympiad({ name, timezone }) {
+  return requestJson('/api/olympiads', {
+    method: 'POST',
+    body: JSON.stringify({ name, timezone }),
+  });
+}
+
+/**
+ * Creates a round under an olympiad.
+ * Wired to POST /api/rounds (backend/src/routes/rounds.js).
+ *
+ * @param {{ olympiadId: string, name: string, openTime: string, closeTime: string }} input
+ * @returns {Promise<import('../../../shared/types').Round>}
+ */
+export function createRound({ olympiadId, name, openTime, closeTime }) {
+  return requestJson('/api/rounds', {
+    method: 'POST',
+    body: JSON.stringify({ olympiadId, name, openTime, closeTime }),
+  });
+}
+
+/**
+ * Lists rounds for a single olympiad.
+ * Wired to GET /api/olympiads/:id/rounds (backend/src/routes/rounds.js).
+ *
+ * @param {string} olympiadId
+ * @returns {Promise<import('../../../shared/types').Round[]>}
+ */
+export function listOlympiadRounds(olympiadId) {
+  return requestJson(`/api/olympiads/${olympiadId}/rounds`);
+}
+
+/**
+ * Lists all rounds, across all olympiads.
+ * Wired to GET /api/rounds (backend/src/routes/rounds.js).
+ *
+ * @returns {Promise<import('../../../shared/types').Round[]>}
+ */
+export function listRounds() {
+  return requestJson('/api/rounds');
 }
 
 /**
@@ -43,7 +132,6 @@ export async function uploadPaper(roundId, { paperFile, memoFile }) {
       body: formData,
     });
   } catch (networkError) {
-    // fetch() itself throws on network failure (server down, CORS, offline)
     throw new ApiError(
       'Could not reach the server. Is the backend running on :5000?',
       0
@@ -54,8 +142,7 @@ export async function uploadPaper(roundId, { paperFile, memoFile }) {
   try {
     data = await response.json();
   } catch {
-    // Response wasn't JSON (e.g. a 500 HTML error page) — fall through,
-    // we'll still report response.ok / response.status below.
+    // Response wasn't JSON — fall through to response.ok check below.
   }
 
   if (!response.ok) {
@@ -65,4 +152,34 @@ export async function uploadPaper(roundId, { paperFile, memoFile }) {
   }
 
   return data;
+
+}
+
+/**
+ * Registers a new educator account. Role is fixed server-side — the
+ * client never sends or chooses it.
+ * Wired to POST /api/auth/register (backend/src/routes/auth.js).
+ *
+ * @param {{ email: string, password: string }} input
+ * @returns {Promise<{ user: { id: string, email: string, role: string }, token: string }>}
+ */
+export function register({ email, password }) {
+  return requestJson('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+/**
+ * Logs in an existing user.
+ * Wired to POST /api/auth/login (backend/src/routes/auth.js).
+ *
+ * @param {{ email: string, password: string }} input
+ * @returns {Promise<{ user: { id: string, email: string, role: string }, token: string }>}
+ */
+export function login({ email, password }) {
+  return requestJson('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
 }
