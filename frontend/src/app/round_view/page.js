@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 
 function formatRemaining(ms) {
   if (ms <= 0) return "closing any moment";
@@ -16,7 +17,7 @@ function formatRemaining(ms) {
   return `${seconds}s`;
 }
 
-export default function RoundView() {
+function RoundViewContent() {
   const searchParams = useSearchParams();
   const roundId = searchParams.get("id");
 
@@ -158,4 +159,15 @@ export default function RoundView() {
       </div>
     </main>
   );
+}
+export default function RoundView() {
+   return ( 
+    <Suspense
+       fallback={ 
+        <main className="round-page"> 
+          <p>Loading round...</p> 
+        </main> } > 
+            <RoundViewContent /> 
+    </Suspense> 
+  ); 
 }

@@ -6,3 +6,4 @@ backend/generated/
 # Local Netlify folder
 .netlify
 package.json
+.vercel
