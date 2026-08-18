@@ -174,3 +174,282 @@ body {
   border-width: 0 42px 42px 0;
   border-color: transparent var(--color-gold) transparent transparent;
 }
+
+.seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  border: 1.5px solid var(--color-gold);
+  color: var(--color-gold);
+}
+
+.seal-mark {
+  font-family: var(--font-plex-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+}
+
+.nav-link {
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.nav-link:hover {
+  color: var(--color-lavender-deep);
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  background: var(--color-gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease;
+}
+
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+
+.texture {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--color-ink) 0,
+    var(--color-ink) 1px,
+    transparent 1px,
+    transparent 32px
+  );
+  opacity: 0.03;
+}
+
+.stamp-in {
+  animation: stamp-in 0.35s ease-out both;
+}
+
+.fade-in-delayed {
+  animation: fade-in 0.4s ease-out both;
+  animation-delay: 0.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp-in,
+  .fade-in-delayed {
+    animation: none;
+  }
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.seal-lg {
+  width: 5rem;
+  height: 5rem;
+}
+
+.scroll-cue {
+  margin-top: 3.5rem;
+  width: 1px;
+  height: 2.5rem;
+  background: linear-gradient(to bottom, var(--color-lavender), transparent);
+}
+
+.step-card {
+  transition: border-color 0.2s ease;
+  border-top: 1px solid transparent;
+  margin-top: -1px;
+  padding-top: 1px;
+}
+
+.step-card:hover {
+  border-top-color: var(--color-gold);
+}
+
+                        
+
+.seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1.5px solid var(--color-gold);
+  color: var(--color-gold);
+}
+
+.seal-lg {
+  width: 5rem;
+  height: 5rem;
+}
+
+.seal-mark {
+  font-family: var(--font-plex-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+}
+
+.nav-link {
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.nav-link:hover {
+  color: var(--color-lavender-deep);
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  background: var(--color-gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease;
+}
+
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+
+
+.scroll-cue {
+  margin-top: 3.5rem;
+  width: 1px;
+  height: 2.5rem;
+  background: linear-gradient(to bottom, var(--color-lavender), transparent);
+}
+
+.step-card {
+  transition: border-color 0.2s ease;
+  border-top: 1px solid transparent;
+  margin-top: -1px;
+  padding-top: 1px;
+}
+
+.step-card:hover {
+  border-top-color: var(--color-gold);
+}
+
+
+.cta-band {
+  position: relative;
+  background: var(--color-lavender-deep);
+}
+
+.cta-fade {
+  position: absolute;
+  top: -6rem;
+  left: 0;
+  right: 0;
+  height: 6rem;
+  background: linear-gradient(to bottom, var(--color-paper), var(--color-lavender-deep));
+  pointer-events: none;
+}
+
+.stamp-in {
+  animation: stamp-in 0.35s ease-out both;
+}
+
+.fade-in-delayed {
+  animation: fade-in 0.4s ease-out both;
+  animation-delay: 0.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp-in,
+  .fade-in-delayed {
+    animation: none;
+  }
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nav-link-light {
+  position: relative;
+  transition: opacity 0.2s ease;
+}
+
+.nav-link-light:hover {
+  opacity: 0.8;
+}
+
+.nav-link-light::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1px;
+  background: var(--color-gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease;
+}
+
+.nav-link-light:hover::after {
+  transform: scaleX(1);
+}
+
+.nav-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3rem;
+  height: 3rem;
+  background: linear-gradient(to bottom, var(--color-lavender-deep), transparent);
+  pointer-events: none;
+}
+
+.watermark {
+  opacity: 0.05;
+}
