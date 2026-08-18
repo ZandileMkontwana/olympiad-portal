@@ -1,7 +1,10 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
-import { login, ApiError } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { login, ApiError, dashboardPathForRole } from '@/lib/api';
+import { useRedirectIfAuthenticated } from '@/hooks/useAuthRedirect';
+
 
 function validateForm(email, password) {
   const errors = {};
@@ -11,12 +14,14 @@ function validateForm(email, password) {
 }
 
 export default function LoginPage() {
+  const router = useRouter();
+  const checking = useRedirectIfAuthenticated();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [status, setStatus] = useState('idle'); // idle | submitting | success | error
   const [errorMessage, setErrorMessage] = useState('');
-  const [loggedInUser, setLoggedInUser] = useState(null);
+  //const [loggedInUser, setLoggedInUser] = useState(null);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -27,11 +32,9 @@ export default function LoginPage() {
     if (Object.keys(errors).length > 0) return;
 
     setStatus('submitting');
-    try {
+     try {
       const result = await login({ email: email.trim(), password });
-      window.localStorage.setItem('authToken', result.token);
-      setLoggedInUser(result.user);
-      setStatus('success');
+      router.push(dashboardPathForRole(result.user.role));
     } catch (err) {
       setStatus('error');
       setErrorMessage(
@@ -39,26 +42,9 @@ export default function LoginPage() {
       );
     }
   }
-
-  if (status === 'success' && loggedInUser) {
-    return (
-      <main className="mx-auto max-w-md px-8 py-24 text-center">
-        <div role="status" className="rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm">
-          <div className="flex items-center justify-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
-            <h1 className="font-display text-xl font-semibold text-ink">
-              Logged in
-            </h1>
-          </div>
-          <p className="mt-2 text-sm text-ink-soft">
-            Signed in as <span className="text-ink">{loggedInUser.email}</span>{' '}
-            (<span className="capitalize">{loggedInUser.role}</span>)
-          </p>
-        </div>
-      </main>
-    );
-  }
-
+if (checking) {
+  return <main className="mx-auto max-w-md px-8 py-24 text-center">Loading...</main>;
+}
   return (
     <main className="mx-auto max-w-md px-8 py-24">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">

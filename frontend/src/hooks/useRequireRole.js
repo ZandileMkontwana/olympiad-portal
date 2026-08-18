@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchCurrentUser, dashboardPathForRole } from "@/lib/auth";
+import { fetchCurrentUser, dashboardPathForRole } from "@/lib/api";
 
-// Blocks access unless logged in AND with the exact required role.
 export function useRequireRole(requiredRole) {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -17,13 +16,11 @@ export function useRequireRole(requiredRole) {
       if (cancelled) return;
 
       if (!fetchedUser) {
-        // Not logged in at all — no bypassing this by typing the URL directly.
         router.replace("/login");
         return;
       }
 
       if (fetchedUser.role !== requiredRole) {
-        // Logged in, but wrong role — send them to where they actually belong.
         router.replace(dashboardPathForRole(fetchedUser.role));
         return;
       }
