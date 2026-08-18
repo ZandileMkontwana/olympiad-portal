@@ -1,3 +1,5 @@
+const path = require('path');
+
 module.exports = {
   'backend/**/*.js': (filenames) => {
     const files = filenames.map((f) => `"${f}"`).join(' ');
@@ -7,10 +9,13 @@ module.exports = {
     ];
   },
   'frontend/**/*.js': (filenames) => {
-    const files = filenames.map((f) => `"${f}"`).join(' ');
+    const relativeFiles = filenames
+      .map((f) => path.relative(path.resolve(__dirname, 'frontend'), f))
+      .map((f) => `"${f}"`)
+      .join(' ');
     return [
-      `npx eslint --config frontend/eslint.config.mjs --fix ${files}`,
-      `npx prettier --config frontend/.prettierrc --write ${files}`,
+      `cd frontend && npx eslint --fix ${relativeFiles}`,
+      `cd frontend && npx prettier --config .prettierrc --write ${relativeFiles}`,
     ];
   },
 };
