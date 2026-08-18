@@ -8,16 +8,13 @@ const { requireAuth } = require('../middleware/auth');
 const JWT_SECRET = process.env.JWT_SECRET;
 const SALT_ROUNDS = 10;
 
-//POST/auth/signup
-router.post('/auth/signup', async(req, res) => {
-    const { email, password, role } = req.body;
+//POST/auth/register
+router.post('/auth/register', async(req, res) => {
+    const { email, password } = req.body;
+    const role = 'educator';
 
     if (!email || !password || !role) {
         return res.status(400).json({ error: 'email, password , and role are required' });
-    }
-
-    if (!['organiser', 'educator', 'student'].includes(role)) {
-        return res.status(400).json({ error: 'role must be organiser, educator, student' });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -43,8 +40,8 @@ router.post('/auth/signup', async(req, res) => {
 });
 
 
-//POST/auth/signin
-router.post('/auth/signin', async(req, res) => {
+//POST/auth/login
+router.post('/auth/login', async(req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -102,6 +99,11 @@ router.post('/auth/reset-password', requireAuth, async(req, res) => {
 
     res.status(200).json({ message: 'Password updated successfully' });
 });
+
+//POST /auth/logout
+router.post('/auth/logout', requireAuth, async(req, res) => {
+    res.status(200).json({ message: 'Logged out successfully' });
+})
 
 // DELETE /auth/account
 router.delete('/auth/account', requireAuth, async(req, res) => {

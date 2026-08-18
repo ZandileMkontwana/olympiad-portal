@@ -100,6 +100,19 @@ export function listOlympiadRounds(olympiadId) {
 }
 
 /**
+<<<<<<< HEAD
+=======
+ * Lists all rounds, across all olympiads.
+ * Wired to GET /api/rounds (backend/src/routes/rounds.js).
+ *
+ * @returns {Promise<import('../../../shared/types').Round[]>}
+ */
+export function listRounds() {
+  return requestJson('/api/rounds');
+}
+
+/**
+>>>>>>> origin/main
  * Uploads a paper (and optional memo) for a round.
  * Wired to POST /api/rounds/:id/papers (backend/src/routes/papers.js).
  *
@@ -142,4 +155,37 @@ export async function uploadPaper(roundId, { paperFile, memoFile }) {
   }
 
   return data;
+<<<<<<< HEAD
+=======
+
+}
+
+/**
+ * Registers a new educator account. Role is fixed server-side — the
+ * client never sends or chooses it.
+ * Wired to POST /api/auth/register (backend/src/routes/auth.js).
+ *
+ * @param {{ email: string, password: string }} input
+ * @returns {Promise<{ user: { id: string, email: string, role: string }, token: string }>}
+ */
+export function register({ email, password }) {
+  return requestJson('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+/**
+ * Logs in an existing user.
+ * Wired to POST /api/auth/login (backend/src/routes/auth.js).
+ *
+ * @param {{ email: string, password: string }} input
+ * @returns {Promise<{ user: { id: string, email: string, role: string }, token: string }>}
+ */
+export function login({ email, password }) {
+  return requestJson('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+>>>>>>> origin/main
 }
