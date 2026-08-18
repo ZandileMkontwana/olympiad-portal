@@ -100,8 +100,6 @@ export function listOlympiadRounds(olympiadId) {
 }
 
 /**
-<<<<<<< HEAD
-=======
  * Lists all rounds, across all olympiads.
  * Wired to GET /api/rounds (backend/src/routes/rounds.js).
  *
@@ -112,7 +110,6 @@ export function listRounds() {
 }
 
 /**
->>>>>>> origin/main
  * Uploads a paper (and optional memo) for a round.
  * Wired to POST /api/rounds/:id/papers (backend/src/routes/papers.js).
  *
@@ -155,8 +152,6 @@ export async function uploadPaper(roundId, { paperFile, memoFile }) {
   }
 
   return data;
-<<<<<<< HEAD
-=======
 
 }
 
@@ -187,5 +182,4 @@ export function login({ email, password }) {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
->>>>>>> origin/main
 }
