@@ -20,6 +20,17 @@ function validateForm(email, password) {
   return errors;
 }
 
+function Watermark() {
+  return (
+    <img
+      src="/tree-mark.png"
+      alt=""
+      aria-hidden="true"
+      className="watermark pointer-events-none absolute left-1/2 top-1/2 w-[700px] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
+    />
+  );
+}
+
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,8 +64,9 @@ export default function RegisterPage() {
 
   if (status === 'success') {
     return (
-      <main className="mx-auto max-w-md px-8 py-24 text-center">
-        <div role="status" className="rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm">
+      <main className="relative mx-auto max-w-md px-8 py-24 text-center overflow-hidden">
+        <Watermark />
+        <div role="status" className="relative rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm">
           <div className="flex items-center justify-center gap-2">
             <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
             <h1 className="font-display text-xl font-semibold text-ink">
@@ -70,13 +82,14 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md px-8 py-24">
-      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
+    <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
+      <Watermark />
+      <h1 className="relative font-display text-2xl font-semibold tracking-tight text-ink text-center">
         Create an account
       </h1>
-      <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+      <div className="relative mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
 
-      <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
+      <form onSubmit={handleSubmit} noValidate className="relative mt-8 space-y-5">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-ink">
             Email <span className="text-gold">*</span>
