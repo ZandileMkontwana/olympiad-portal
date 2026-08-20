@@ -70,7 +70,16 @@ export function listOlympiadRounds(olympiadId) {
 export function listRounds() {
   return requestJson('/api/rounds');
 }
-
+/**
+ * Fetches a single round by id.
+ * Wired to GET /api/rounds/:id (backend/src/routes/rounds.js).
+ *
+ * @param {string} roundId
+ * @returns {Promise<import('../../../shared/types').Round>}
+ */
+export function getRound(roundId) {
+  return requestJson(`/api/rounds/${roundId}`);
+}
 export async function uploadPaper(roundId, { paperFile, memoFile }) {
   const formData = new FormData();
   formData.append('paper', paperFile);

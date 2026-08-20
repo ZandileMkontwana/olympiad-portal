@@ -1,95 +1,93 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { listRounds, ApiError} from '@/lib/api';
+//THIS IS THE ORGANISER'S PAGE
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useRequireRole } from "@/hooks/useRequireRole";
+import { logout, listRounds, ApiError } from "@/lib/api";
 
+export default function OrganiserDashboard() {
+  const { user, checking } = useRequireRole("organiser");
+  const router = useRouter();
 
-export default function RoundsDashboardPage() {
-  const [status, setStatus] = useState('loading');
   const [rounds, setRounds] = useState([]);
+  const [roundsStatus, setRoundsStatus] = useState("loading");
 
   useEffect(() => {
+    if (checking) return;
+
     async function fetchRounds() {
       try {
         const data = await listRounds();
-        if (data.length === 0) {
-          setStatus('empty');
-        } else {
-          setRounds(data);
-          setStatus('ready');
-        }
+        setRounds(data);
+        setRoundsStatus(data.length === 0 ? "empty" : "ready");
       } catch (err) {
-        setStatus('error');
+        setRoundsStatus("error");
       }
     }
 
     fetchRounds();
-  }, []);
+  }, [checking]);
 
+  if (checking) {
+    return <main className="round-page"><p>Loading...</p></main>;
+  }
 
+  async function handleLogout() {
+    await logout();
+    router.push("/login");
+  }
 
   return (
-    <main className="mx-auto max-w-3xl px-8 py-12">
-      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
-        Rounds
-      </h1>
-      <div className="mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+    <main className="round-page">
+      <h1>Organiser Console</h1>
+      <p className="description">
+        Logged in as <strong>{user.email}</strong> ({user.role})
+      </p>
 
-      {status === 'loading' && (
-        <p className="mt-8 text-sm text-ink-soft">Loading rounds…</p>
+      <div className="card" style={{ display: "flex", gap: "12px" }}>
+        <Link href="/rounds/new" className="button">
+          Create Round
+        </Link>
+        <button onClick={handleLogout} className="button">
+          Log out
+        </button>
+      </div>
+
+      <h2 style={{ marginTop: "24px" }}>Rounds</h2>
+
+      {roundsStatus === "loading" && (
+        <p className="description">Loading rounds...</p>
       )}
 
-      {status === 'empty' && (
-        <p className="mt-8 text-sm text-ink-soft">
-          No rounds yet. Create one to get started.
-        </p>
+      {roundsStatus === "empty" && (
+        <p className="description">No rounds yet. Create one to get started.</p>
       )}
 
-      {status === 'error' && (
-        <div
-          role="alert"
-          className="mt-8 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
-        >
-          Couldn&apos;t load rounds. Try refreshing the page.
-        </div>
+      {roundsStatus === "error" && (
+        <p className="message">Couldn't load rounds. Try refreshing the page.</p>
       )}
 
-{status === 'ready' && (
-  <ul className="mt-8 space-y-3">
-    {rounds.map((round) => {
-      const stateStyles = {
-        scheduled: 'bg-slate/10 text-slate',
-        open: 'bg-sage/10 text-sage',
-        closed: 'bg-gold/10 text-gold',
-        released: 'bg-lavender/10 text-lavender-deep',
-      };
-
-      return (
-        <li
-          key={round.id}
-          className="flex items-center justify-between rounded-lg border border-lavender/20 bg-surface p-4 shadow-sm"
-        >
-          <div>
-            <p className="font-medium text-ink">{round.name}</p>
-            <p className="mt-1 text-xs text-ink-soft">
-              Opens {new Date(round.openTime).toLocaleString()} · Closes{' '}
-              {new Date(round.closeTime).toLocaleString()}
-            </p>
-          </div>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${
-              stateStyles[round.state] ?? 'bg-ink-soft/10 text-ink-soft'
-            }`}
-          >
-            {round.state}
-          </span>
-        </li>
-      );
-    })}
-  </ul>
-)}
-      
+      {roundsStatus === "ready" && (
+        <ul style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          {rounds.map((round) => (
+            <li key={round.id}>
+              <Link
+                href={`/round_view?id=${round.id}`}
+                className="card"
+                style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px" }}
+              >
+                <span>{round.name}</span>
+                <span style={{ textTransform: "capitalize" }}>{round.state}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   );
 }
+
+//THIS IS THE EORGANISER'S PAGE
