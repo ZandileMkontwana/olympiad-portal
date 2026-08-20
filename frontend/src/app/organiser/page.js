@@ -70,14 +70,14 @@ export default function OrganiserDashboard() {
       {roundsStatus === "ready" && (
         <ul style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
           {rounds.map((round) => {
-            // Open rounds go to the upload page; closed rounds go to the
-            // closed-round explanation page; anything else (scheduled,
-            // released) falls back to the educator round_view for now.
+            // Scheduled and open rounds both go to the upload page — organisers can
+            // add a paper any time before or during the round. Only closed rounds
+            // get blocked.
             let href = `/educator/round_view?id=${round.id}`;
-            if (round.state === "open") {
-              href = `/rounds/${round.id}/papers`;
+            if (round.state === "open" || round.state === "scheduled") {
+            href = `/rounds/${round.id}/papers`;
             } else if (round.state === "closed") {
-              href = `/rounds/${round.id}/closed_round`;
+            href = `/rounds/${round.id}/closed_round`;
             }
 
             return (
