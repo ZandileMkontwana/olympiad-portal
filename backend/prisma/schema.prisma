@@ -16,16 +16,16 @@ model Olympiad {
 }
 
 model Round {
-  id          String       @id @default(uuid())
-  olympiad    Olympiad     @relation(fields: [olympiadId], references: [id])
-  olympiadId  String
-  name        String
-  openTime    DateTime
-  closeTime   DateTime
-  state       String       @default("scheduled")
-  paper       Paper?
-  submissions Submission[]
+  id            String         @id @default(uuid())
+  olympiadId    String
+  name          String
+  openTime      DateTime
+  closeTime     DateTime
+  state         String         @default("scheduled")
+  paper         Paper?
+  olympiad      Olympiad       @relation(fields: [olympiadId], references: [id])
   roundEntrants RoundEntrant[]
+  submissions   Submission[]
 }
 
 model User {
@@ -34,6 +34,7 @@ model User {
   passwordHash String
   role         String
   createdAt    DateTime  @default(now())
+  name         String
   educator     Educator?
 }
 
@@ -55,13 +56,13 @@ model Educator {
 }
 
 model Entrant {
-  id          String       @id @default(uuid())
-  school      School       @relation(fields: [schoolId], references: [id])
-  schoolId    String
-  name        String
-  grade       String
-  submissions Submission[]
+  id            String         @id @default(uuid())
+  schoolId      String
+  name          String
+  grade         String
+  school        School         @relation(fields: [schoolId], references: [id])
   roundEntrants RoundEntrant[]
+  submissions   Submission[]
 }
 
 model Paper {
@@ -95,23 +96,12 @@ model Result {
 }
 
 model RoundEntrant {
-  id           String   @id
-  roundId      String
-  entrantId    String
-  registeredAt DateTime @default(now())
-  Entrant      Entrant  @relation(fields: [entrantId], references: [id])
-  Round        Round    @relation(fields: [roundId], references: [id])
-
-  @@unique([roundId, entrantId])
-}
-
-model RoundEntrant {
   id           String   @id @default(uuid())
-  round        Round    @relation(fields: [roundId], references: [id])
   roundId      String
-  entrant      Entrant  @relation(fields: [entrantId], references: [id])
   entrantId    String
   registeredAt DateTime @default(now())
+  entrant      Entrant  @relation(fields: [entrantId], references: [id])
+  round        Round    @relation(fields: [roundId], references: [id])
 
   @@unique([roundId, entrantId])
 }
