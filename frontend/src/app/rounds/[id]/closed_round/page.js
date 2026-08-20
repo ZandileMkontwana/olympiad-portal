@@ -47,7 +47,7 @@ export default function ClosedRoundPage() {
           {errorMessage}
         </div>
         <Link
-          href="/rounds"
+          href="/organiser"
           className="mt-6 inline-block rounded-md border border-lavender/40 px-4 py-2 text-sm font-medium text-lavender-deep transition-colors hover:bg-lavender/10"
         >
           Back to rounds
@@ -98,7 +98,7 @@ export default function ClosedRoundPage() {
       </div>
 
       <Link
-        href="/rounds"
+        href="/organiser"
         className="mt-6 inline-block rounded-md border border-lavender/40 px-4 py-2 text-sm font-medium text-lavender-deep transition-colors hover:bg-lavender/10"
       >
         Back to rounds

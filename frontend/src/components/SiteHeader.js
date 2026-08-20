@@ -42,7 +42,7 @@ export default function SiteHeader() {
           </div>
         ) : (
           <div className="flex gap-4 text-sm">
-            <Link href="/rounds" className="nav-link text-ink-soft">
+            <Link href="/organiser" className="nav-link text-ink-soft">
               Rounds
             </Link>
             <Link href="/rounds/new" className="nav-link text-ink-soft">

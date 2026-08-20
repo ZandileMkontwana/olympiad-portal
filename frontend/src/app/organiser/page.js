@@ -48,9 +48,6 @@ export default function OrganiserDashboard() {
       </p>
 
       <div className="card" style={{ display: "flex", gap: "12px" }}>
-        <Link href="/rounds/new" className="button">
-          Create Round
-        </Link>
         <button onClick={handleLogout} className="button">
           Log out
         </button>
@@ -72,18 +69,30 @@ export default function OrganiserDashboard() {
 
       {roundsStatus === "ready" && (
         <ul style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          {rounds.map((round) => (
-            <li key={round.id}>
-              <Link
-                href={`/round_view?id=${round.id}`}
-                className="card"
-                style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px" }}
-              >
-                <span>{round.name}</span>
-                <span style={{ textTransform: "capitalize" }}>{round.state}</span>
-              </Link>
-            </li>
-          ))}
+          {rounds.map((round) => {
+            // Open rounds go to the upload page; closed rounds go to the
+            // closed-round explanation page; anything else (scheduled,
+            // released) falls back to the educator round_view for now.
+            let href = `/educator/round_view?id=${round.id}`;
+            if (round.state === "open") {
+              href = `/rounds/${round.id}/papers`;
+            } else if (round.state === "closed") {
+              href = `/rounds/${round.id}/closed_round`;
+            }
+
+            return (
+              <li key={round.id}>
+                <Link
+                  href={href}
+                  className="card"
+                  style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px" }}
+                >
+                  <span>{round.name}</span>
+                  <span style={{ textTransform: "capitalize" }}>{round.state}</span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </main>
