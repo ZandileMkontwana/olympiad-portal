@@ -40,6 +40,7 @@ export default function RoundView() {
         );
 
         const data = await response.json();
+        
 
         if (!response.ok) {
           throw new Error(data.error || "Failed to fetch round");
@@ -149,9 +150,9 @@ export default function RoundView() {
               Submissions are open. Closes in {timeRemaining}.
             </p>
 
-            <Link href={`/rounds/${roundId}/submit`} className="button">
-              Submit Results
-            </Link>
+           <Link href={`/educator/submit?id=${roundId}`} className="button">
+            Submit Results
+          </Link>
           </>
         )}
 
