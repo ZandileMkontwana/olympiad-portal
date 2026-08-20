@@ -17,15 +17,15 @@ model Olympiad {
 
 model Round {
   id            String         @id @default(uuid())
-  olympiad      Olympiad       @relation(fields: [olympiadId], references: [id])
   olympiadId    String
   name          String
   openTime      DateTime
   closeTime     DateTime
   state         String         @default("scheduled")
   paper         Paper?
-  submissions   Submission[]
+  olympiad      Olympiad       @relation(fields: [olympiadId], references: [id])
   roundEntrants RoundEntrant[]
+  submissions   Submission[]
 }
 
 model User {
@@ -35,6 +35,7 @@ model User {
   passwordHash String
   role         String
   createdAt    DateTime  @default(now())
+  name         String
   educator     Educator?
 }
 
@@ -57,12 +58,12 @@ model Educator {
 
 model Entrant {
   id            String         @id @default(uuid())
-  school        School         @relation(fields: [schoolId], references: [id])
   schoolId      String
   name          String
   grade         String
-  submissions   Submission[]
+  school        School         @relation(fields: [schoolId], references: [id])
   roundEntrants RoundEntrant[]
+  submissions   Submission[]
 }
 
 model Paper {
@@ -97,11 +98,11 @@ model Result {
 
 model RoundEntrant {
   id           String   @id @default(uuid())
-  round        Round    @relation(fields: [roundId], references: [id])
   roundId      String
-  entrant      Entrant  @relation(fields: [entrantId], references: [id])
   entrantId    String
   registeredAt DateTime @default(now())
+  entrant      Entrant  @relation(fields: [entrantId], references: [id])
+  round        Round    @relation(fields: [roundId], references: [id])
 
   @@unique([roundId, entrantId])
 }
