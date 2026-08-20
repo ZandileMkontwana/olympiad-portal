@@ -8,9 +8,6 @@ module.exports = {
   },
   'frontend/**/*.js': (filenames) => {
     const files = filenames.map((f) => `"${f}"`).join(' ');
-    return [
-      `npx eslint --config frontend/eslint.config.mjs --fix ${files}`,
-      `npx prettier --config frontend/.prettierrc --write ${files}`,
-    ];
+    return [`node scripts/lint-frontend.js ${files}`];
   },
 };
