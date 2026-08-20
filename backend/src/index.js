@@ -13,10 +13,12 @@ const { startScheduler } = require('./scheduler');
 const app = express();
 
 // cors + cookieParser must come BEFORE the routers, or requests never reach them
-app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  })
+);
 app.use(cookieParser());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

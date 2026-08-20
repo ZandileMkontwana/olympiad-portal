@@ -1,7 +1,6 @@
 // Shared API client for the organiser console.
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -27,10 +26,7 @@ async function requestJson(path, options = {}) {
       },
     });
   } catch (networkError) {
-    throw new ApiError(
-      'Could not reach the server. Is the backend running on :5000?',
-      0
-    );
+    throw new ApiError('Could not reach the server. Is the backend running on :5000?', 0);
   }
 
   let data = null;
@@ -41,8 +37,7 @@ async function requestJson(path, options = {}) {
   }
 
   if (!response.ok) {
-    const message =
-      (data && data.error) || `Request failed with status ${response.status}`;
+    const message = (data && data.error) || `Request failed with status ${response.status}`;
     throw new ApiError(message, response.status);
   }
 
@@ -95,10 +90,7 @@ export async function uploadPaper(roundId, { paperFile, memoFile }) {
       body: formData,
     });
   } catch (networkError) {
-    throw new ApiError(
-      'Could not reach the server. Is the backend running on :5000?',
-      0
-    );
+    throw new ApiError('Could not reach the server. Is the backend running on :5000?', 0);
   }
 
   let data = null;
@@ -109,8 +101,7 @@ export async function uploadPaper(roundId, { paperFile, memoFile }) {
   }
 
   if (!response.ok) {
-    const message =
-      (data && data.error) || `Upload failed with status ${response.status}`;
+    const message = (data && data.error) || `Upload failed with status ${response.status}`;
     throw new ApiError(message, response.status);
   }
 

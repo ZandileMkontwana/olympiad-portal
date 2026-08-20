@@ -1,17 +1,15 @@
 'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
-const PUBLIC_PATHS = ["/", "/login", "/register"];
+const PUBLIC_PATHS = ['/', '/login', '/register'];
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
 
-  const headerClass = isPublicPage
-    ? "bg-lavender-deep"
-    : "border-b border-lavender/20 bg-surface";
+  const headerClass = isPublicPage ? 'bg-lavender-deep' : 'border-b border-lavender/20 bg-surface';
 
   return (
     <header className={headerClass}>
@@ -19,11 +17,11 @@ export default function SiteHeader() {
         <Link
           href="/"
           className={`flex items-center gap-2 font-display text-lg font-semibold ${
-            isPublicPage ? "text-white" : "text-ink"
+            isPublicPage ? 'text-white' : 'text-ink'
           }`}
         >
           <img
-            src={isPublicPage ? "/tree-mark-white.png" : "/tree-mark.png"}
+            src={isPublicPage ? '/tree-mark-white.png' : '/tree-mark.png'}
             alt=""
             className="h-6 w-6 object-contain"
             aria-hidden="true"
@@ -51,7 +49,6 @@ export default function SiteHeader() {
           </div>
         )}
       </nav>
-
     </header>
   );
 }

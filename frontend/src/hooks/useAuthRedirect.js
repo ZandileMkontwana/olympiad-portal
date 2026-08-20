@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { fetchCurrentUser, dashboardPathForRole } from "@/lib/api";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { fetchCurrentUser, dashboardPathForRole } from '@/lib/api';
 
 // If already logged in, bounce away to the correct dashboard instead of
 // showing the landing/login page again.

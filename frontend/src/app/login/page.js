@@ -1,10 +1,9 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login, ApiError, dashboardPathForRole } from '@/lib/api';
 import { useRedirectIfAuthenticated } from '@/hooks/useAuthRedirect';
-
 
 function validateForm(email, password) {
   const errors = {};
@@ -32,19 +31,17 @@ export default function LoginPage() {
     if (Object.keys(errors).length > 0) return;
 
     setStatus('submitting');
-     try {
+    try {
       const result = await login({ email: email.trim(), password });
       router.push(dashboardPathForRole(result.user.role));
     } catch (err) {
       setStatus('error');
-      setErrorMessage(
-        err instanceof ApiError ? err.message : 'Something went wrong.'
-      );
+      setErrorMessage(err instanceof ApiError ? err.message : 'Something went wrong.');
     }
   }
-if (checking) {
-  return <main className="mx-auto max-w-md px-8 py-24 text-center">Loading...</main>;
-}
+  if (checking) {
+    return <main className="mx-auto max-w-md px-8 py-24 text-center">Loading...</main>;
+  }
   return (
     <main className="mx-auto max-w-md px-8 py-24">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
@@ -94,7 +91,10 @@ if (checking) {
         </div>
 
         {status === 'error' && (
-          <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div
+            role="alert"
+            className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          >
             {errorMessage}
           </div>
         )}
