@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { fetchCurrentUser, dashboardPathForRole } from "@/lib/api";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { fetchCurrentUser, dashboardPathForRole } from '@/lib/api';
 
 export function useRequireRole(requiredRole) {
   const router = useRouter();
@@ -16,7 +16,7 @@ export function useRequireRole(requiredRole) {
       if (cancelled) return;
 
       if (!fetchedUser) {
-        router.replace("/login");
+        router.replace('/login');
         return;
       }
 

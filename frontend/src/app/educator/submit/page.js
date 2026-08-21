@@ -1,5 +1,5 @@
 // app/rounds/[id]/submit/page.js
-"use client";
+'use client';
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
@@ -13,8 +13,8 @@ export default function SubmissionTablePage() {
   const [entrants, setEntrants] = useState([]);
   const [memoAnswers, setMemoAnswers] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [uploadError, setUploadError] = useState("");
+  const [error, setError] = useState('');
+  const [uploadError, setUploadError] = useState('');
 
   const [answers, setAnswers] = useState({});
   const [rowStatus, setRowStatus] = useState({});
@@ -53,11 +53,11 @@ export default function SubmissionTablePage() {
         ]);
 
         const roundData = await roundRes.json();
-        if (!roundRes.ok) throw new Error(roundData.error || "Failed to fetch round");
+        if (!roundRes.ok) throw new Error(roundData.error || 'Failed to fetch round');
         setRound(roundData);
 
         const entrantsData = await entrantsRes.json();
-        if (!entrantsRes.ok) throw new Error(entrantsData.error || "Failed to fetch entrants");
+        if (!entrantsRes.ok) throw new Error(entrantsData.error || 'Failed to fetch entrants');
         setEntrants(entrantsData);
 
         if (paperRes.ok) {
@@ -82,7 +82,7 @@ export default function SubmissionTablePage() {
             keys[entrant.id] = existing.idempotencyKey;
             restoredAnswers[entrant.id] = existing.answers;
             restoredStatus[entrant.id] = {
-              state: "success",
+              state: 'success',
               score: existing.result ? existing.result.score : null,
             };
             restoredReceipt.push({
@@ -130,31 +130,33 @@ export default function SubmissionTablePage() {
   }
 
   function downloadTemplate() {
-    const header = ["Entrant Name", "Entrant ID", ...questions.map((q) => `Q${q}`)];
-    const rows = entrants.map((entrant) => [entrant.name, entrant.id, ...questions.map(() => "")]);
+    const header = ['Entrant Name', 'Entrant ID', ...questions.map((q) => `Q${q}`)];
+    const rows = entrants.map((entrant) => [entrant.name, entrant.id, ...questions.map(() => '')]);
 
     const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Answers");
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Answers');
     XLSX.writeFile(workbook, `round-${roundId}-answer-sheet.xlsx`);
   }
 
   function handleFileUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setUploadError("");
+    setUploadError('');
 
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const workbook = XLSX.read(e.target.result, { type: "array" });
+        const workbook = XLSX.read(e.target.result, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
         const [header, ...dataRows] = rows;
-        const idCol = header.indexOf("Entrant ID");
+        const idCol = header.indexOf('Entrant ID');
         if (idCol === -1) {
-          throw new Error("Couldn't find an 'Entrant ID' column — use the downloaded template as-is.");
+          throw new Error(
+            "Couldn't find an 'Entrant ID' column — use the downloaded template as-is."
+          );
         }
         const questionCols = questions.map((q) => ({
           question: q,
@@ -174,7 +176,7 @@ export default function SubmissionTablePage() {
         }
 
         setAnswers((prev) => ({ ...prev, ...newAnswers }));
-        showToast("success", "Answer sheet loaded — review the table, then submit.");
+        showToast('success', 'Answer sheet loaded — review the table, then submit.');
       } catch (err) {
         setUploadError(err.message);
       }
@@ -183,7 +185,7 @@ export default function SubmissionTablePage() {
   }
 
   async function submitRow(entrantId, { silent = false } = {}) {
-    setRowStatus((prev) => ({ ...prev, [entrantId]: { state: "submitting" } }));
+    setRowStatus((prev) => ({ ...prev, [entrantId]: { state: 'submitting' } }));
     const entrantAnswers = answers[entrantId] || {};
     const entrant = entrants.find((e) => e.id === entrantId);
     const entrantName = entrant ? entrant.name : entrantId;
@@ -205,11 +207,11 @@ export default function SubmissionTablePage() {
         }
       );
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Submission failed");
+      if (!response.ok) throw new Error(data.error || 'Submission failed');
 
       setRowStatus((prev) => ({
         ...prev,
-        [entrantId]: { state: "success", score: data.result ? data.result.score : null },
+        [entrantId]: { state: 'success', score: data.result ? data.result.score : null },
       }));
 
       setReceipt((prev) => [
@@ -225,19 +227,19 @@ export default function SubmissionTablePage() {
       ]);
 
       if (!silent) {
-        const scoreText = data.result ? ` — scored ${data.result.score.toFixed(1)}%` : "";
-        showToast("success", `${entrantName}'s submission was accepted${scoreText}.`);
+        const scoreText = data.result ? ` — scored ${data.result.score.toFixed(1)}%` : '';
+        showToast('success', `${entrantName}'s submission was accepted${scoreText}.`);
       }
 
       return true;
     } catch (err) {
       setRowStatus((prev) => ({
         ...prev,
-        [entrantId]: { state: "error", message: err.message },
+        [entrantId]: { state: 'error', message: err.message },
       }));
 
       if (!silent) {
-        showToast("error", `${entrantName}'s submission failed: ${err.message}`);
+        showToast('error', `${entrantName}'s submission failed: ${err.message}`);
       }
 
       return false;
@@ -250,7 +252,7 @@ export default function SubmissionTablePage() {
     let failed = 0;
 
     for (const entrant of entrants) {
-      const alreadyDone = rowStatus[entrant.id]?.state === "success";
+      const alreadyDone = rowStatus[entrant.id]?.state === 'success';
       if (!alreadyDone) {
         const ok = await submitRow(entrant.id, { silent: true });
         if (ok) succeeded++;
@@ -261,41 +263,52 @@ export default function SubmissionTablePage() {
     setBulkSubmitting(false);
 
     if (succeeded === 0 && failed === 0) {
-      showToast("success", "Everything was already submitted.");
+      showToast('success', 'Everything was already submitted.');
     } else if (failed === 0) {
-      showToast("success", `${succeeded} submission${succeeded === 1 ? "" : "s"} accepted successfully.`);
+      showToast(
+        'success',
+        `${succeeded} submission${succeeded === 1 ? '' : 's'} accepted successfully.`
+      );
     } else {
       showToast(
-        "error",
-        `${succeeded} accepted, ${failed} failed — check the highlighted row${failed === 1 ? "" : "s"} below.`
+        'error',
+        `${succeeded} accepted, ${failed} failed — check the highlighted row${failed === 1 ? '' : 's'} below.`
       );
     }
   }
 
   if (loading) {
-    return <main className="round-page"><p>Loading...</p></main>;
+    return (
+      <main className="round-page">
+        <p>Loading...</p>
+      </main>
+    );
   }
 
   if (error) {
-    return <main className="round-page"><div className="message">{error}</div></main>;
+    return (
+      <main className="round-page">
+        <div className="message">{error}</div>
+      </main>
+    );
   }
 
-  if (round.state !== "open") {
+  if (round.state !== 'open') {
     return (
       <main className="round-page">
         <h1>Submit Results</h1>
         <div className="card">
           <p className="description">
-            Submissions are not being accepted right now — this round is currently{" "}
+            Submissions are not being accepted right now — this round is currently{' '}
             <strong>{round.state}</strong>.
           </p>
           <p className="description">
-            {round.state === "scheduled" &&
+            {round.state === 'scheduled' &&
               "This round hasn't opened yet. Results can be submitted once it does."}
-            {round.state === "closed" &&
-              "This round has closed. Results can no longer be submitted for it."}
-            {round.state === "released" &&
-              "This round has closed and results have been released. Submissions are no longer accepted."}
+            {round.state === 'closed' &&
+              'This round has closed. Results can no longer be submitted for it.'}
+            {round.state === 'released' &&
+              'This round has closed and results have been released. Submissions are no longer accepted.'}
           </p>
         </div>
       </main>
@@ -303,38 +316,40 @@ export default function SubmissionTablePage() {
   }
 
   return (
-    <main className="round-page" style={{ position: "relative" }}>
+    <main className="round-page" style={{ position: 'relative' }}>
       {toast && (
         <div
           role="alert"
           style={{
-            position: "fixed",
-            top: "16px",
-            left: "50%",
-            transform: "translateX(-50%)",
+            position: 'fixed',
+            top: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
             zIndex: 1000,
-            padding: "12px 20px",
-            borderRadius: "8px",
-            color: "white",
+            padding: '12px 20px',
+            borderRadius: '8px',
+            color: 'white',
             fontWeight: 500,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-            backgroundColor: toast.type === "success" ? "#16a34a" : "#dc2626",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            maxWidth: "90vw",
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            backgroundColor: toast.type === 'success' ? '#16a34a' : '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            maxWidth: '90vw',
           }}
         >
-          <span>{toast.type === "success" ? "✓" : "⚠"} {toast.message}</span>
+          <span>
+            {toast.type === 'success' ? '✓' : '⚠'} {toast.message}
+          </span>
           <button
             type="button"
             onClick={() => setToast(null)}
             style={{
-              background: "none",
-              border: "none",
-              color: "white",
-              cursor: "pointer",
-              fontSize: "16px",
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '16px',
               lineHeight: 1,
             }}
             aria-label="Dismiss"
@@ -348,7 +363,8 @@ export default function SubmissionTablePage() {
 
       {!memoAnswers && (
         <p className="message">
-          No memo answer key found for this round yet — the paper needs a memo uploaded before results can be scored.
+          No memo answer key found for this round yet — the paper needs a memo uploaded before
+          results can be scored.
         </p>
       )}
 
@@ -358,18 +374,18 @@ export default function SubmissionTablePage() {
 
       {entrants.length > 0 && memoAnswers && (
         <>
-          <div className="card" style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <div className="card" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button type="button" onClick={downloadTemplate} className="button">
               Download answer sheet ({questions.length} questions, {entrants.length} students)
             </button>
 
-            <label className="button" style={{ cursor: "pointer" }}>
+            <label className="button" style={{ cursor: 'pointer' }}>
               Upload completed sheet
               <input
                 type="file"
                 accept=".xlsx,.csv"
                 onChange={handleFileUpload}
-                style={{ display: "none" }}
+                style={{ display: 'none' }}
               />
             </label>
 
@@ -379,70 +395,74 @@ export default function SubmissionTablePage() {
               disabled={bulkSubmitting}
               className="button"
             >
-              {bulkSubmitting ? "Submitting all…" : "Submit All"}
+              {bulkSubmitting ? 'Submitting all…' : 'Submit All'}
             </button>
           </div>
 
           {uploadError && <p className="message">{uploadError}</p>}
 
-          <table className="card" style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="card" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ padding: "8px 16px", textAlign: "left" }}>Entrant</th>
+                <th style={{ padding: '8px 16px', textAlign: 'left' }}>Entrant</th>
                 {questions.map((q) => (
-                  <th key={q} style={{ padding: "8px 16px", textAlign: "center" }}>Q{q}</th>
+                  <th key={q} style={{ padding: '8px 16px', textAlign: 'center' }}>
+                    Q{q}
+                  </th>
                 ))}
-                <th style={{ padding: "8px 16px" }}>Score</th>
-                <th style={{ padding: "8px 16px" }}></th>
+                <th style={{ padding: '8px 16px' }}>Score</th>
+                <th style={{ padding: '8px 16px' }}></th>
               </tr>
             </thead>
             <tbody>
               {entrants.map((entrant) => {
-                const status = rowStatus[entrant.id] || { state: "idle" };
+                const status = rowStatus[entrant.id] || { state: 'idle' };
                 const liveScore = computeLiveScore(entrant.id);
-                const displayScore = status.state === "success" ? status.score : liveScore;
-                const isFailed = status.state === "error";
+                const displayScore = status.state === 'success' ? status.score : liveScore;
+                const isFailed = status.state === 'error';
 
                 return (
                   <tr
                     key={entrant.id}
-                    style={isFailed ? { backgroundColor: "#fef2f2" } : undefined}
+                    style={isFailed ? { backgroundColor: '#fef2f2' } : undefined}
                   >
-                    <td style={{ padding: "8px 16px" }}>{entrant.name}</td>
+                    <td style={{ padding: '8px 16px' }}>{entrant.name}</td>
                     {questions.map((q) => (
-                      <td key={q} style={{ padding: "8px 16px", textAlign: "center" }}>
+                      <td key={q} style={{ padding: '8px 16px', textAlign: 'center' }}>
                         <input
                           type="text"
                           maxLength={1}
                           placeholder="—"
-                          value={(answers[entrant.id] && answers[entrant.id][q]) || ""}
+                          value={(answers[entrant.id] && answers[entrant.id][q]) || ''}
                           onChange={(e) => updateAnswer(entrant.id, q, e.target.value)}
-                          style={{ width: "36px", textAlign: "center" }}
-                          disabled={status.state === "submitting"}
+                          style={{ width: '36px', textAlign: 'center' }}
+                          disabled={status.state === 'submitting'}
                         />
                       </td>
                     ))}
-                    <td style={{ padding: "8px 16px", textAlign: "center" }}>
-                      {displayScore !== null ? `${displayScore.toFixed(1)}%` : "—"}
-                      {status.state === "idle" && liveScore !== null && (
-                        <span style={{ fontSize: "0.75em", opacity: 0.6 }}> (preview)</span>
+                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                      {displayScore !== null ? `${displayScore.toFixed(1)}%` : '—'}
+                      {status.state === 'idle' && liveScore !== null && (
+                        <span style={{ fontSize: '0.75em', opacity: 0.6 }}> (preview)</span>
                       )}
-                      {status.state === "success" && (
-                        <span style={{ fontSize: "0.75em", opacity: 0.6 }}> ✓ saved</span>
+                      {status.state === 'success' && (
+                        <span style={{ fontSize: '0.75em', opacity: 0.6 }}> ✓ saved</span>
                       )}
                     </td>
-                    <td style={{ padding: "8px 16px" }}>
+                    <td style={{ padding: '8px 16px' }}>
                       <button
                         type="button"
                         onClick={() => submitRow(entrant.id)}
-                        disabled={status.state === "submitting"}
+                        disabled={status.state === 'submitting'}
                         className="button"
                       >
-                        {status.state === "submitting" ? "…" : status.state === "success" ? "Resubmit" : "Submit"}
+                        {status.state === 'submitting'
+                          ? '…'
+                          : status.state === 'success'
+                            ? 'Resubmit'
+                            : 'Submit'}
                       </button>
-                      {status.state === "error" && (
-                        <p className="message">{status.message}</p>
-                      )}
+                      {status.state === 'error' && <p className="message">{status.message}</p>}
                     </td>
                   </tr>
                 );
@@ -454,32 +474,41 @@ export default function SubmissionTablePage() {
 
       {receipt.length > 0 && (
         <div className="card" role="status">
-          <h2>Receipt — {receipt.length} of {entrants.length} accepted</h2>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <h2>
+            Receipt — {receipt.length} of {entrants.length} accepted
+          </h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ padding: "4px 12px", textAlign: "left" }}>Entrant</th>
-                <th style={{ padding: "4px 12px", textAlign: "left" }}>Answers</th>
-                <th style={{ padding: "4px 12px", textAlign: "center" }}>Score</th>
-                <th style={{ padding: "4px 12px", textAlign: "left" }}>Accepted at</th>
-                <th style={{ padding: "4px 12px", textAlign: "left" }}>Submission ID</th>
+                <th style={{ padding: '4px 12px', textAlign: 'left' }}>Entrant</th>
+                <th style={{ padding: '4px 12px', textAlign: 'left' }}>Answers</th>
+                <th style={{ padding: '4px 12px', textAlign: 'center' }}>Score</th>
+                <th style={{ padding: '4px 12px', textAlign: 'left' }}>Accepted at</th>
+                <th style={{ padding: '4px 12px', textAlign: 'left' }}>Submission ID</th>
               </tr>
             </thead>
             <tbody>
               {receipt.map((entry) => (
                 <tr key={entry.entrantId}>
-                  <td style={{ padding: "4px 12px" }}>{entry.entrantName}</td>
-                  <td style={{ padding: "4px 12px", fontFamily: "monospace", maxWidth: "300px", whiteSpace: "normal" }}>
-                    {questions.map((q) => `Q${q}:${entry.answers[q] || "-"}`).join("  ")}
+                  <td style={{ padding: '4px 12px' }}>{entry.entrantName}</td>
+                  <td
+                    style={{
+                      padding: '4px 12px',
+                      fontFamily: 'monospace',
+                      maxWidth: '300px',
+                      whiteSpace: 'normal',
+                    }}
+                  >
+                    {questions.map((q) => `Q${q}:${entry.answers[q] || '-'}`).join('  ')}
                   </td>
-                  <td style={{ padding: "4px 12px", textAlign: "center" }}>
-                    {entry.score !== null ? `${entry.score.toFixed(1)}%` : "—"}
+                  <td style={{ padding: '4px 12px', textAlign: 'center' }}>
+                    {entry.score !== null ? `${entry.score.toFixed(1)}%` : '—'}
                   </td>
-                  <td style={{ padding: "4px 12px" }}>
+                  <td style={{ padding: '4px 12px' }}>
                     {new Date(entry.submittedAt).toLocaleString()}
                   </td>
-                  <td style={{ padding: "4px 12px", fontFamily: "monospace", fontSize: "0.85em" }}>
-                    {entry.submissionId || "—"}
+                  <td style={{ padding: '4px 12px', fontFamily: 'monospace', fontSize: '0.85em' }}>
+                    {entry.submissionId || '—'}
                   </td>
                 </tr>
               ))}

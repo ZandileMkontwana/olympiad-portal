@@ -1,9 +1,17 @@
-import Link from "next/link";
+import Link from 'next/link';
 
 const STEPS = [
-  { n: "01", title: "Register school", body: "Educators create an account and get their school set up." },
-  { n: "02", title: "Submit papers", body: "Upload papers ahead of each round's deadline." },
-  { n: "03", title: "Track results", body: "Watch rounds move from open to closed, and see results land." },
+  {
+    n: '01',
+    title: 'Register school',
+    body: 'Educators create an account and get their school set up.',
+  },
+  { n: '02', title: 'Submit papers', body: "Upload papers ahead of each round's deadline." },
+  {
+    n: '03',
+    title: 'Track results',
+    body: 'Watch rounds move from open to closed, and see results land.',
+  },
 ];
 
 export default function LandingPage() {
@@ -46,9 +54,7 @@ export default function LandingPage() {
           {STEPS.map((step) => (
             <div key={step.n} className="step-card">
               <span className="font-mono text-xs text-gold">{step.n}</span>
-              <h2 className="mt-2 font-display text-lg font-semibold text-ink">
-                {step.title}
-              </h2>
+              <h2 className="mt-2 font-display text-lg font-semibold text-ink">{step.title}</h2>
               <p className="mt-1 text-sm text-ink-soft">{step.body}</p>
             </div>
           ))}
@@ -62,7 +68,8 @@ export default function LandingPage() {
             Ready to run your next round?
           </h2>
           <p className="mt-4 text-lavender/80">
-            Set up rounds, collect papers, and track results — built for the way olympiads actually run.
+            Set up rounds, collect papers, and track results — built for the way olympiads actually
+            run.
           </p>
           <Link
             href="/register"
