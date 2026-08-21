@@ -35,7 +35,6 @@ model User {
   passwordHash String
   role         String
   createdAt    DateTime  @default(now())
-  name         String
   educator     Educator?
 }
 
