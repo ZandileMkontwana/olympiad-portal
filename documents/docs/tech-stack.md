@@ -30,9 +30,15 @@ Schema-first modelling, type-safe generated client, and built-in migrations — 
 Powers the round lifecycle — ticks every 30 seconds, comparing the current time (in UTC) against each round's `openTime`/`closeTime` to transition state automatically. Chosen for simplicity: no separate job queue infrastructure needed at this scale, and it's easy to demo and reason about.
 
 ## Authentication
-**Passport.js**
+**bcrypt + JWT**
 
-Established, well-documented library rather than a custom-built auth system, satisfying the course's Authentication & Security requirement (sign up, sign in, password reset, account deletion via a proven library, not hand-rolled).
+Chosen because it's simpler and more direct for what we actually need. Passport is a plugin framework — it's most useful when you need to support many different login methods (Google, Facebook, local email/password, etc.) through one consistent interface. We only need one method: email + password. Passport would add a layer of abstraction (strategies, serialization/deserialization) without really buying us anything extra for that single case.
+
+bcrypt + JWT directly does exactly what we need:
+
+bcrypt hashes passwords securely before storing them
+JWT creates a signed token that proves who's logged in, without the server needing to store session state in memory or a database
+httpOnly cookies keep that token safe from being stolen by malicious JS in the browser
 
 ## File storage
 **[Cloudflare R2 / AWS S3 — update once confirmed]**
@@ -46,6 +52,7 @@ Used for round reminders and submission receipts, satisfying the course's requir
 
 ## Version control
 **Gitea**, with **Conventional Commits** and a **feature-branch + pull request** workflow, enforced via branch protection requiring review and (once configured) passing CI checks.
+Please check [code_quality_tool](./code_quality_tool.md) document for details about the Code quality tool used.
 
 ## CI/CD
 **Gitea Actions** — see [Git Methodology](./git-methodology) for details on our merge and versioning process.
@@ -55,5 +62,5 @@ Used for round reminders and submission receipts, satisfying the course's requir
 
 ## Deployment
 - **Backend:** Railway
-- **Frontend:** [Vercel — update once confirmed]
+- **Frontend:** Vercel 
 - **Docs:** Netlify
