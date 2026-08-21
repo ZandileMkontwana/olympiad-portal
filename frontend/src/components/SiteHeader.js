@@ -43,9 +43,6 @@ export default function SiteHeader() {
             <Link href="/organiser" className="nav-link text-ink-soft">
               Rounds
             </Link>
-            <Link href="/rounds/new" className="nav-link text-ink-soft">
-              New round
-            </Link>
           </div>
         )}
       </nav>
