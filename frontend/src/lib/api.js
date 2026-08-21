@@ -75,11 +75,14 @@ export function listRounds() {
 export function getRound(roundId) {
   return requestJson(`/api/rounds/${roundId}`);
 }
-export async function uploadPaper(roundId, { paperFile, memoFile }) {
+export async function uploadPaper(roundId, { paperFile, memoFile, memoAnswers }) {
   const formData = new FormData();
   formData.append('paper', paperFile);
   if (memoFile) {
     formData.append('memo', memoFile);
+  }
+  if (memoAnswers && Object.keys(memoAnswers).length > 0) {
+    formData.append('memoAnswers', JSON.stringify(memoAnswers));
   }
 
   let response;
