@@ -2,11 +2,12 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 
 export default function SubmissionTablePage() {
-  const { id: roundId } = useParams();
+  const searchParams = useSearchParams();
+  const roundId = searchParams.get("id");
 
   const [round, setRound] = useState(null);
   const [entrants, setEntrants] = useState([]);
@@ -21,7 +22,6 @@ export default function SubmissionTablePage() {
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [receipt, setReceipt] = useState([]);
 
-  // Toast: { type: "success" | "error", message: string } | null
   const [toast, setToast] = useState(null);
   const toastTimeoutRef = useRef(null);
 
@@ -46,10 +46,10 @@ export default function SubmissionTablePage() {
     async function fetchData() {
       try {
         const [roundRes, entrantsRes, paperRes, submissionsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}`),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/entrants`),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/papers`),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/submissions`),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}`, { credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/entrants`, { credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/papers`, { credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/submissions`, { credentials: "include" }),
         ]);
 
         const roundData = await roundRes.json();
@@ -193,9 +193,9 @@ export default function SubmissionTablePage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/submissions`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            "x-user-role": "educator",
           },
           body: JSON.stringify({
             entrantId,
