@@ -20,11 +20,11 @@ function setAuthCookie(res, token) {
 
 // POST /auth/register
 router.post('/auth/register', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, name, schoolName } = req.body;
   const role = 'educator';
 
-  if (!email || !password || !role) {
-    return res.status(400).json({ error: 'email, password , and role are required' });
+  if (!email || !password || !name || !schoolName) {
+    return res.status(400).json({ error: 'email, password, name, and schoolName are required' });
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -34,15 +34,38 @@ router.post('/auth/register', async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
+  // Find or create the school by name
+  let school = await prisma.school.findFirst({ where: { name: schoolName } });
+  if (!school) {
+    school = await prisma.school.create({
+      data: { name: schoolName, timezone: 'Africa/Johannesburg' }, // reasonable default; adjust if schools need their own timezone input
+    });
+  }
+
   const user = await prisma.user.create({
-    data: { email, passwordHash, role },
+    data: {
+      email,
+      passwordHash,
+      role,
+      name,
+      educator: {
+        create: { schoolId: school.id },
+      },
+    },
+    include: { educator: { include: { school: true } } },
   });
 
   const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
 
   setAuthCookie(res, token);
   res.status(201).json({
-    user: { id: user.id, email: user.email, role: user.role },
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      school: user.educator.school.name,
+    },
   });
 });
 
