@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 function formatRemaining(ms) {
-  if (ms <= 0) return "closing any moment";
+  if (ms <= 0) return 'closing any moment';
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -18,35 +18,29 @@ function formatRemaining(ms) {
 
 export default function RoundView() {
   const searchParams = useSearchParams();
-  const roundId = searchParams.get("id");
+  const roundId = searchParams.get('id');
 
   const [round, setRound] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [downloadError, setDownloadError] = useState("");
-  const [timeRemaining, setTimeRemaining] = useState("");
+  const [loading, setLoading] = useState(!!roundId);
+  const [error, setError] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+  const [timeRemaining, setTimeRemaining] = useState('');
 
   useEffect(() => {
-    if (!roundId) {
-      setError("No round ID was provided.");
-      setLoading(false);
-      return;
-    }
+    if (!roundId) return;
 
     async function fetchRound() {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}`
-        );
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}`);
 
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || "Failed to fetch round");
+          throw new Error(data.error || 'Failed to fetch round');
         }
 
         setRound(data);
-        setError("");
+        setError('');
       } catch (error) {
         setError(error.message);
       } finally {
@@ -76,7 +70,7 @@ export default function RoundView() {
   }, [round?.closeTime]);
 
   async function handleDownload() {
-    setDownloadError("");
+    setDownloadError('');
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/papers`
@@ -84,13 +78,21 @@ export default function RoundView() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch paper");
+        throw new Error(data.error || 'Failed to fetch paper');
       }
 
       window.location.href = `${process.env.NEXT_PUBLIC_API_URL}${data.fileUrl}`;
     } catch (error) {
       setDownloadError(error.message);
     }
+  }
+
+  if (!roundId) {
+    return (
+      <main className="round-page">
+        <div className="message">No round ID was provided.</div>
+      </main>
+    );
   }
 
   if (loading) {
@@ -132,29 +134,22 @@ export default function RoundView() {
       <div className="card">
         <h2>Round Details</h2>
 
-        <p className="description">
-          This round is currently {round.state}.
-        </p>
+        <p className="description">This round is currently {round.state}.</p>
 
-        {round.state === "open" && (
+        {round.state === 'open' && (
           <>
             <button className="button" onClick={handleDownload}>
               Download Paper
             </button>
-            {downloadError && (
-              <p className="message">{downloadError}</p>
-            )}
+            {downloadError && <p className="message">{downloadError}</p>}
 
-            <p className="description">
-              Submissions are open. Closes in {timeRemaining}.
-            </p>
+            <p className="description">Submissions are open. Closes in {timeRemaining}.</p>
 
-            <Link href={`/rounds/${roundId}/submit`} className="button">
+            <Link href={`/educator/submit?id=${roundId}`} className="button">
               Submit Results
             </Link>
           </>
         )}
-
       </div>
     </main>
   );

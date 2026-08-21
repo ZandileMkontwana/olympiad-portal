@@ -7,112 +7,121 @@ const { requireAuth } = require('../middleware/auth');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const SALT_ROUNDS = 10;
+const isProd = process.env.NODE_ENV === 'production';
 
-//POST/auth/register
-router.post('/auth/register', async(req, res) => {
-    const { email, password, name } = req.body;
-    const role = 'educator';
+function setAuthCookie(res, token) {
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+}
 
-    if (!email || !password || !name) {
-        return res.status(400).json({ error: 'email, password, and name are required' });
-    }
+// POST /auth/register
+router.post('/auth/register', async (req, res) => {
+  const { email, password } = req.body;
+  const role = 'educator';
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-        return res.status(409).json({ error: 'An account with this email already exists' });
-    }
+  if (!email || !password || !role) {
+    return res.status(400).json({ error: 'email, password , and role are required' });
+  }
 
-    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    return res.status(409).json({ error: 'An account with this email already exists' });
+  }
 
-    const user = await prisma.user.create({
-        data: { email, passwordHash, role, name }
-    });
+  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+  const user = await prisma.user.create({
+    data: { email, passwordHash, role },
+  });
 
-    res.status(201).json({
-        user: { id: user.id, email: user.email, role: user.role, name: user.name },
-        token
-    });
+  const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+
+  setAuthCookie(res, token);
+  res.status(201).json({
+    user: { id: user.id, email: user.email, role: user.role },
+  });
 });
 
+// POST /auth/login
+router.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body;
 
-//POST/auth/login
-router.post('/auth/login', async(req, res) => {
-    const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'email and password are required' });
+  }
 
-    if (!email || !password) {
-        return res.status(400).json({ error: 'email and password are required' });
-    }
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid email or password' });
+  }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+  const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+  if (!passwordMatches) {
+    return res.status(401).json({ error: 'Invalid email or password' });
+  }
 
-    if (!user) {
-        return res.status(401).json({ error: 'Invalid email or password' });
-    }
+  const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
 
-    const passwordMatches = await bcrypt.compare(password, user.passwordHash);
-
-    if (!passwordMatches) {
-        return res.status(401).json({ error: 'Invalid email or password ' });
-    }
-
-    const token = jwt.sign({ userId: user.id, role: user.role },
-        JWT_SECRET, { expiresIn: '7d' }
-    );
-
-    res.status(200).json({
-        user: { id: user.id, email: user.email, role: user.role },
-        token
-    });
+  setAuthCookie(res, token);
+  res.status(200).json({
+    user: { id: user.id, email: user.email, role: user.role },
+  });
 });
 
-//POST /auth/reset-password
-router.post('/auth/reset-password', requireAuth, async(req, res) => {
-    const { currentPassword, newPassword } = req.body;
+// POST /auth/reset-password
+router.post('/auth/reset-password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
 
-    if (!currentPassword || !newPassword) {
-        return res.status(400).json({ error: 'currentPassword and newPassword are required' });
-    }
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+  }
 
-    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+  const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
 
-    if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-    }
+  const passwordMatches = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!passwordMatches) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
 
-    const passwordMatches = await bcrypt.compare(currentPassword, user.passwordHash);
+  const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
-    if (!passwordMatches) {
-        return res.status(401).json({ error: 'Current password is incorrect' });
-    }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: newPasswordHash },
+  });
 
-    const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-
-    await prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash: newPasswordHash }
-    });
-
-    res.status(200).json({ message: 'Password updated successfully' });
+  res.status(200).json({ message: 'Password updated successfully' });
 });
 
-//POST /auth/logout
-router.post('/auth/logout', requireAuth, async(req, res) => {
-    res.status(200).json({ message: 'Logged out successfully' });
-})
+// POST /auth/logout
+router.post('/auth/logout', (req, res) => {
+  res.clearCookie('token');
+  res.status(200).json({ message: 'Logged out successfully' });
+});
+
+// GET /auth/me
+router.get('/auth/me', requireAuth, async (req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ user: { id: user.id, email: user.email, role: user.role } });
+});
 
 // DELETE /auth/account
-router.delete('/auth/account', requireAuth, async(req, res) => {
-    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+router.delete('/auth/account', requireAuth, async (req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
 
-    if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-    }
-
-    await prisma.user.delete({ where: { id: user.id } });
-
-    res.status(200).json({ message: 'Account deleted successfully' });
+  await prisma.user.delete({ where: { id: user.id } });
+  res.status(200).json({ message: 'Account deleted successfully' });
 });
 
 module.exports = router;

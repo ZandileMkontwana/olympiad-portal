@@ -39,6 +39,7 @@ erDiagram
   }
   USER {
     string id PK
+    string name
     string email
     string passwordHash
     string role
@@ -95,7 +96,7 @@ The core state machine: `scheduled → open → closed → released`, driven by 
 A registered school competing in the olympiad. Has many educators and entrants.
 
 ### User
-Login account for anyone — organiser, educator, or student. Password handling goes through our auth library, not custom code.
+Login account for anyone — organiser, educator, or student. `name` is the user's display name, required at registration. Password handling goes through our auth library, not custom code. Public registration only ever creates `educator` accounts - organiser accounts are provisioned directly by the team.
 
 ### Educator
 Links a `User` account to a `School`. Educators upload results on behalf of their entrants.

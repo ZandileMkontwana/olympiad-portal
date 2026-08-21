@@ -56,9 +56,7 @@ export default function RegisterPage() {
       setStatus('success');
     } catch (err) {
       setStatus('error');
-      setErrorMessage(
-        err instanceof ApiError ? err.message : 'Something went wrong.'
-      );
+      setErrorMessage(err instanceof ApiError ? err.message : 'Something went wrong.');
     }
   }
 
@@ -69,9 +67,7 @@ export default function RegisterPage() {
         <div role="status" className="relative rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm">
           <div className="flex items-center justify-center gap-2">
             <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
-            <h1 className="font-display text-xl font-semibold text-ink">
-              Account created
-            </h1>
+            <h1 className="font-display text-xl font-semibold text-ink">Account created</h1>
           </div>
           <p className="mt-2 text-sm text-ink-soft">
             You&apos;re registered as an educator. Log in to continue.
@@ -131,7 +127,10 @@ export default function RegisterPage() {
         </div>
 
         {status === 'error' && (
-          <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div
+            role="alert"
+            className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          >
             {errorMessage}
           </div>
         )}
