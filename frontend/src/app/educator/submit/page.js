@@ -1,13 +1,13 @@
 // app/rounds/[id]/submit/page.js
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from "react";
-import { useSearchParams } from "next/navigation";
-import * as XLSX from "xlsx";
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import * as XLSX from 'xlsx';
 
 export default function SubmissionTablePage() {
   const searchParams = useSearchParams();
-  const roundId = searchParams.get("id");
+  const roundId = searchParams.get('id');
 
   const [round, setRound] = useState(null);
   const [entrants, setEntrants] = useState([]);
@@ -46,10 +46,18 @@ export default function SubmissionTablePage() {
     async function fetchData() {
       try {
         const [roundRes, entrantsRes, paperRes, submissionsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}`, { credentials: "include" }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/entrants`, { credentials: "include" }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/papers`, { credentials: "include" }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/submissions`, { credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}`, {
+            credentials: 'include',
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/entrants`, {
+            credentials: 'include',
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/papers`, {
+            credentials: 'include',
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/submissions`, {
+            credentials: 'include',
+          }),
         ]);
 
         const roundData = await roundRes.json();
@@ -194,10 +202,10 @@ export default function SubmissionTablePage() {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/submissions`,
         {
-          method: "POST",
-          credentials: "include",
+          method: 'POST',
+          credentials: 'include',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             entrantId,

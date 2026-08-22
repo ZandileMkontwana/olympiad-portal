@@ -1,0 +1,65 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: feature/round-lifecycle-setup
+nodes_managed: true
+exported_at: "2026-08-22T13:07:33Z"
+modules:
+    "":
+        dir_name: Olympiad Portal Monorepo
+        title: Olympiad Portal Monorepo
+        scope:
+            - README.md
+            - .gitignore
+            - .lintstagedrc.js
+            - package-lock.json
+        source_files: []
+        children:
+            - backend
+            - docs
+            - frontend
+        depends_on: []
+        related_to: []
+    backend:
+        dir_name: Olympiad Portal Backend API
+        title: Olympiad Portal Backend API
+        scope:
+            - backend/
+        source_files: []
+        children:
+            - backend/routes_papers_rounds_submissions
+        depends_on: []
+        related_to:
+            - path: frontend
+    backend/routes_papers_rounds_submissions:
+        dir_name: Round, Paper & Submission Routes
+        title: Round, Paper & Submission Routes
+        scope:
+            - backend/src/routes/papers.js
+            - backend/src/routes/rounds.js
+            - backend/src/routes/submissions.js
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: frontend
+    docs:
+        dir_name: Olympiad Portal Documentation Site (Docusaurus)
+        title: Olympiad Portal Documentation Site (Docusaurus)
+        scope:
+            - documents/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    frontend:
+        dir_name: Olympiad Portal Next.js Frontend
+        title: Olympiad Portal Next.js Frontend
+        scope:
+            - frontend/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend
+            - path: backend/routes_papers_rounds_submissions
