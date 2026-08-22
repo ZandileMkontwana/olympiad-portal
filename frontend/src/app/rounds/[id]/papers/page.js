@@ -35,16 +35,11 @@ export default function PaperUploadPage() {
   const [uploadedPaper, setUploadedPaper] = useState(null);
 
   function updateRow(index, field, value) {
-    setAnswerRows((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
-    );
+    setAnswerRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   }
 
   function addRow() {
-    setAnswerRows((prev) => [
-      ...prev,
-      { question: String(prev.length + 1), answer: '' },
-    ]);
+    setAnswerRows((prev) => [...prev, { question: String(prev.length + 1), answer: '' }]);
   }
 
   function removeRow(index) {
@@ -78,9 +73,7 @@ export default function PaperUploadPage() {
     } catch (err) {
       setStatus('error');
       setErrorMessage(
-        err instanceof ApiError
-          ? err.message
-          : 'Something went wrong. Please try again.'
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.'
       );
     }
   }
@@ -103,32 +96,22 @@ export default function PaperUploadPage() {
           className="certificate-card rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm"
         >
           <div className="flex items-center gap-2">
-            <span
-              className="h-2 w-2 rounded-full bg-sage"
-              aria-hidden="true"
-            />
-            <h1 className="font-display text-xl font-semibold text-ink">
-              Paper uploaded
-            </h1>
+            <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
+            <h1 className="font-display text-xl font-semibold text-ink">Paper uploaded</h1>
           </div>
           <p className="mt-2 text-sm text-ink-soft">
-            Uploaded for round{' '}
-            <span className="font-mono text-ink">{roundId}</span> at{' '}
+            Uploaded for round <span className="font-mono text-ink">{roundId}</span> at{' '}
             {new Date(uploadedPaper.uploadedAt).toLocaleString()}.
           </p>
           <dl className="mt-4 space-y-1 text-sm">
             <div className="flex gap-2">
               <dt className="font-medium text-ink-soft">Paper</dt>
-              <dd className="truncate font-mono text-ink">
-                {uploadedPaper.fileUrl}
-              </dd>
+              <dd className="truncate font-mono text-ink">{uploadedPaper.fileUrl}</dd>
             </div>
             {uploadedPaper.memoUrl && (
               <div className="flex gap-2">
                 <dt className="font-medium text-ink-soft">Memo</dt>
-                <dd className="truncate font-mono text-ink">
-                  {uploadedPaper.memoUrl}
-                </dd>
+                <dd className="truncate font-mono text-ink">{uploadedPaper.memoUrl}</dd>
               </div>
             )}
             {uploadedPaper.memoAnswers && (
@@ -155,9 +138,7 @@ export default function PaperUploadPage() {
 
   return (
     <main className="mx-auto max-w-xl px-8 py-12">
-      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
-        Upload paper
-      </h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Upload paper</h1>
       <div className="mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-3 text-sm text-ink-soft">
         Round <span className="font-mono text-ink">{roundId}</span>
@@ -212,7 +193,8 @@ export default function PaperUploadPage() {
             Answer key <span className="text-ink-soft">(for automarking)</span>
           </label>
           <p className="mt-1 text-xs text-ink-soft">
-            The correct option for each question. This is what the portal actually checks submissions against.
+            The correct option for each question. This is what the portal actually checks
+            submissions against.
           </p>
 
           <div className="mt-3 space-y-2">

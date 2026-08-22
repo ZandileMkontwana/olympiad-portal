@@ -3,6 +3,9 @@ backend/node_modules/
 frontend/node_modules/
 .env
 backend/generated/
+backend/coverage/
+frontend/coverage/
 # Local Netlify folder
 .netlify
 package.json
+.qoder

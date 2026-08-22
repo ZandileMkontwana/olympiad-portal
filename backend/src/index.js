@@ -21,6 +21,7 @@ app.use(
 );
 app.use(cookieParser());
 app.use(express.json());
+
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/api', papersRouter);
@@ -28,8 +29,12 @@ app.use('/api', roundsRouter);
 app.use('/api', submissionsRouter);
 app.use('/api', authRouter);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Backend running on :${PORT}`);
-  startScheduler();
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Backend running on :${PORT}`);
+    startScheduler();
+  });
+}
+
+module.exports = app;
