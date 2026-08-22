@@ -1,6 +1,9 @@
 ---
 sidebar_position: 1
 ---
+![Backend Coverage](https://img.shields.io/badge/backend%20coverage-98.5%25-brightgreen)
+![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-98.8%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-117%20passing-brightgreen)
 
 # Getting Started — Backend
 
