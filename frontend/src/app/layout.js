@@ -1,6 +1,6 @@
+import { ClerkProvider } from '@clerk/nextjs';
 import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
 
 // Display face — headings only, used with restraint.
@@ -31,14 +31,16 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html
-      lang="en"
-      className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
-        <SiteHeader /> 
-  {children}
-</body>
-    </html>
+    <ClerkProvider>
+      <html
+        lang="en"
+        className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} h-full antialiased`}
+      >
+        <body className="min-h-full flex flex-col">
+          <SiteHeader />
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
