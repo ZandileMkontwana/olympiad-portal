@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { register, ApiError } from '@/lib/api';
 
-function validateForm(email, password) {
+function validateForm(name, email, password, schoolName) {
   const errors = {};
 
+  if (!name.trim()) {
+    errors.name = 'Name is required.';
+  }
   if (!email.trim()) {
     errors.email = 'Email is required.';
   } else if (!/^\S+@\S+\.\S+$/.test(email)) {
@@ -15,6 +18,9 @@ function validateForm(email, password) {
     errors.password = 'Password is required.';
   } else if (password.length < 8) {
     errors.password = 'Password must be at least 8 characters.';
+  }
+  if (!schoolName.trim()) {
+    errors.schoolName = 'School name is required.';
   }
 
   return errors;
@@ -32,27 +38,33 @@ function Watermark() {
 }
 
 export default function RegisterPage() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [schoolName, setSchoolName] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [status, setStatus] = useState('idle'); // idle | submitting | success | error
   const [errorMessage, setErrorMessage] = useState('');
+  const [registeredUser, setRegisteredUser] = useState(null);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setErrorMessage('');
 
-    const errors = validateForm(email, password);
+    const errors = validateForm(name, email, password, schoolName);
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
     setStatus('submitting');
     try {
-      const result = await register({ email: email.trim(), password });
-      // Store the token now so it's ready once protected routes exist —
-      // where a logged-in educator actually lands is Person 4's redirect
-      // logic (not built yet), so we just confirm success here.
+      const result = await register({
+        email: email.trim(),
+        password,
+        name: name.trim(),
+        schoolName: schoolName.trim(),
+      });
       window.localStorage.setItem('authToken', result.token);
+      setRegisteredUser(result.user);
       setStatus('success');
     } catch (err) {
       setStatus('error');
@@ -70,7 +82,9 @@ export default function RegisterPage() {
             <h1 className="font-display text-xl font-semibold text-ink">Account created</h1>
           </div>
           <p className="mt-2 text-sm text-ink-soft">
-            You&apos;re registered as an educator. Log in to continue.
+            {registeredUser?.name ? `Welcome, ${registeredUser.name}. ` : ''}
+            You&apos;re registered as an educator
+            {registeredUser?.school ? ` at ${registeredUser.school}` : ''}. Log in to continue.
           </p>
         </div>
       </main>
@@ -86,6 +100,26 @@ export default function RegisterPage() {
       <div className="relative mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
 
       <form onSubmit={handleSubmit} noValidate className="relative mt-8 space-y-5">
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-ink">
+            Name <span className="text-gold">*</span>
+          </label>
+          <input
+            id="name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            aria-invalid={Boolean(fieldErrors.name)}
+            aria-describedby={fieldErrors.name ? 'name-error' : undefined}
+            className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
+          />
+          {fieldErrors.name && (
+            <p id="name-error" role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.name}
+            </p>
+          )}
+        </div>
+
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-ink">
             Email <span className="text-gold">*</span>
@@ -122,6 +156,26 @@ export default function RegisterPage() {
           {fieldErrors.password && (
             <p id="password-error" role="alert" className="mt-1 text-sm text-red-600">
               {fieldErrors.password}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="schoolName" className="block text-sm font-medium text-ink">
+            School name <span className="text-gold">*</span>
+          </label>
+          <input
+            id="schoolName"
+            type="text"
+            value={schoolName}
+            onChange={(e) => setSchoolName(e.target.value)}
+            aria-invalid={Boolean(fieldErrors.schoolName)}
+            aria-describedby={fieldErrors.schoolName ? 'schoolName-error' : undefined}
+            className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
+          />
+          {fieldErrors.schoolName && (
+            <p id="schoolName-error" role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.schoolName}
             </p>
           )}
         </div>
