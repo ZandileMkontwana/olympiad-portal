@@ -24,11 +24,12 @@
 
 ## Update Summary
 **Changes Made**
-- Updated testing framework configuration with comprehensive Vitest setup for both backend and frontend
-- Added detailed coverage of 10 new test files covering authentication flows, submission handling, paper management, round lifecycle operations, API interactions, and authentication hooks
-- Enhanced coverage thresholds with 80% line coverage requirements and HTML/LCOV reporting capabilities
-- Expanded test examples to include scheduler testing, email functionality, and comprehensive API endpoint testing
-- Updated CI workflow recommendations to include automated testing and coverage enforcement
+- Enhanced Vitest implementation details with specific configuration for both backend and frontend environments
+- Added practical usage instructions including npm run test:coverage command execution
+- Updated coverage thresholds to reflect current 80% line coverage requirements
+- Expanded testing examples with detailed authentication flows, API endpoint testing, and React component testing
+- Integrated comprehensive mocking strategies for external dependencies including Prisma, JWT, SendGrid, and fetch APIs
+- Added CI workflow recommendations for automated testing and coverage enforcement
 
 ## Table of Contents
 1. Introduction
@@ -46,7 +47,7 @@
 13. Conclusion
 
 ## Introduction
-This document defines the comprehensive testing strategy for the Olympiad Portal, covering both backend and frontend using Vitest as the unified testing framework. The implementation includes over 1,200 lines of test code across 10 test files, providing extensive coverage of authentication flows, submission handling, paper management, round lifecycle operations, API interactions, and authentication hooks. The testing approach follows a structured pyramid methodology with unit tests, integration tests, and clear coverage thresholds enforced at 80% line coverage.
+This document defines the comprehensive testing strategy for the Olympiad Portal, covering both backend and frontend using Vitest as the unified testing framework. The implementation includes over 1,200 lines of test code across 11 test files, providing extensive coverage of authentication flows, submission handling, paper management, round lifecycle operations, API interactions, and authentication hooks. The testing approach follows a structured pyramid methodology with unit tests, integration tests, and clear coverage thresholds enforced at 80% line coverage.
 
 ## Project Structure
 The project uses a monorepo-style layout with separate backend and frontend packages, each with its own Vitest configuration and comprehensive test suites:
@@ -68,7 +69,7 @@ graph TB
 subgraph "Backend Testing"
 B_CFG["vitest.config.mjs<br/>Node Environment"]
 B_SETUP["test-setup.js<br/>Environment Variables"]
-B_TESTS["10 Test Files<br/>1,200+ Lines of Code"]
+B_TESTS["11 Test Files<br/>1,200+ Lines of Code"]
 B_SRC["Express Routes & Middleware"]
 end
 subgraph "Frontend Testing"
@@ -249,7 +250,7 @@ C->>L : log("Closed 2 rounds")
 Testing of submission receipt email functionality with SendGrid integration, including proper formatting, error handling, and logging.
 
 **Section sources**
-- [backend/src/lib/email.test.js:1-86](file://backend/src/lib/email.test.js#L1-L86)
+- [backend/src/lib/email.test.js:1-86](file://backend/src/lib/email.test.js#L1-86)
 
 ### Frontend API Client Tests
 Mocked fetch testing validates request construction, error handling, response mapping, and credential inclusion with comprehensive ApiError handling.
@@ -270,10 +271,10 @@ end
 ```
 
 **Diagram sources**
-- [frontend/src/lib/api.test.js:1-337](file://frontend/src/lib/api.test.js#L1-L337)
+- [frontend/src/lib/api.test.js:1-337](file://frontend/src/lib/api.test.js#L1-337)
 
 **Section sources**
-- [frontend/src/lib/api.test.js:1-337](file://frontend/src/lib/api.test.js#L1-L337)
+- [frontend/src/lib/api.test.js:1-337](file://frontend/src/lib/api.test.js#L1-337)
 
 ### Frontend Hook Tests (Authentication Redirect and Role Requirements)
 Hooks are tested using renderHook to simulate async state and navigation behavior with comprehensive authentication and authorization scenarios.
@@ -296,18 +297,18 @@ end
 ```
 
 **Diagram sources**
-- [frontend/src/hooks/useAuthRedirect.test.js:1-66](file://frontend/src/hooks/useAuthRedirect.test.js#L1-L66)
-- [frontend/src/hooks/useRequireRole.test.js:1-87](file://frontend/src/hooks/useRequireRole.test.js#L1-L87)
+- [frontend/src/hooks/useAuthRedirect.test.js:1-66](file://frontend/src/hooks/useAuthRedirect.test.js#L1-66)
+- [frontend/src/hooks/useRequireRole.test.js:1-87](file://frontend/src/hooks/useRequireRole.test.js#L1-87)
 
 **Section sources**
-- [frontend/src/hooks/useAuthRedirect.test.js:1-66](file://frontend/src/hooks/useAuthRedirect.test.js#L1-L66)
-- [frontend/src/hooks/useRequireRole.test.js:1-87](file://frontend/src/hooks/useRequireRole.test.js#L1-L87)
+- [frontend/src/hooks/useAuthRedirect.test.js:1-66](file://frontend/src/hooks/useAuthRedirect.test.js#L1-66)
+- [frontend/src/hooks/useRequireRole.test.js:1-87](file://frontend/src/hooks/useRequireRole.test.js#L1-87)
 
 ### Backend Root App Tests
 Root-level tests assert routing behavior and CORS configuration with proper middleware setup.
 
 **Section sources**
-- [backend/src/index.test.js:1-27](file://backend/src/index.test.js#L1-L27)
+- [backend/src/index.test.js:1-27](file://backend/src/index.test.js#L1-27)
 
 ## Dependency Analysis
 **Backend Test Dependencies:**
@@ -379,11 +380,11 @@ Common issues and resolutions:
 - Email service failures: Mock SendGrid to test error handling paths without actual API calls
 
 **Section sources**
-- [backend/src/test-setup.js:1-6](file://backend/src/test-setup.js#L1-L6)
-- [backend/src/routes/submissions.test.js:21-35](file://backend/src/routes/submissions.test.js#L21-L35)
-- [backend/src/scheduler.test.js:9-19](file://backend/src/scheduler.test.js#L9-L19)
-- [backend/src/lib/email.test.js:6-14](file://backend/src/lib/email.test.js#L6-L14)
-- [frontend/src/lib/api.test.js:49-108](file://frontend/src/lib/api.test.js#L49-L108)
+- [backend/src/test-setup.js:1-6](file://backend/src/test-setup.js#L1-6)
+- [backend/src/routes/submissions.test.js:21-35](file://backend/src/routes/submissions.test.js#L21-35)
+- [backend/src/scheduler.test.js:9-19](file://backend/src/scheduler.test.js#L9-19)
+- [backend/src/lib/email.test.js:6-14](file://backend/src/lib/email.test.js#L6-14)
+- [frontend/src/lib/api.test.js:49-108](file://frontend/src/lib/api.test.js#L49-108)
 
 ## Continuous Integration and Quality Gates
 **Current CI Status:**
@@ -407,9 +408,9 @@ Gate --> |No| Fail["Pipeline Fails"]
 ```
 
 **Section sources**
-- [.gitea/workflows/lint.yml:1-46](file://.gitea/workflows/lint.yml#L1-L46)
-- [backend/vitest.config.mjs:14-19](file://backend/vitest.config.mjs#L14-L19)
-- [frontend/vitest.config.mjs:17-22](file://frontend/vitest.config.mjs#L17-L22)
+- [.gitea/workflows/lint.yml:1-46](file://.gitea/workflows/lint.yml#L1-46)
+- [backend/vitest.config.mjs:14-19](file://backend/vitest.config.mjs#L14-19)
+- [frontend/vitest.config.mjs:17-22](file://frontend/vitest.config.mjs#L17-22)
 
 ## Guidelines for Writing Maintainable and Effective Tests
 **Organization and Naming:**
@@ -441,16 +442,16 @@ Gate --> |No| Fail["Pipeline Fails"]
 - External services: email service integration with error handling
 
 **Section sources**
-- [backend/src/routes/auth.test.js:1-287](file://backend/src/routes/auth.test.js#L1-L287)
-- [backend/src/middleware/auth.test.js:1-110](file://backend/src/middleware/auth.test.js#L1-L110)
-- [backend/src/routes/submissions.test.js:1-265](file://backend/src/routes/submissions.test.js#L1-L265)
-- [backend/src/routes/papers.test.js:1-209](file://backend/src/routes/papers.test.js#L1-L209)
-- [backend/src/routes/rounds.test.js:1-209](file://backend/src/routes/rounds.test.js#L1-L209)
-- [backend/src/scheduler.test.js:1-91](file://backend/src/scheduler.test.js#L1-L91)
-- [backend/src/lib/email.test.js:1-86](file://backend/src/lib/email.test.js#L1-L86)
-- [frontend/src/hooks/useAuthRedirect.test.js:1-66](file://frontend/src/hooks/useAuthRedirect.test.js#L1-L66)
-- [frontend/src/hooks/useRequireRole.test.js:1-87](file://frontend/src/hooks/useRequireRole.test.js#L1-L87)
-- [frontend/src/lib/api.test.js:1-337](file://frontend/src/lib/api.test.js#L1-L337)
+- [backend/src/routes/auth.test.js:1-287](file://backend/src/routes/auth.test.js#L1-287)
+- [backend/src/middleware/auth.test.js:1-110](file://backend/src/middleware/auth.test.js#L1-110)
+- [backend/src/routes/submissions.test.js:1-265](file://backend/src/routes/submissions.test.js#L1-265)
+- [backend/src/routes/papers.test.js:1-209](file://backend/src/routes/papers.test.js#L1-209)
+- [backend/src/routes/rounds.test.js:1-209](file://backend/src/routes/rounds.test.js#L1-209)
+- [backend/src/scheduler.test.js:1-91](file://backend/src/scheduler.test.js#L1-91)
+- [backend/src/lib/email.test.js:1-86](file://backend/src/lib/email.test.js#L1-86)
+- [frontend/src/hooks/useAuthRedirect.test.js:1-66](file://frontend/src/hooks/useAuthRedirect.test.js#L1-66)
+- [frontend/src/hooks/useRequireRole.test.js:1-87](file://frontend/src/hooks/useRequireRole.test.js#L1-87)
+- [frontend/src/lib/api.test.js:1-337](file://frontend/src/lib/api.test.js#L1-337)
 
 ## Security Testing Approaches
 **Input Validation and Sanitization:**
@@ -471,10 +472,10 @@ Gate --> |No| Fail["Pipeline Fails"]
 - Add security scanning in CI pipeline
 
 **Section sources**
-- [backend/src/middleware/auth.test.js:1-110](file://backend/src/middleware/auth.test.js#L1-L110)
-- [backend/src/routes/auth.test.js:1-287](file://backend/src/routes/auth.test.js#L1-L287)
-- [backend/src/routes/submissions.test.js:201-208](file://backend/src/routes/submissions.test.js#L201-L208)
-- [backend/src/test-setup.js:1-6](file://backend/src/test-setup.js#L1-L6)
+- [backend/src/middleware/auth.test.js:1-110](file://backend/src/middleware/auth.test.js#L1-110)
+- [backend/src/routes/auth.test.js:1-287](file://backend/src/routes/auth.test.js#L1-287)
+- [backend/src/routes/submissions.test.js:201-208](file://backend/src/routes/submissions.test.js#L201-208)
+- [backend/src/test-setup.js:1-6](file://backend/src/test-setup.js#L1-6)
 
 ## Load and Performance Testing
 **Current Scope:**
