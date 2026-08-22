@@ -1,0 +1,1 @@
+Express Router + Multer for file uploads; Prisma ORM for all database access; Node.js native `fs`/`path` for local disk storage of uploaded papers and memos.

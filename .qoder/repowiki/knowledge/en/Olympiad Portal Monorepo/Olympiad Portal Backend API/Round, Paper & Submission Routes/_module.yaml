@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: backend/routes_papers_rounds_submissions
+title: Round, Paper & Submission Routes
+scope:
+    - backend/src/routes/papers.js
+    - backend/src/routes/rounds.js
+    - backend/src/routes/submissions.js
+source_files: []
+depends_on: []
+related_to:
+    - path: frontend

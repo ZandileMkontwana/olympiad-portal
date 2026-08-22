@@ -1,0 +1,1 @@
+Monorepo that composes the Olympiad Portal's Express backend, Next.js frontend, and Docusaurus documentation site behind a shared Prisma data layer and lint-staged pre-commit hooks.

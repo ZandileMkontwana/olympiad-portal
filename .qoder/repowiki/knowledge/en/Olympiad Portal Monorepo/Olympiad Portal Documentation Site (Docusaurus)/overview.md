@@ -1,0 +1,1 @@
+Docusaurus-based documentation and blog site for the Olympiad Portal, providing getting-started guides, API reference, architecture docs, and a project blog.

@@ -1,0 +1,1 @@
+Express.js server that wires together auth, round/paper/submission routes, a Prisma-backed data layer, and a cron scheduler into a single REST API for the Olympaid portal.

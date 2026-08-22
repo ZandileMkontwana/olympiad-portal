@@ -1,0 +1,1 @@
+Run `npm run dev` for the development server, `npm run build` / `npm start` for production, `npm test` (or `test:watch`, `test:coverage`) for Vitest, and `npm run lint` / `npm run format` for code quality. Tests require `NEXT_PUBLIC_API_BASE_URL` to be set if they exercise the API client; the default falls back to `http://localhost:5000`.

@@ -1,0 +1,1 @@
+`npm run start` launches the server on port 5000 (or `$PORT`); `npm test` / `npm run test:watch` / `npm run test:coverage` run the Vitest suite; `npm run lint` and `npm run format` invoke ESLint and Prettier; `postinstall` runs `prisma generate` automatically.

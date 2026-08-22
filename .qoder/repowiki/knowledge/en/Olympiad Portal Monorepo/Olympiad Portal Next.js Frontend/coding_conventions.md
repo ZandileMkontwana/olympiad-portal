@@ -1,0 +1,6 @@
+- Route pages are colocated as `page.js` files inside Next.js App Router segments under `src/app/<role>/<segment>/`.
+- Client-only components and hooks declare `'use client'` at the top of the file before importing React or Next navigation APIs.
+- All backend communication goes through `src/lib/api.js` helpers that wrap `fetch` with `credentials: 'include'` and throw a unified `ApiError` carrying the HTTP status.
+- Authentication state is resolved once per component via `fetchCurrentUser()` from `@/lib/api`, then used to drive redirects with `dashboardPathForRole(role)` rather than inline role checks.
+- Environment configuration is read through `process.env.NEXT_PUBLIC_*` variables (e.g. `NEXT_PUBLIC_API_BASE_URL`) instead of hard-coded URLs.
+- Tests are co-located next to source as `*.test.js` files and run against the jsdom environment with V8 coverage thresholds defined in `vitest.config.mjs`.

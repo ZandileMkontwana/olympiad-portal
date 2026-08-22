@@ -1,6 +1,7 @@
 const express = require('express');
-const router = express.Router();
 const prisma = require('../lib/prisma');
+
+const router = express.Router();
 
 router.post('/olympiads', async (req, res) => {
   try {
@@ -89,9 +90,9 @@ router.get('/rounds/:id/entrants', async (req, res) => {
   try {
     const roundEntrants = await prisma.roundEntrant.findMany({
       where: { roundId: req.params.id },
-      include: { Entrant: true },  // <-- capital E, matches what Prisma generated
+      include: { Entrant: true }, // <-- capital E, matches what Prisma generated
     });
-    res.json(roundEntrants.map((re) => re.Entrant));  // <-- also capital E here
+    res.json(roundEntrants.map((re) => re.Entrant)); // <-- also capital E here
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch entrants' });
@@ -110,4 +111,5 @@ router.get('/rounds/:id/submissions', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch submissions' });
   }
 });
+
 module.exports = router;

@@ -23,10 +23,11 @@ const config = {
     v4: true, // Improve compatibility with the upcoming Docusaurus v4
   },
 
-  // Set the production url of your site here
-  url: 'https://loquacious-fairy-d08618.netlify.app',
-  // Set the /<baseUrl>/ pathname under which your site is served
-  baseUrl: '/',
+    // Set the production url of your site here
+  url: 'https://zandilemkontwana.github.io',
+  baseUrl: '/Olympaid-Portal-CodeCrafters/',
+  organizationName: 'ZandileMkontwana',
+  projectName: 'Olympaid-Portal-CodeCrafters-',
 
   onBrokenLinks: 'throw',
 

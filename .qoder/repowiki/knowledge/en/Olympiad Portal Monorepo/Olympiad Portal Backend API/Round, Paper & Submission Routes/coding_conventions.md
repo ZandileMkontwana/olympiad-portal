@@ -1,0 +1,5 @@
+- Each route module creates an `express.Router()`, registers handlers, and exports it as the default module so the app can mount it under a prefix.
+- Route handlers wrap Prisma calls in try/catch blocks that log the error and return a uniform `{ error: ... }` JSON response with an appropriate HTTP status code.
+- Input validation returns 400 with a descriptive `{ error: ... }` message before any database access (e.g., required fields, date ordering, valid JSON parsing).
+- Authorization is enforced by spreading the `requireRole('...')` middleware array into route definitions rather than wrapping handler bodies.
+- Database queries use Prisma's `include` option to eagerly load related entities (e.g., `round.paper`, `submission.result`, `Entrant`) instead of issuing separate queries.

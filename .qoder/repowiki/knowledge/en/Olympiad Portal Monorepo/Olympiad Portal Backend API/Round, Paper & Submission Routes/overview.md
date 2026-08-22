@@ -1,0 +1,1 @@
+Express route handlers for managing olympiads, rounds, paper uploads, and educator submissions with idempotent memo-answer auto-marking.

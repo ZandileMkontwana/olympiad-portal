@@ -1,0 +1,1 @@
+Pre-commit hooks are configured via lint-staged at the repo root and apply different toolchains per child (`backend/**/*.js` → ESLint + Prettier; `frontend/**/*.js` → `scripts/lint-frontend.js`).
