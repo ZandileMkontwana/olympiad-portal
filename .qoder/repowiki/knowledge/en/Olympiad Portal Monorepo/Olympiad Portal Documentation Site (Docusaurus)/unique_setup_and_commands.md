@@ -1,1 +1,0 @@
-Requires Node >=20.0. Development: `npm run start` (or `npm run docusaurus start`). Build static site: `npm run build`. Serve built site locally: `npm run serve`. Deploy to Netlify: `npm run deploy`. Swizzle theme components if customization is needed: `npm run swizzle`.

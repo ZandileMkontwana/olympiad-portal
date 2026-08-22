@@ -1,4 +1,0 @@
-- Each feature area lives in its own file under `src/routes/` and is mounted onto the Express app at the `/api` prefix from `src/index.js`.
-- Every source file has a co-located `*.test.js` sibling tested with Vitest, sharing setup via `src/test-setup.js`.
-- Database access goes through the singleton Prisma client exported from `src/lib/prisma.js` rather than creating per-request clients.
-- Authentication state is carried via signed cookies parsed by `cookie-parser` and validated by the `src/middleware/auth.js` guard.

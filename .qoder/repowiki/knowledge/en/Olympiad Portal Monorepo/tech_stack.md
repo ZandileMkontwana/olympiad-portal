@@ -1,1 +1,0 @@
-Node.js monorepo using npm (`package-lock.json`) with lint-staged orchestrating per-app ESLint/Prettier pipelines; shared Prisma schema underpins both backend and frontend data access.

@@ -1,1 +1,0 @@
-Docusaurus 3.10 with the classic preset, React 19, MDX, Mermaid diagrams via `@docusaurus/theme-mermaid`, Prism syntax highlighting via `prism-react-renderer`, and Netlify CLI for deployment.

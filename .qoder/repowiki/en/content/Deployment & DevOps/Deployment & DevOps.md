@@ -2,8 +2,14 @@
 
 <cite>
 **Referenced Files in This Document**
+- [deploy.yml](file://documents/.github/workflows/deploy.yml)
 - [deploy-docs.yml](file://.gitea/workflows/deploy-docs.yml)
 - [lint.yml](file://.gitea/workflows/lint.yml)
+- [docusaurus.config.js](file://documents/docusaurus.config.js)
+- [eslint.config.mjs (backend)](file://backend/eslint.config.mjs)
+- [eslint.config.mjs (frontend)](file://frontend/eslint.config.mjs)
+- [.gitignore](file://.gitignore)
+- [.gitignore (documents)](file://documents/.gitignore)
 - [package.json (backend)](file://backend/package.json)
 - [package.json (frontend)](file://frontend/package.json)
 - [index.js (backend)](file://backend/src/index.js)
@@ -11,9 +17,15 @@
 - [vitest.config.mjs (backend)](file://backend/vitest.config.mjs)
 - [vitest.config.mjs (frontend)](file://frontend/vitest.config.mjs)
 - [next.config.mjs](file://frontend/next.config.mjs)
-- [.gitignore (backend)](file://backend/.gitignore)
-- [.gitignore (frontend)](file://frontend/.gitignore)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated CI/CD pipeline section to include new GitHub Pages deployment workflow
+- Enhanced development tooling section with updated ESLint configurations
+- Updated documentation deployment strategy from Netlify to GitHub Pages
+- Added comprehensive .gitignore improvements
+- Revised environment configuration management for GitHub Pages deployment
 
 ## Table of Contents
 1. Introduction
@@ -28,36 +40,39 @@
 10. Appendices
 
 ## Introduction
-This document provides comprehensive deployment and DevOps guidance for the Olympiad Portal, focusing on CI/CD configuration, environment management, secrets handling, deployment strategies, containerization considerations, infrastructure requirements, monitoring/logging, backup and disaster recovery, scaling, and security. It is grounded in the repository’s existing CI workflows, backend/frontend configurations, and database schema.
+This document provides comprehensive deployment and DevOps guidance for the Olympiad Portal, focusing on CI/CD configuration, environment management, secrets handling, deployment strategies, containerization considerations, infrastructure requirements, monitoring/logging, backup and disaster recovery, scaling, and security. It is grounded in the repository's existing CI workflows, backend/frontend configurations, and database schema.
 
 ## Project Structure
 The project is a monorepo with:
 - Backend: Express API with Prisma and PostgreSQL
 - Frontend: Next.js application
-- Documentation site: Docusaurus deployed to Netlify via CI
-- CI/CD: Gitea Actions for linting and docs deployment
+- Documentation site: Docusaurus deployed to GitHub Pages via GitHub Actions
+- CI/CD: Gitea Actions for linting and GitHub Actions for docs deployment
 
 ```mermaid
 graph TB
-subgraph "CI"
+subgraph "CI/CD"
 L["Lint Job"]
 D["Docs Deploy Job"]
+GP["GitHub Pages Deploy"]
 end
 subgraph "Runtime"
 FE["Next.js Frontend"]
 BE["Express Backend"]
 DB["PostgreSQL"]
-NETLIFY["Netlify (Docs)"]
+GHPAGES["GitHub Pages (Docs)"]
 end
 L --> |"runs on push/PR"| FE
 L --> |"runs on push/PR"| BE
-D --> |"build + deploy"| NETLIFY
+D --> |"build + deploy"| GP
+GP --> |"publishes to"| GHPAGES
 FE --> |"HTTP /api"* BE
 BE --> |"Prisma client"| DB
 ```
 
 **Diagram sources**
 - [lint.yml:1-46](file://.gitea/workflows/lint.yml#L1-L46)
+- [deploy.yml:1-25](file://documents/.github/workflows/deploy.yml#L1-L25)
 - [deploy-docs.yml:1-26](file://.gitea/workflows/deploy-docs.yml#L1-L26)
 - [package.json (backend):1-50](file://backend/package.json#L1-L50)
 - [package.json (frontend):1-36](file://frontend/package.json#L1-L36)
@@ -65,6 +80,7 @@ BE --> |"Prisma client"| DB
 
 **Section sources**
 - [lint.yml:1-46](file://.gitea/workflows/lint.yml#L1-L46)
+- [deploy.yml:1-25](file://documents/.github/workflows/deploy.yml#L1-L25)
 - [deploy-docs.yml:1-26](file://.gitea/workflows/deploy-docs.yml#L1-L26)
 - [package.json (backend):1-50](file://backend/package.json#L1-L50)
 - [package.json (frontend):1-36](file://frontend/package.json#L1-L36)
@@ -73,7 +89,8 @@ BE --> |"Prisma client"| DB
 ## Core Components
 - CI/CD Pipelines
   - Linting pipeline runs ESLint on both frontend and backend on pushes and pull requests targeting main.
-  - Docs deployment pipeline builds the documentation site and deploys to Netlify using secrets.
+  - Documentation deployment pipeline builds the documentation site and deploys to GitHub Pages using GitHub Actions.
+  - Legacy Netlify deployment workflow maintained for backward compatibility.
 - Backend Runtime
   - Express server loads environment variables at startup, serves static uploads, mounts API routes, starts a scheduler, and listens on a configurable port.
 - Database
@@ -83,6 +100,7 @@ BE --> |"Prisma client"| DB
 
 **Section sources**
 - [lint.yml:1-46](file://.gitea/workflows/lint.yml#L1-L46)
+- [deploy.yml:1-25](file://documents/.github/workflows/deploy.yml#L1-L25)
 - [deploy-docs.yml:1-26](file://.gitea/workflows/deploy-docs.yml#L1-L26)
 - [index.js:1-43](file://backend/src/index.js#L1-L43)
 - [schema.prisma:6-9](file://backend/prisma/schema.prisma#L6-L9)
@@ -137,12 +155,39 @@ LintFrontend --> End
 **Section sources**
 - [lint.yml:1-46](file://.gitea/workflows/lint.yml#L1-L46)
 
-### CI/CD Pipeline: Docs Deployment
+### CI/CD Pipeline: Documentation Deployment to GitHub Pages
 - Trigger: Push to main branch.
 - Steps:
   - Checkout code.
-  - Install docs dependencies.
-  - Build docs site.
+  - Setup Node.js 20 environment.
+  - Install documentation dependencies.
+  - Build documentation site.
+  - Deploy to GitHub Pages using peaceiris/actions-gh-pages action.
+
+```mermaid
+sequenceDiagram
+participant GH as "GitHub Actions"
+participant Docs as "Docusaurus Site"
+participant GP as "GitHub Pages"
+GH->>GH : Checkout
+GH->>GH : Setup Node 20
+GH->>Docs : npm install && npm run build
+GH->>GP : Deploy using peaceiris/actions-gh-pages
+GP-->>GH : Deploy result
+```
+
+**Diagram sources**
+- [deploy.yml:1-25](file://documents/.github/workflows/deploy.yml#L1-L25)
+
+**Section sources**
+- [deploy.yml:1-25](file://documents/.github/workflows/deploy.yml#L1-L25)
+
+### CI/CD Pipeline: Legacy Netlify Deployment
+- Trigger: Push to main branch.
+- Steps:
+  - Checkout code.
+  - Install documentation dependencies.
+  - Build documentation site.
   - Deploy to Netlify using secrets for authentication and site ID.
 
 ```mermaid
@@ -172,7 +217,8 @@ Netlify-->>GH : Deploy result
   - Uses Next.js build/start scripts.
   - No custom Next config overrides present.
 - Secrets Handling
-  - Docs deployment uses GitHub/Gitea secrets for Netlify auth token and site ID.
+  - GitHub Pages deployment uses built-in GITHUB_TOKEN for authentication.
+  - Netlify deployment uses GitHub/Gitea secrets for Netlify auth token and site ID.
   - Ensure .env files are ignored by git (already configured).
 
 Recommended environment variables for production:
@@ -187,25 +233,56 @@ Recommended environment variables for production:
 - [index.js:1-43](file://backend/src/index.js#L1-L43)
 - [package.json (backend):1-50](file://backend/package.json#L1-L50)
 - [package.json (frontend):1-36](file://frontend/package.json#L1-L36)
+- [deploy.yml:21-25](file://documents/.github/workflows/deploy.yml#L21-L25)
 - [deploy-docs.yml:14-26](file://.gitea/workflows/deploy-docs.yml#L14-L26)
-- [.gitignore (backend):1-5](file://backend/.gitignore#L1-L5)
-- [.gitignore (frontend):33-34](file://frontend/.gitignore#L33-L34)
+- [.gitignore:1-11](file://.gitignore#L1-L11)
+- [.gitignore (documents):1-21](file://documents/.gitignore#L1-L21)
+
+### Development Tooling and ESLint Configuration
+- Backend ESLint Configuration
+  - Uses modern ESLint flat config format with @eslint/js and globals.
+  - Integrates with Prettier for consistent code formatting.
+  - Supports both CommonJS and ES modules.
+  - Configured to ignore generated files and node_modules.
+- Frontend ESLint Configuration
+  - Uses Next.js recommended configuration with core web vitals.
+  - Integrates with Prettier for consistent code formatting.
+  - Custom ignores for Next.js build artifacts.
+  - Optimized for React and Next.js development patterns.
+
+**Section sources**
+- [eslint.config.mjs (backend):1-19](file://backend/eslint.config.mjs#L1-L19)
+- [eslint.config.mjs (frontend):1-17](file://frontend/eslint.config.mjs#L1-L17)
+
+### Documentation Site Configuration
+- Docusaurus Configuration Updates
+  - Updated production URL to point to GitHub Pages deployment.
+  - Maintains compatibility with existing documentation structure.
+  - Configured with Mermaid diagram support.
+  - Includes blog functionality and social media integration.
+
+**Section sources**
+- [docusaurus.config.js:27-29](file://documents/docusaurus.config.js#L27-L29)
+- [docusaurus.config.js:69-132](file://documents/docusaurus.config.js#L69-L132)
 
 ### Deployment Strategies
 - Development
   - Run backend locally with Node; ensure DATABASE_URL points to local or dev database.
   - Run frontend dev server; configure CORS to allow localhost origins.
+  - Use local documentation build for preview purposes.
 - Preview/Staging
   - Use separate DATABASE_URL and email credentials.
   - Add a preview deployment job that builds and deploys frontend/backend to a staging host.
 - Production
   - Pin Node version in runtime (e.g., Dockerfile or platform settings).
   - Set DATABASE_URL, PORT, and other secrets via platform secret store.
-  - Run migrations before starting the app (see “Database Migrations” below).
+  - Run migrations before starting the app (see "Database Migrations" below).
+  - Documentation automatically deploys to GitHub Pages on main branch pushes.
 
 **Section sources**
 - [index.js:34-40](file://backend/src/index.js#L34-L40)
 - [schema.prisma:6-9](file://backend/prisma/schema.prisma#L6-L9)
+- [deploy.yml:3-25](file://documents/.github/workflows/deploy.yml#L3-L25)
 
 ### Containerization Approach
 - The repository does not include Dockerfiles or container orchestration manifests.
@@ -215,17 +292,17 @@ Recommended environment variables for production:
   - Store secrets in platform secret stores (e.g., Kubernetes Secrets, cloud provider secret managers).
   - Use health checks and readiness probes for rolling updates.
 
-[No sources needed since this section provides general guidance]
-
 ### Infrastructure Requirements
 - PostgreSQL instance accessible from the backend runtime.
 - Node.js 20 runtime for backend and frontend.
 - Storage for uploaded papers (persistent volume or object storage).
 - Optional: CDN for static assets and images.
+- GitHub Pages enabled for documentation hosting.
 
 **Section sources**
 - [schema.prisma:6-9](file://backend/prisma/schema.prisma#L6-L9)
 - [index.js:26-27](file://backend/src/index.js#L26-L27)
+- [deploy.yml:9-25](file://documents/.github/workflows/deploy.yml#L9-L25)
 
 ### Monitoring and Logging
 - Application Logs
@@ -240,8 +317,6 @@ Recommended environment variables for production:
 - Uptime and Alerts
   - Configure synthetic monitors and alerting rules for critical paths.
 
-[No sources needed since this section provides general guidance]
-
 ### Backup and Recovery
 - Database Backups
   - Schedule regular logical backups (e.g., pg_dump) for PostgreSQL.
@@ -254,8 +329,6 @@ Recommended environment variables for production:
   - Maintain runbooks for restoring DB and files in a new environment.
   - Test failover drills periodically.
 
-[No sources needed since this section provides general guidance]
-
 ### Scaling Strategies
 - Horizontal Scaling
   - Scale stateless backend instances behind a load balancer.
@@ -267,12 +340,13 @@ Recommended environment variables for production:
   - Cache frequent reads (e.g., round metadata) with Redis or CDN where appropriate.
 - Frontend Scaling
   - Serve static assets via CDN; leverage Next.js optimizations.
-
-[No sources needed since this section provides general guidance]
+- Documentation Scaling
+  - GitHub Pages provides automatic scaling for documentation sites.
 
 ### Security Considerations
 - SSL/TLS
   - Terminate TLS at reverse proxy or platform edge; enforce HTTPS.
+  - GitHub Pages provides automatic HTTPS for documentation.
 - Firewall Rules
   - Restrict inbound access to only required ports (e.g., 443).
   - Allow outbound to database and external APIs only.
@@ -283,8 +357,9 @@ Recommended environment variables for production:
   - Configure strict allowed origins per environment.
 - Input Validation and Rate Limiting
   - Validate inputs server-side; apply rate limiting to protect APIs.
-
-[No sources needed since this section provides general guidance]
+- GitHub Pages Security
+  - Leverage GitHub's built-in security features and HTTPS enforcement.
+  - Use GitHub's secret management for deployment tokens.
 
 ## Dependency Analysis
 Key runtime dependencies and their roles:
@@ -297,6 +372,9 @@ Key runtime dependencies and their roles:
 - Frontend
   - Next.js: Framework for rendering and serving the UI.
   - Testing and linting tooling via Vitest and ESLint.
+- Documentation
+  - Docusaurus: Static site generator for documentation.
+  - GitHub Actions: CI/CD automation for deployment.
 
 ```mermaid
 graph LR
@@ -304,17 +382,21 @@ FE["Next.js Frontend"] --> |"HTTP"| BE["Express Backend"]
 BE --> |"Prisma Client"| DB["PostgreSQL"]
 BE --> |"Email"| SG["SendGrid"]
 BE --> |"Scheduler"| CRON["node-cron"]
+DOC["Docusaurus Docs"] --> |"Deployed via"| GHActions["GitHub Actions"]
+GHActions --> |"Publishes to"| GHPages["GitHub Pages"]
 ```
 
 **Diagram sources**
 - [package.json (backend):19-32](file://backend/package.json#L19-L32)
 - [package.json (frontend):15-19](file://frontend/package.json#L15-L19)
 - [schema.prisma:6-9](file://backend/prisma/schema.prisma#L6-L9)
+- [deploy.yml:21-25](file://documents/.github/workflows/deploy.yml#L21-L25)
 
 **Section sources**
 - [package.json (backend):19-32](file://backend/package.json#L19-L32)
 - [package.json (frontend):15-19](file://frontend/package.json#L15-L19)
 - [schema.prisma:6-9](file://backend/prisma/schema.prisma#L6-L9)
+- [deploy.yml:21-25](file://documents/.github/workflows/deploy.yml#L21-L25)
 
 ## Performance Considerations
 - Database
@@ -326,10 +408,12 @@ BE --> |"Scheduler"| CRON["node-cron"]
 - Frontend
   - Leverage Next.js built-in optimizations (image optimization, code splitting).
   - Minimize bundle size and defer non-critical resources.
+- Documentation
+  - GitHub Pages provides optimized static site delivery with global CDN.
+  - Docusaurus generates optimized static assets for fast loading.
 - CI
   - Cache npm dependencies to speed up pipelines.
-
-[No sources needed since this section provides general guidance]
+  - Use GitHub Actions caching for faster builds.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -345,15 +429,24 @@ Common issues and resolutions:
   - Ensure /uploads path is mounted and files exist on disk or storage.
 - Tests Failing in CI
   - Check Node version alignment and dependency installation steps.
+- GitHub Pages Deployment Issues
+  - Verify GitHub Pages is enabled in repository settings.
+  - Check that the main branch has the correct workflow configuration.
+  - Ensure proper permissions for GITHUB_TOKEN.
+- Documentation Build Failures
+  - Verify Node.js 20 is available in the GitHub Actions environment.
+  - Check for broken links or invalid markdown syntax.
+  - Review build logs for specific error messages.
 
 **Section sources**
 - [index.js:16-27](file://backend/src/index.js#L16-L27)
-- [.gitignore (backend):1-5](file://backend/.gitignore#L1-L5)
+- [.gitignore:1-11](file://.gitignore#L1-L11)
 - [lint.yml:16-27](file://.gitea/workflows/lint.yml#L16-L27)
 - [vitest.config.mjs (backend):1-28](file://backend/vitest.config.mjs#L1-L28)
+- [deploy.yml:11-25](file://documents/.github/workflows/deploy.yml#L11-L25)
 
 ## Conclusion
-The Olympiad Portal includes a solid foundation for CI/CD with linting and docs deployment. To reach production-grade reliability, add explicit deployment pipelines for frontend and backend, secure environment and secrets management, robust monitoring/logging, backup and disaster recovery processes, and clear scaling and security practices. The existing configurations provide a strong base to build upon.
+The Olympiad Portal includes a solid foundation for CI/CD with linting and enhanced documentation deployment capabilities. The migration to GitHub Pages for documentation hosting provides better integration with the GitHub ecosystem while maintaining the legacy Netlify deployment option. To reach production-grade reliability, add explicit deployment pipelines for frontend and backend, secure environment and secrets management, robust monitoring/logging, backup and disaster recovery processes, and clear scaling and security practices. The existing configurations provide a strong base to build upon.
 
 ## Appendices
 
@@ -371,3 +464,21 @@ The Olympiad Portal includes a solid foundation for CI/CD with linting and docs 
 **Section sources**
 - [vitest.config.mjs (backend):1-28](file://backend/vitest.config.mjs#L1-L28)
 - [vitest.config.mjs (frontend):1-31](file://frontend/vitest.config.mjs#L1-L31)
+
+### GitHub Pages Configuration
+- Documentation site is configured to deploy to GitHub Pages using the peaceiris/actions-gh-pages action.
+- The deployment uses Node.js 20 and builds the Docusaurus site before publishing.
+- GitHub Pages provides automatic HTTPS and global CDN distribution.
+
+**Section sources**
+- [deploy.yml:1-25](file://documents/.github/workflows/deploy.yml#L1-L25)
+- [docusaurus.config.js:27-29](file://documents/docusaurus.config.js#L27-L29)
+
+### Enhanced .gitignore Configuration
+- Root .gitignore includes Node.js modules, environment files, and build artifacts.
+- Documents-specific .gitignore excludes build directories, cache files, and environment files.
+- Improved exclusion patterns prevent accidental commits of sensitive or generated files.
+
+**Section sources**
+- [.gitignore:1-11](file://.gitignore#L1-L11)
+- [.gitignore (documents):1-21](file://documents/.gitignore#L1-L21)

@@ -1,1 +1,0 @@
-Next.js App Router frontend for the Olympiad Portal, providing landing, auth, and organiser/educator dashboards with a shared API client and role-based routing hooks.

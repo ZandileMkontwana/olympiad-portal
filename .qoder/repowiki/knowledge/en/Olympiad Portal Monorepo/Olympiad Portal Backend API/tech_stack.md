@@ -1,1 +1,0 @@
-Express 5 + CORS + cookie-parser for HTTP; Prisma 5 with PostgreSQL schema migrations; bcrypt + jsonwebtoken + passport/passport-local for authentication; multer for paper uploads; @sendgrid/mail for email; node-cron for scheduled jobs; Vitest + Supertest for testing with V8 coverage.

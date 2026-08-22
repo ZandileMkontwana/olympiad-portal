@@ -1,2 +1,0 @@
-- Each application maintains its own linting/formatting configuration (e.g., `backend/eslint.config.mjs`, `backend/.prettierrc`, frontend-specific script) rather than sharing a single root config.
-- Staged file paths are resolved relative to the repo root and dispatched to per-app tooling through lint-staged glob patterns.

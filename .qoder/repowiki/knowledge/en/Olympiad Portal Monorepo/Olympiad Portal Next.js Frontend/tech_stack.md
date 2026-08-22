@@ -1,1 +1,0 @@
-Next.js 16 App Router with React 19, Tailwind CSS v4 via @tailwindcss/postcss, Vitest + jsdom for unit tests, ESLint 9 with eslint-config-next, Prettier, and xlsx for spreadsheet handling.
