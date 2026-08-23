@@ -46,18 +46,10 @@ export default function SubmissionTablePage() {
     async function fetchData() {
       try {
         const [roundRes, entrantsRes, paperRes, submissionsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}`, {
-            credentials: 'include',
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/entrants`, {
-            credentials: 'include',
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/papers`, {
-            credentials: 'include',
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/submissions`, {
-            credentials: 'include',
-          }),
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`, { credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/entrants`, { credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/papers`, { credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/submissions`, { credentials: "include" }),
         ]);
 
         const roundData = await roundRes.json();
@@ -200,7 +192,7 @@ export default function SubmissionTablePage() {
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/submissions`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/submissions`,
         {
           method: 'POST',
           credentials: 'include',
