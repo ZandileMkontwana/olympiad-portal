@@ -1,13 +1,13 @@
 // app/rounds/[id]/submit/page.js
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from "react";
-import { useSearchParams } from "next/navigation";
-import * as XLSX from "xlsx";
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import * as XLSX from 'xlsx';
 
 export default function SubmissionTablePage() {
   const searchParams = useSearchParams();
-  const roundId = searchParams.get("id");
+  const roundId = searchParams.get('id');
 
   const [round, setRound] = useState(null);
   const [entrants, setEntrants] = useState([]);
@@ -194,10 +194,10 @@ export default function SubmissionTablePage() {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/submissions`,
         {
-          method: "POST",
-          credentials: "include",
+          method: 'POST',
+          credentials: 'include',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             entrantId,
