@@ -58,6 +58,30 @@ router.post('/educators/complete-profile', requireAuth(), async(req, res) => {
     });
 });
 
+// GET /auth/me
+router.get('/auth/me', requireAuth(), async(req, res) => {
+    const { userId: clerkUserId } = req.auth();
+
+    const user = await prisma.user.findUnique({
+        where: { clerkUserId },
+        include: { educator: { include: { school: true } } }
+    });
+
+    if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+        user: {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            name: user.name,
+            school: user.educator ? user.educator.school.name : null
+        }
+    });
+});
+
 // DELETE /auth/account
 router.delete('/auth/account', requireAuth(), async(req, res) => {
     const { userId: clerkUserId } = req.auth();
