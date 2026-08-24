@@ -1,4 +1,4 @@
-# Sprint 1 Retrospective 
+# Sprint 1 Retrospective
 
 ## Zandile (Round Lifecycle & Data Core)
 
@@ -27,3 +27,60 @@
 - Confirm the CI runner situation is resolved (or documented as a known limitation) and wire status checks into branch protection
 - Backfill the API reference doc with any newly added routes from teammates
 - Investigate the ES module vs CommonJS mismatch that just surfaced in the backend
+
+## Mlungisi (Papers, Submissions & Marking)
+
+### What went well
+
+- Delivered the full backend scope I owned: paper upload/download, submissions
+  with idempotency handling, MCQ automarking, receipt emails via SendGrid,
+  and the full authentication system (including a mid-sprint migration from
+  our own JWT-based auth to Clerk per the client's requirement).
+- Caught and fixed several real bugs before they caused bigger problems -
+  a duplicate schema.prisma model that would have broken everyone's local
+  setup, a broken seed script after the auth migration, and a silent typo
+  (`module.export` instead of `module.exports`) that caused a confusing
+  runtime crash.
+- Got comfortable with the full git branch/PR/merge-conflict workflow -
+  resolved several real conflicts in shared files (schema.prisma,
+  package.json) without losing work or breaking main.
+
+### What was challenging
+
+- Coordinating schema changes with a teammate in real time - we hit the
+  same file (schema.prisma) independently multiple times, which caused
+  duplicate definitions and blocked everyone until resolved. Better
+  upfront communication before touching shared schema would have avoided
+  this.
+- The Clerk migration was bigger than expected - it touched almost every
+  file I'd built for auth, and testing it properly required the frontend
+  integration to exist first, which meant a period of backend work I
+  couldn't fully verify on my own.
+- Windows-specific tooling friction (file locks during `prisma generate`
+  while the server was running, PowerShell's handling of quotes and
+  special characters in curl commands) cost real time that had nothing
+  to do with the actual feature work.
+
+### What I'd do differently
+
+- Run `npx prisma generate` as a required check before opening any PR
+  that touches schema.prisma, to catch duplicate/broken definitions
+  before they reach main.
+- Raise significant architecture changes (like the Clerk migration) with
+  the team as a proper discussion before starting, rather than mid-flight -
+  worked out fine this time, but was more improvised than ideal.
+- Keep scratch/test files out of the working directory more consistently
+  rather than relying on remembering not to `git add` them each time.
+
+### What I learned
+
+- How JWT-based authentication actually works under the hood (signing,
+  verifying, hashing with bcrypt) before also learning what a managed
+  auth provider like Clerk abstracts away, which gave me a much better
+  understanding of why that abstraction is valuable.
+- Real experience resolving git merge conflicts under time pressure,
+  including in generated/lockfile-adjacent files where the right move
+  is often to regenerate rather than hand-edit.
+- The importance of testing auth-protected endpoints through the actual
+  intended flow (browser + real session) rather than assuming a
+  simplified test (like a copied cookie in curl) will behave identically.
