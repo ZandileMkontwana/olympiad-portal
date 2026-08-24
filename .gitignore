@@ -8,3 +8,4 @@ frontend/coverage/
 # Local Netlify folder
 .netlify
 .qoder
+.next/
