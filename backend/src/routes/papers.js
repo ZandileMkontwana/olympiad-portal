@@ -3,27 +3,51 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const prisma = require('../lib/prisma');
-const { requireRole } = require('../middleware/auth');
+const { requireAuth } = require('@clerk/express');
 
 const router = express.Router();
 
-const UPLOAD_DIR = path.join(__dirname, '../../uploads/papers');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const supabase = require('../lib/supabase');
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${file.originalname}`;
-    cb(null, unique);
-  },
-});
+//Keeping files in supaabase memeroy instead of locak disk
+//uploading the buffer straight to supabase storage
+const upload = multer({ storage: multer.memoryStorage() });
 
-const upload = multer({ storage });
+const BUCKET = process.env.SUPABASE_BUCKET_NAME;
+
+async function uploadToSupabase(file) {
+  const uniqueName = `${Date.now()}-${file.originalname}`;
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(uniqueName, file.buffer, { contentType: file.mimetype });
+
+  if (error){
+    throw new Error(`Supabase upload failed: ${error.message}`);
+  }
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(uniqueName);
+  return data.publicUrl;
+
+}
+
+async function requireOrganiserRole(req, res, next) {
+  const { userId: clerkUserId } = req.auth();
+  const user = await prisma.user.findUnique({ where: { clerkUserId } });
+
+  if (!user || user.role !== 'organiser') {
+    return res.status(403).json({ error: 'Organiser access required' });
+  }
+
+  next();
+}
+
 
 // POST /rounds/:id/papers
 router.post(
   '/rounds/:id/papers',
-  ...requireRole('organiser'),
+  requireAuth(),
+  requireOrganiserRole,
   upload.fields([
     { name: 'paper', maxCount: 1 },
     { name: 'memo', maxCount: 1 },
@@ -39,23 +63,20 @@ router.post(
     const memoFile = req.files.memo[0];
 
     let memoAnswers = null;
-    if (req.body.memoAnswers) {
-      try {
+    if (req.body.memoAnswers){
+      try{
         memoAnswers = JSON.parse(req.body.memoAnswers);
-      } catch (err) {
-        console.error('Invalid memoAnswers JSON:', err.message);
-        return res.status(400).json({ error: 'memoAnswers must be valid JSON' });
+      } catch (err){
+        return res.status(400).json({ error: 'memoAnswers must be valid JSON'});
       }
     }
 
-    try {
+    try{
+      const fileUrl = await uploadToSupabase(paperFile);
+      const memoUrl = await uploadToSupabase(memoFile);
+
       const paper = await prisma.paper.create({
-        data: {
-          roundId,
-          fileUrl: `/uploads/papers/${paperFile.filename}`,
-          memoUrl: `/uploads/papers/${memoFile.filename}`,
-          memoAnswers,
-        },
+        data: { roundId , fileUrl ,memoUrl , memoAnswers },
       });
       res.status(201).json(paper);
     } catch (err) {
@@ -82,7 +103,7 @@ router.get('/rounds/:id/papers', async (req, res) => {
 
   if (!downloadable) {
     return res.status(403).json({
-      error: `Paper not available — round is currently '${round.state}'`,
+      error: `Paper not available - round is currently '${round.state}'`,
     });
   }
 
