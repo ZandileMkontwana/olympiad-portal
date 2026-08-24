@@ -1,7 +1,6 @@
 // Shared API client for the organiser console.
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -9,17 +8,6 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
   }
-}
-
-// TODO(auth): there is no sign-in flow in the frontend yet, so this will
-// always return no token until one exists. Once a sign-in page is built,
-// have it store the JWT from POST /api/auth/signin here (localStorage key
-// 'authToken', or wherever the sign-in page ends up putting it — update
-// both places together).
-function authHeaders() {
-  if (typeof window === 'undefined') return {};
-  const token = window.localStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 /**
@@ -31,17 +19,14 @@ async function requestJson(path, options = {}) {
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        ...authHeaders(),
         ...options.headers,
       },
     });
   } catch (networkError) {
-    throw new ApiError(
-      'Could not reach the server. Is the backend running on :5000?',
-      0
-    );
+    throw new ApiError('Could not reach the server. Is the backend running on :5000?', 0);
   }
 
   let data = null;
@@ -52,21 +37,13 @@ async function requestJson(path, options = {}) {
   }
 
   if (!response.ok) {
-    const message =
-      (data && data.error) || `Request failed with status ${response.status}`;
+    const message = (data && data.error) || `Request failed with status ${response.status}`;
     throw new ApiError(message, response.status);
   }
 
   return data;
 }
 
-/**
- * Creates an olympiad.
- * Wired to POST /api/olympiads (backend/src/routes/rounds.js).
- *
- * @param {{ name: string, timezone: string }} input
- * @returns {Promise<import('../../../shared/types').Olympiad>}
- */
 export function createOlympiad({ name, timezone }) {
   return requestJson('/api/olympiads', {
     method: 'POST',
@@ -74,13 +51,6 @@ export function createOlympiad({ name, timezone }) {
   });
 }
 
-/**
- * Creates a round under an olympiad.
- * Wired to POST /api/rounds (backend/src/routes/rounds.js).
- *
- * @param {{ olympiadId: string, name: string, openTime: string, closeTime: string }} input
- * @returns {Promise<import('../../../shared/types').Round>}
- */
 export function createRound({ olympiadId, name, openTime, closeTime }) {
   return requestJson('/api/rounds', {
     method: 'POST',
@@ -88,54 +58,42 @@ export function createRound({ olympiadId, name, openTime, closeTime }) {
   });
 }
 
-/**
- * Lists rounds for a single olympiad.
- * Wired to GET /api/olympiads/:id/rounds (backend/src/routes/rounds.js).
- *
- * @param {string} olympiadId
- * @returns {Promise<import('../../../shared/types').Round[]>}
- */
 export function listOlympiadRounds(olympiadId) {
   return requestJson(`/api/olympiads/${olympiadId}/rounds`);
 }
 
-/**
- * Lists all rounds, across all olympiads.
- * Wired to GET /api/rounds (backend/src/routes/rounds.js).
- *
- * @returns {Promise<import('../../../shared/types').Round[]>}
- */
 export function listRounds() {
   return requestJson('/api/rounds');
 }
-
 /**
- * Uploads a paper (and optional memo) for a round.
- * Wired to POST /api/rounds/:id/papers (backend/src/routes/papers.js).
+ * Fetches a single round by id.
+ * Wired to GET /api/rounds/:id (backend/src/routes/rounds.js).
  *
  * @param {string} roundId
- * @param {{ paperFile: File, memoFile?: File | null }} files
- * @returns {Promise<import('../../../shared/types').Paper>}
+ * @returns {Promise<import('../../../shared/types').Round>}
  */
-export async function uploadPaper(roundId, { paperFile, memoFile }) {
+export function getRound(roundId) {
+  return requestJson(`/api/rounds/${roundId}`);
+}
+export async function uploadPaper(roundId, { paperFile, memoFile, memoAnswers }) {
   const formData = new FormData();
   formData.append('paper', paperFile);
   if (memoFile) {
     formData.append('memo', memoFile);
+  }
+  if (memoAnswers && Object.keys(memoAnswers).length > 0) {
+    formData.append('memoAnswers', JSON.stringify(memoAnswers));
   }
 
   let response;
   try {
     response = await fetch(`${API_BASE_URL}/api/rounds/${roundId}/papers`, {
       method: 'POST',
-      headers: authHeaders(),
+      credentials: 'include',
       body: formData,
     });
   } catch (networkError) {
-    throw new ApiError(
-      'Could not reach the server. Is the backend running on :5000?',
-      0
-    );
+    throw new ApiError('Could not reach the server. Is the backend running on :5000?', 0);
   }
 
   let data = null;
@@ -146,40 +104,43 @@ export async function uploadPaper(roundId, { paperFile, memoFile }) {
   }
 
   if (!response.ok) {
-    const message =
-      (data && data.error) || `Upload failed with status ${response.status}`;
+    const message = (data && data.error) || `Upload failed with status ${response.status}`;
     throw new ApiError(message, response.status);
   }
 
   return data;
-
 }
 
-/**
- * Registers a new educator account. Role is fixed server-side — the
- * client never sends or chooses it.
- * Wired to POST /api/auth/register (backend/src/routes/auth.js).
- *
- * @param {{ email: string, password: string }} input
- * @returns {Promise<{ user: { id: string, email: string, role: string }, token: string }>}
- */
-export function register({ email, password }) {
+export function register({ email, password, name, schoolName }) {
   return requestJson('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, name, schoolName }),
   });
 }
 
-/**
- * Logs in an existing user.
- * Wired to POST /api/auth/login (backend/src/routes/auth.js).
- *
- * @param {{ email: string, password: string }} input
- * @returns {Promise<{ user: { id: string, email: string, role: string }, token: string }>}
- */
+
 export function login({ email, password }) {
   return requestJson('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
+}
+
+export async function fetchCurrentUser() {
+  try {
+    const data = await requestJson('/api/auth/me');
+    return data.user;
+  } catch {
+    return null;
+  }
+}
+
+export function logout() {
+  return requestJson('/api/auth/logout', { method: 'POST' });
+}
+
+export function dashboardPathForRole(role) {
+  if (role === 'organiser') return '/organiser'; // TODO: confirm real path
+  if (role === 'educator') return '/educator';
+  return '/login';
 }

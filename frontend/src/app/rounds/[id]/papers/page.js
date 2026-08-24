@@ -28,10 +28,23 @@ export default function PaperUploadPage() {
 
   const [paperFile, setPaperFile] = useState(null);
   const [memoFile, setMemoFile] = useState(null);
+  const [answerRows, setAnswerRows] = useState([{ question: '1', answer: '' }]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [status, setStatus] = useState('idle'); // idle | submitting | success | error
   const [errorMessage, setErrorMessage] = useState('');
   const [uploadedPaper, setUploadedPaper] = useState(null);
+
+  function updateRow(index, field, value) {
+    setAnswerRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  }
+
+  function addRow() {
+    setAnswerRows((prev) => [...prev, { question: String(prev.length + 1), answer: '' }]);
+  }
+
+  function removeRow(index) {
+    setAnswerRows((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -43,17 +56,24 @@ export default function PaperUploadPage() {
       return;
     }
 
+    // Build the answer key from filled-in rows only — empty rows are
+    // silently skipped rather than blocking the whole upload.
+    const memoAnswers = {};
+    answerRows.forEach((row) => {
+      if (row.question.trim() && row.answer.trim()) {
+        memoAnswers[row.question.trim()] = row.answer.trim().toUpperCase();
+      }
+    });
+
     setStatus('submitting');
     try {
-      const paper = await uploadPaper(roundId, { paperFile, memoFile });
+      const paper = await uploadPaper(roundId, { paperFile, memoFile, memoAnswers });
       setUploadedPaper(paper);
       setStatus('success');
     } catch (err) {
       setStatus('error');
       setErrorMessage(
-        err instanceof ApiError
-          ? err.message
-          : 'Something went wrong. Please try again.'
+        err instanceof ApiError ? err.message : 'Something went wrong. Please try again.'
       );
     }
   }
@@ -61,6 +81,7 @@ export default function PaperUploadPage() {
   function handleReset() {
     setPaperFile(null);
     setMemoFile(null);
+    setAnswerRows([{ question: '1', answer: '' }]);
     setFieldErrors({});
     setStatus('idle');
     setErrorMessage('');
@@ -75,31 +96,30 @@ export default function PaperUploadPage() {
           className="certificate-card rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm"
         >
           <div className="flex items-center gap-2">
-            <span
-              className="h-2 w-2 rounded-full bg-sage"
-              aria-hidden="true"
-            />
-            <h1 className="font-display text-xl font-semibold text-ink">
-              Paper uploaded
-            </h1>
+            <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
+            <h1 className="font-display text-xl font-semibold text-ink">Paper uploaded</h1>
           </div>
           <p className="mt-2 text-sm text-ink-soft">
-            Uploaded for round{' '}
-            <span className="font-mono text-ink">{roundId}</span> at{' '}
+            Uploaded for round <span className="font-mono text-ink">{roundId}</span> at{' '}
             {new Date(uploadedPaper.uploadedAt).toLocaleString()}.
           </p>
           <dl className="mt-4 space-y-1 text-sm">
             <div className="flex gap-2">
               <dt className="font-medium text-ink-soft">Paper</dt>
-              <dd className="truncate font-mono text-ink">
-                {uploadedPaper.fileUrl}
-              </dd>
+              <dd className="truncate font-mono text-ink">{uploadedPaper.fileUrl}</dd>
             </div>
             {uploadedPaper.memoUrl && (
               <div className="flex gap-2">
                 <dt className="font-medium text-ink-soft">Memo</dt>
-                <dd className="truncate font-mono text-ink">
-                  {uploadedPaper.memoUrl}
+                <dd className="truncate font-mono text-ink">{uploadedPaper.memoUrl}</dd>
+              </div>
+            )}
+            {uploadedPaper.memoAnswers && (
+              <div className="flex gap-2">
+                <dt className="font-medium text-ink-soft">Answer key</dt>
+                <dd className="text-ink">
+                  {Object.keys(uploadedPaper.memoAnswers).length} question
+                  {Object.keys(uploadedPaper.memoAnswers).length === 1 ? '' : 's'} set
                 </dd>
               </div>
             )}
@@ -118,9 +138,7 @@ export default function PaperUploadPage() {
 
   return (
     <main className="mx-auto max-w-xl px-8 py-12">
-      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
-        Upload paper
-      </h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Upload paper</h1>
       <div className="mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-3 text-sm text-ink-soft">
         Round <span className="font-mono text-ink">{roundId}</span>
@@ -160,11 +178,63 @@ export default function PaperUploadPage() {
             aria-describedby={fieldErrors.memo ? 'memo-error' : undefined}
             className="mt-2 block w-full rounded-md text-sm text-ink-soft file:mr-4 file:rounded-md file:border-0 file:bg-lavender/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-lavender-deep hover:file:bg-lavender/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
           />
+          <p className="mt-1 text-xs text-ink-soft">
+            The file for markers to reference — not used for automarking.
+          </p>
           {fieldErrors.memo && (
             <p id="memo-error" role="alert" className="mt-1 text-sm text-red-600">
               {fieldErrors.memo}
             </p>
           )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink">
+            Answer key <span className="text-ink-soft">(for automarking)</span>
+          </label>
+          <p className="mt-1 text-xs text-ink-soft">
+            The correct option for each question. This is what the portal actually checks
+            submissions against.
+          </p>
+
+          <div className="mt-3 space-y-2">
+            {answerRows.map((row, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Q#"
+                  value={row.question}
+                  onChange={(e) => updateRow(index, 'question', e.target.value)}
+                  className="w-16 rounded-md border border-lavender/30 bg-surface px-2 py-1.5 text-sm text-ink text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
+                />
+                <input
+                  type="text"
+                  placeholder="Answer (e.g. B)"
+                  value={row.answer}
+                  onChange={(e) => updateRow(index, 'answer', e.target.value)}
+                  className="flex-1 rounded-md border border-lavender/30 bg-surface px-3 py-1.5 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
+                />
+                {answerRows.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeRow(index)}
+                    className="text-sm text-ink-soft hover:text-red-600"
+                    aria-label={`Remove question ${row.question}`}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={addRow}
+            className="mt-3 text-sm font-medium text-lavender-deep hover:opacity-80"
+          >
+            + Add question
+          </button>
         </div>
 
         {status === 'error' && (

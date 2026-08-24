@@ -14,5 +14,6 @@ export default defineConfig([
     },
   },
   { files: ["**/*.js"], languageOptions: { sourceType: "commonjs" } },
+  { files: ["**/*.test.js"], languageOptions: { sourceType: "module" } },
   prettierConfig,
 ]);
