@@ -3,12 +3,12 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 require('dotenv').config();
-
 const papersRouter = require('./routes/papers');
 const roundsRouter = require('./routes/rounds');
 const submissionsRouter = require('./routes/submissions');
 const authRouter = require('./routes/auth');
 const { startScheduler } = require('./scheduler');
+const { clerkMiddleware } = require('@clerk/express');
 
 const app = express();
 
@@ -21,7 +21,7 @@ app.use(
 );
 app.use(cookieParser());
 app.use(express.json());
-
+app.use(clerkMiddleware());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/api', papersRouter);

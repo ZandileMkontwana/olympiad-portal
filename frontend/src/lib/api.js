@@ -111,10 +111,10 @@ export async function uploadPaper(roundId, { paperFile, memoFile, memoAnswers })
   return data;
 }
 
-export function register({ email, password }) {
+export function register({ email, password, name, schoolName }) {
   return requestJson('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, name, schoolName }),
   });
 }
 

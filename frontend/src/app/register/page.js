@@ -1,117 +1,135 @@
 'use client';
 
 import { useState } from 'react';
-import { register, ApiError } from '@/lib/api';
+import { SignUp, useAuth } from '@clerk/nextjs';
 
-function validateForm(email, password) {
-  const errors = {};
-
-  if (!email.trim()) {
-    errors.email = 'Email is required.';
-  } else if (!/^\S+@\S+\.\S+$/.test(email)) {
-    errors.email = 'Enter a valid email address.';
-  }
-  if (!password) {
-    errors.password = 'Password is required.';
-  } else if (password.length < 8) {
-    errors.password = 'Password must be at least 8 characters.';
-  }
-
-  return errors;
+function Watermark() {
+  return (
+    <img
+      src="/tree-mark.png"
+      alt=""
+      aria-hidden="true"
+      className="watermark pointer-events-none absolute left-1/2 top-1/2 w-[700px] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain"
+    />
+  );
 }
 
-export default function RegisterPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+function CompleteProfileForm() {
+  const { getToken } = useAuth();
+  const [name, setName] = useState('');
+  const [schoolName, setSchoolName] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [status, setStatus] = useState('idle'); // idle | submitting | success | error
   const [errorMessage, setErrorMessage] = useState('');
+  const [profile, setProfile] = useState(null);
+
+  function validate() {
+    const errors = {};
+    if (!name.trim()) errors.name = 'Name is required.';
+    if (!schoolName.trim()) errors.schoolName = 'School name is required.';
+    return errors;
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
     setErrorMessage('');
 
-    const errors = validateForm(email, password);
+    const errors = validate();
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
     setStatus('submitting');
     try {
-      const result = await register({ email: email.trim(), password });
-      // Store the token now so it's ready once protected routes exist —
-      // where a logged-in educator actually lands is Person 4's redirect
-      // logic (not built yet), so we just confirm success here.
-      window.localStorage.setItem('authToken', result.token);
+      const token = await getToken();
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/educators/complete-profile`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ name: name.trim(), schoolName: schoolName.trim() }),
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Something went wrong.');
+      }
+
+      setProfile(data.user);
       setStatus('success');
     } catch (err) {
       setStatus('error');
-      setErrorMessage(err instanceof ApiError ? err.message : 'Something went wrong.');
+      setErrorMessage(err.message || 'Something went wrong.');
     }
   }
 
-  if (status === 'success') {
+  if (status === 'success' && profile) {
     return (
-      <main className="mx-auto max-w-md px-8 py-24 text-center">
-        <div
-          role="status"
-          className="rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm"
-        >
-          <div className="flex items-center justify-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
-            <h1 className="font-display text-xl font-semibold text-ink">Account created</h1>
-          </div>
-          <p className="mt-2 text-sm text-ink-soft">
-            You&apos;re registered as an educator. Log in to continue.
-          </p>
+      <div
+        role="status"
+        className="relative rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm"
+      >
+        <div className="flex items-center justify-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
+          <h1 className="font-display text-xl font-semibold text-ink">Account created</h1>
         </div>
-      </main>
+        <p className="mt-2 text-sm text-ink-soft">
+          Welcome, {profile.name}. You&apos;re registered as an educator at {profile.school}.
+        </p>
+      </div>
     );
   }
 
   return (
-    <main className="mx-auto max-w-md px-8 py-24">
+    <div className="relative">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
-        Create an account
+        Finish setting up your account
       </h1>
       <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+      <p className="mt-4 text-center text-sm text-ink-soft">
+        You&apos;re signed in — just need your name and school to finish.
+      </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-ink">
-            Email <span className="text-gold">*</span>
+          <label htmlFor="name" className="block text-sm font-medium text-ink">
+            Name <span className="text-gold">*</span>
           </label>
           <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            aria-invalid={Boolean(fieldErrors.email)}
-            aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+            id="name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            aria-invalid={Boolean(fieldErrors.name)}
+            aria-describedby={fieldErrors.name ? 'name-error' : undefined}
             className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
           />
-          {fieldErrors.email && (
-            <p id="email-error" role="alert" className="mt-1 text-sm text-red-600">
-              {fieldErrors.email}
+          {fieldErrors.name && (
+            <p id="name-error" role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.name}
             </p>
           )}
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-ink">
-            Password <span className="text-gold">*</span>
+          <label htmlFor="schoolName" className="block text-sm font-medium text-ink">
+            School name <span className="text-gold">*</span>
           </label>
           <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            aria-invalid={Boolean(fieldErrors.password)}
-            aria-describedby={fieldErrors.password ? 'password-error' : undefined}
+            id="schoolName"
+            type="text"
+            value={schoolName}
+            onChange={(e) => setSchoolName(e.target.value)}
+            aria-invalid={Boolean(fieldErrors.schoolName)}
+            aria-describedby={fieldErrors.schoolName ? 'schoolName-error' : undefined}
             className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
           />
-          {fieldErrors.password && (
-            <p id="password-error" role="alert" className="mt-1 text-sm text-red-600">
-              {fieldErrors.password}
+          {fieldErrors.schoolName && (
+            <p id="schoolName-error" role="alert" className="mt-1 text-sm text-red-600">
+              {fieldErrors.schoolName}
             </p>
           )}
         </div>
@@ -130,9 +148,30 @@ export default function RegisterPage() {
           disabled={status === 'submitting'}
           className="w-full rounded-md bg-lavender-deep px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {status === 'submitting' ? 'Creating account…' : 'Create account'}
+          {status === 'submitting' ? 'Saving…' : 'Finish setup'}
         </button>
       </form>
+    </div>
+  );
+}
+
+export default function RegisterPage() {
+  const { isSignedIn, isLoaded } = useAuth();
+
+  if (!isLoaded) {
+    return <main className="mx-auto max-w-md px-8 py-24 text-center">Loading…</main>;
+  }
+
+  return (
+    <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
+      <Watermark />
+      {isSignedIn ? (
+        <CompleteProfileForm />
+      ) : (
+        <div className="relative flex justify-center">
+          <SignUp routing="hash" signInUrl="/login" fallbackRedirectUrl="/register" />
+        </div>
+      )}
     </main>
   );
 }

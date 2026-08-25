@@ -4,13 +4,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useClerk } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { logout, listRounds, ApiError } from '@/lib/api';
 
 export default function OrganiserDashboard() {
   const { user, checking } = useRequireRole('organiser');
-  const router = useRouter();
+  const { signOut } = useClerk();
 
   const [rounds, setRounds] = useState([]);
   const [roundsStatus, setRoundsStatus] = useState('loading');
@@ -40,8 +40,7 @@ export default function OrganiserDashboard() {
   }
 
   async function handleLogout() {
-    await logout();
-    router.push('/login');
+    await signOut({ redirectUrl: '/login' });
   }
 
   return (

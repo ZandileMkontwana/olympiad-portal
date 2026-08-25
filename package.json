@@ -18,5 +18,9 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.9.6"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^7.8.0",
+    "@supabase/supabase-js": "^2.112.3"
   }
 }

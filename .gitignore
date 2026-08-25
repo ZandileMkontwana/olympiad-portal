@@ -7,5 +7,5 @@ backend/coverage/
 frontend/coverage/
 # Local Netlify folder
 .netlify
-package.json
 .qoder
+.next/

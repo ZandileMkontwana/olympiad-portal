@@ -16,7 +16,7 @@ function formatRemaining(ms) {
   return `${seconds}s`;
 }
 
-export default function RoundView() {
+function RoundViewContent() {
   const searchParams = useSearchParams();
   const roundId = searchParams.get('id');
 
@@ -31,7 +31,9 @@ export default function RoundView() {
 
     async function fetchRound() {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}`);
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`
+        );
 
         const data = await response.json();
 
@@ -73,7 +75,7 @@ export default function RoundView() {
     setDownloadError('');
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/rounds/${roundId}/papers`
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/papers`
       );
       const data = await response.json();
 
@@ -81,7 +83,7 @@ export default function RoundView() {
         throw new Error(data.error || 'Failed to fetch paper');
       }
 
-      window.location.href = `${process.env.NEXT_PUBLIC_API_URL}${data.fileUrl}`;
+      window.location.href = `${process.env.NEXT_PUBLIC_API_BASE_URL}${data.fileUrl}`;
     } catch (error) {
       setDownloadError(error.message);
     }
