@@ -1,11 +1,11 @@
 // app/rounds/[id]/submit/page.js
 'use client';
 
-import { Suspense,useEffect, useState, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import * as XLSX from 'xlsx';
 
-function SubmissionTableContent()  {
+function SubmissionTableContent() {
   const searchParams = useSearchParams();
   const roundId = searchParams.get('id');
 

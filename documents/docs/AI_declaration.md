@@ -23,7 +23,7 @@ AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) wa
 
 All code was reviewed, tested in-browser, and verified against the live backend by the author before being committed. All product and design decisions (page content, visual direction, which fields to collect, how features should behave) were made by the author; AI assistance was used to implement, explain, and troubleshoot those decisions, not to originate them.
 
-
+---
 ## AI Declaration — Kutloano
 
 AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) was used throughout this sprint's full-stack work in the following ways:

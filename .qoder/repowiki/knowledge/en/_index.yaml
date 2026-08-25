@@ -3,7 +3,7 @@ schema_version: 1
 locale: en-US
 branch: feature/round-lifecycle-setup
 nodes_managed: true
-exported_at: "2026-08-25T10:14:39Z"
+exported_at: "2026-08-25T11:12:43Z"
 modules:
     "":
         dir_name: Olympiad Portal Monorepo
@@ -21,8 +21,8 @@ modules:
         depends_on: []
         related_to: []
     backend:
-        dir_name: Olympaid Portal Backend API
-        title: Olympaid Portal Backend API
+        dir_name: Olympaid Backend API
+        title: Olympaid Backend API
         scope:
             - backend/
         source_files: []
