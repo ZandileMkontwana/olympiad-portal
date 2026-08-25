@@ -1,4 +1,4 @@
-## AI Declaration
+## AI Declaration - Zandile
 
 AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) was used throughout this project's development in the following ways:
 
@@ -7,8 +7,11 @@ AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) wa
 - **Documentation:** plan for documentation and setting up docusaurus
 - **Planning:** structuring task breakdowns and sprint planning discussions
 
+I used Qoder to guide me in the creation of code coverage
+
 All code was reviewed, tested, and verified by the author before being committed. All architectural and design decisions (data model structure, API design, technology choices) were made by the team; AI assistance was used to explain and troubleshoot those decisions, not to originate project requirements or scope.
 
+---
 ## AI Declaration — Roni
 
 AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) was used throughout this sprint's frontend and design work in the following ways:
@@ -33,3 +36,14 @@ AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) wa
 * Planning: structuring a sprint retrospective and a categorized issue list for the team's tracker.
 
 All code was reviewed, tested, and verified against the live backend by the author before being committed. All architectural and design decisions (data model structure, API design, technology and library choices, including the Clerk and Supabase migrations) were made by the team; AI assistance was used to implement, explain, and troubleshoot those decisions, not to originate them.
+---
+## AI Declaration — Mlungisi
+
+AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) was used throughout this sprint's backend work in the following ways:
+
+- **Backend development:** guidance on building the paper upload/download endpoints, submission handling with idempotency logic, MCQ automarking, SendGrid email integration, and the authentication system — including a mid-sprint migration to Clerk per the client's requirement.
+- **File storage:** guidance implementing file storage via Supabase Storage for paper/memo uploads.
+- **Debugging:** help resolving schema and dependency issues after merges, and general troubleshooting of backend errors during development.
+- **Git workflow:** help resolving merge conflicts in shared files.
+
+All code was reviewed, tested, and verified against the live backend by the author before being committed. All architectural and design decisions were made by the author and team; AI assistance was used to implement, explain, and troubleshoot those decisions, not to originate them.

@@ -12,7 +12,6 @@ export default function OrganiserDashboard() {
   const { user, checking } = useRequireRole('organiser');
   const { signOut } = useClerk();
 
-
   const [rounds, setRounds] = useState([]);
   const [roundsStatus, setRoundsStatus] = useState('loading');
 
@@ -41,7 +40,7 @@ export default function OrganiserDashboard() {
   }
 
   async function handleLogout() {
-    await signOut({redirectUrl: '/login'});
+    await signOut({ redirectUrl: '/login' });
   }
 
   return (

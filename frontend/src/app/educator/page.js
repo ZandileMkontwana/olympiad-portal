@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {useClerk} from '@clerk/nextjs';
+import { useClerk } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { logout, listRounds, ApiError } from '@/lib/api';
 
@@ -38,7 +38,7 @@ export default function EducatorDashboard() {
   }
 
   async function handleLogout() {
-    await signOut({redirectUrl: '/login'});
+    await signOut({ redirectUrl: '/login' });
   }
 
   return (

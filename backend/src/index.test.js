@@ -1,4 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock clerkMiddleware and Supabase createClient BEFORE loading index.js
+const clerk = require('@clerk/express');
+vi.spyOn(clerk, 'clerkMiddleware').mockReturnValue((req, res, next) => next());
+
+// Spy on createClient to prevent real WebSocket initialization on Node.js < 22
+const supabaseJs = require('@supabase/supabase-js');
+vi.spyOn(supabaseJs, 'createClient').mockReturnValue({
+  storage: {
+    from: () => ({
+      upload: () => Promise.resolve({ error: null }),
+      getPublicUrl: () => ({ data: { publicUrl: '' } }),
+    }),
+  },
+});
+
 const request = require('supertest');
 const app = require('./index');
 

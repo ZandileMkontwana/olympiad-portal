@@ -1,61 +1,78 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
-import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import fs from 'fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-const jwt = require('jsonwebtoken');
-const prisma = require('../lib/prisma');
-const papersRouter = require('./papers');
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = path.join(__dirname, '../../uploads/papers');
+// ===== Mock Clerk and Supabase BEFORE loading source modules =====
+const clerk = require('@clerk/express');
+vi.spyOn(clerk, 'requireAuth').mockReturnValue((req, res, next) => {
+  req.auth = () => ({ userId: 'clerk-user-1' });
+  next();
+});
+
+// Spy on createClient to prevent real WebSocket initialization on Node.js < 22
+const supabaseJs = require('@supabase/supabase-js');
+vi.spyOn(supabaseJs, 'createClient').mockReturnValue({
+  storage: {
+    from: () => ({
+      upload: () => Promise.resolve({ error: null }),
+      getPublicUrl: () => ({ data: { publicUrl: '' } }),
+    }),
+  },
+});
+
+// ===== Load source modules (they will use our mocked Clerk + Supabase) =====
+const prisma = require('../lib/prisma');
+const supabase = require('../lib/supabase');
+const papersRouter = require('./papers');
 
 function createApp() {
   const app = express();
   app.use(express.json());
-  app.use(cookieParser());
   app.use('/api', papersRouter);
   return app;
 }
 
 describe('Papers routes', () => {
   let app;
+  let mockUpload;
+  let mockGetPublicUrl;
 
   beforeEach(() => {
-    vi.spyOn(jwt, 'verify');
+    vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.paper, 'create');
     vi.spyOn(prisma.round, 'findUnique');
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    process.env.JWT_SECRET = 'test-secret';
-    jwt.verify.mockReturnValue({ userId: 'user-1', role: 'organiser' });
+    // Default: user is an organiser
+    prisma.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'organiser' });
+
+    // Default Supabase mock: uploads succeed, returns public URL
+    mockUpload = vi.fn().mockResolvedValue({ error: null });
+    mockGetPublicUrl = vi.fn().mockReturnValue({
+      data: { publicUrl: 'https://test.supabase.co/test-bucket/file.pdf' },
+    });
+    vi.spyOn(supabase.storage, 'from').mockReturnValue({
+      upload: mockUpload,
+      getPublicUrl: mockGetPublicUrl,
+    });
+
     app = createApp();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    if (fs.existsSync(UPLOAD_DIR)) {
-      const files = fs.readdirSync(UPLOAD_DIR);
-      for (const file of files) {
-        fs.unlinkSync(path.join(UPLOAD_DIR, file));
-      }
-    }
   });
 
   describe('POST /api/rounds/:id/papers', () => {
     it('returns 403 without organiser role', async () => {
-      jwt.verify.mockReturnValue({ userId: 'user-1', role: 'educator' });
-      const res = await request(app)
-        .post('/api/rounds/round-1/papers')
-        .set('Cookie', 'token=valid');
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'educator' });
+      const res = await request(app).post('/api/rounds/round-1/papers');
       expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/Organiser/);
     });
 
     it('returns 400 when both files are missing', async () => {
       const res = await request(app)
         .post('/api/rounds/round-1/papers')
-        .set('Cookie', 'token=valid')
         .field('memoAnswers', JSON.stringify({ q1: 'A' }));
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/Both paper and memo/);
@@ -64,7 +81,6 @@ describe('Papers routes', () => {
     it('returns 400 when only paper is provided', async () => {
       const res = await request(app)
         .post('/api/rounds/round-1/papers')
-        .set('Cookie', 'token=valid')
         .attach('paper', Buffer.from('fake'), 'paper.pdf');
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/Both paper and memo/);
@@ -73,7 +89,6 @@ describe('Papers routes', () => {
     it('returns 400 when memoAnswers is not valid JSON', async () => {
       const res = await request(app)
         .post('/api/rounds/round-1/papers')
-        .set('Cookie', 'token=valid')
         .field('memoAnswers', 'not-json{')
         .attach('paper', Buffer.from('fake'), 'paper.pdf')
         .attach('memo', Buffer.from('fake'), 'memo.pdf');
@@ -85,13 +100,12 @@ describe('Papers routes', () => {
       prisma.paper.create.mockResolvedValue({
         id: 'paper-1',
         roundId: 'round-1',
-        fileUrl: '/uploads/papers/paper.pdf',
-        memoUrl: '/uploads/papers/memo.pdf',
+        fileUrl: 'https://test.supabase.co/test-bucket/file.pdf',
+        memoUrl: 'https://test.supabase.co/test-bucket/file.pdf',
       });
 
       const res = await request(app)
         .post('/api/rounds/round-1/papers')
-        .set('Cookie', 'token=valid')
         .field('memoAnswers', JSON.stringify({ q1: 'A' }))
         .attach('paper', Buffer.from('fake pdf content'), 'paper.pdf')
         .attach('memo', Buffer.from('fake memo content'), 'memo.pdf');
@@ -99,6 +113,7 @@ describe('Papers routes', () => {
       expect(res.status).toBe(201);
       expect(res.body.id).toBe('paper-1');
       expect(prisma.paper.create).toHaveBeenCalled();
+      expect(mockUpload).toHaveBeenCalledTimes(2);
     });
 
     it('creates paper without memoAnswers when not provided', async () => {
@@ -109,7 +124,6 @@ describe('Papers routes', () => {
 
       const res = await request(app)
         .post('/api/rounds/round-1/papers')
-        .set('Cookie', 'token=valid')
         .attach('paper', Buffer.from('fake'), 'paper.pdf')
         .attach('memo', Buffer.from('fake'), 'memo.pdf');
 
@@ -121,12 +135,23 @@ describe('Papers routes', () => {
       );
     });
 
+    it('returns 500 when Supabase upload fails', async () => {
+      mockUpload.mockResolvedValue({ error: { message: 'Storage error' } });
+
+      const res = await request(app)
+        .post('/api/rounds/round-1/papers')
+        .attach('paper', Buffer.from('fake'), 'paper.pdf')
+        .attach('memo', Buffer.from('fake'), 'memo.pdf');
+
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Could not save/);
+    });
+
     it('returns 500 when prisma fails', async () => {
       prisma.paper.create.mockRejectedValue(new Error('DB error'));
 
       const res = await request(app)
         .post('/api/rounds/round-1/papers')
-        .set('Cookie', 'token=valid')
         .attach('paper', Buffer.from('fake'), 'paper.pdf')
         .attach('memo', Buffer.from('fake'), 'memo.pdf');
 
@@ -176,7 +201,10 @@ describe('Papers routes', () => {
     });
 
     it('returns paper when round is open', async () => {
-      const paper = { id: 'paper-1', fileUrl: '/uploads/papers/paper.pdf' };
+      const paper = {
+        id: 'paper-1',
+        fileUrl: 'https://test.supabase.co/test-bucket/file.pdf',
+      };
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         state: 'open',
@@ -188,7 +216,10 @@ describe('Papers routes', () => {
     });
 
     it('returns paper when round is released', async () => {
-      const paper = { id: 'paper-1', fileUrl: '/uploads/papers/paper.pdf' };
+      const paper = {
+        id: 'paper-1',
+        fileUrl: 'https://test.supabase.co/test-bucket/file.pdf',
+      };
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         state: 'released',

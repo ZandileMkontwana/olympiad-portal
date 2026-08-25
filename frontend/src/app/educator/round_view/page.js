@@ -31,7 +31,9 @@ function RoundViewContent() {
 
     async function fetchRound() {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`);
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`
+        );
 
         const data = await response.json();
 
