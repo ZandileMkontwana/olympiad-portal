@@ -8,3 +8,5 @@ AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) wa
 - **Planning:** structuring task breakdowns and sprint planning discussions
 
 All code was reviewed, tested, and verified by the author before being committed. All architectural and design decisions (data model structure, API design, technology choices) were made by the team; AI assistance was used to explain and troubleshoot those decisions, not to originate project requirements or scope.
+
+code coverage was done with the assistance of qoder

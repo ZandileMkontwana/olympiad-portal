@@ -41,8 +41,8 @@ erDiagram
     string id PK
     string name
     string email
-    string passwordHash
     string role
+    string clerkUserId
   }
   EDUCATOR {
     string id PK

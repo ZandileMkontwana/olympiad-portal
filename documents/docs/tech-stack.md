@@ -41,12 +41,14 @@ JWT creates a signed token that proves who's logged in, without the server needi
 httpOnly cookies keep that token safe from being stolen by malicious JS in the browser
 
 ## File storage
-**[Cloudflare R2 / AWS S3 — update once confirmed]**
+**Supabase Storage**
 
-Used for storing paper and memo PDFs, kept separate from the database — Postgres is not used to store file bytes directly, only file URLs referencing storage.
+Used for storing paper and memo PDF files, kept separate from the primary database — Postgres stores only file URLs (`fileUrl`, `memoUrl` on the `Paper` table), never file bytes directly. Chosen over Cloudflare R2 after discovering R2 requires a card on file for account verification even on the free tier; Supabase Storage's free tier (1GB storage, 2GB egress/month) needs no card and comfortably covers our scale of test papers and memos.
+
+Access goes through our own Express upload/download endpoints, which call Supabase's SDK internally — the frontend never talks to Supabase directly. This keeps file storage compliant with the course's Hand-Written API requirement, the same principle applied to how the frontend accesses the database.
 
 ## External API integration
-**[SendGrid / Twilio — update once confirmed]**
+**[Not yet confirmed]**
 
 Used for round reminders and submission receipts, satisfying the course's requirement to integrate with a relevant external API service.
 
