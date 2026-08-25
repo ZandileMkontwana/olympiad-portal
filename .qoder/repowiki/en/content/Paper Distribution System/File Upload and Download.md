@@ -4,21 +4,21 @@
 **Referenced Files in This Document**
 - [papers.js](file://backend/src/routes/papers.js)
 - [supabase.js](file://backend/src/lib/supabase.js)
-- [index.js](file://backend/src/index.js)
+- [api.js](file://frontend/src/lib/api.js)
 - [auth.js](file://backend/src/middleware/auth.js)
 - [schema.prisma](file://backend/prisma/schema.prisma)
-- [api.js](file://frontend/src/lib/api.js)
 - [papers.test.js](file://backend/src/routes/papers.test.js)
 - [api.test.js](file://frontend/src/lib/api.test.js)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Updated Multer configuration from local disk storage to memory storage for cloud upload
-- Replaced local filesystem storage with Supabase Storage integration
-- Updated file URL generation to use Supabase public URLs instead of local paths
-- Modified architecture diagrams to reflect cloud storage approach
-- Updated troubleshooting section for cloud-specific considerations
+- Updated Multer configuration from local disk storage to memory storage for direct cloud upload
+- Replaced local filesystem storage with Supabase Storage integration throughout the system
+- Updated file URL generation to return full Supabase public URLs instead of relative local paths
+- Enhanced error handling to properly catch and report Supabase storage failures
+- Updated architecture diagrams to reflect cloud storage approach with direct file access
+- Modified troubleshooting section for cloud-specific considerations and memory management
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -32,7 +32,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document explains the file upload and download functionality for the Paper Distribution System. It covers how Multer is configured to handle examination papers and memo answer keys using memory storage for direct upload to Supabase Storage, how files are stored in cloud buckets with automatic public URL generation, how the frontend uploads and downloads files via the API client, and how errors are handled throughout the process.
+This document explains the file upload and download functionality for the Paper Distribution System. It covers how Multer is configured with memory storage for direct upload to Supabase Storage, how files are stored in cloud buckets with automatic public URL generation, how the frontend uploads and downloads files via the API client, and how errors are handled throughout the process. The system now uses a cloud-first approach where files are never written to local disk storage but are instead uploaded directly to Supabase Storage buckets.
 
 ## Project Structure
 The file handling spans both backend and frontend with cloud storage integration:
@@ -297,9 +297,10 @@ Common issues and their causes:
 - Unauthorized access: Without the organiser role, the upload endpoint returns 403.
 - Round not available: When downloading, if the round is not in open or released state, the endpoint returns 403 with a descriptive error.
 - No paper uploaded: If no paper exists for the round, the download endpoint returns 404.
-- **Updated**: Supabase upload failures: Network or authentication errors when uploading to Supabase Storage result in 500 errors.
-- **Updated**: Memory exhaustion: Large concurrent uploads may cause memory issues due to memory storage approach.
-- **Updated**: Bucket permissions: Ensure Supabase bucket has appropriate read/write permissions configured.
+- **Updated**: Supabase upload failures: Network or authentication errors when uploading to Supabase Storage result in 500 errors with detailed error messages.
+- **Updated**: Memory exhaustion: Large concurrent uploads may cause memory issues due to memory storage approach. Consider implementing file size limits and monitoring memory usage.
+- **Updated**: Bucket permissions: Ensure Supabase bucket has appropriate read/write permissions configured and that the correct bucket name is set in environment variables.
+- **Updated**: Network connectivity: Verify that the Supabase service is accessible and that network policies allow outbound connections to Supabase endpoints.
 
 Frontend error handling:
 - Network failures throw ApiError with status 0.
@@ -314,4 +315,4 @@ Frontend error handling:
 - [api.test.js:179-241](file://frontend/src/lib/api.test.js#L179-L241)
 
 ## Conclusion
-The system implements a robust dual-file upload mechanism for examination papers and memo answer keys using Multer with memory storage for direct upload to Supabase Storage. Files are now stored in cloud buckets with automatic public URL generation, eliminating the need for local filesystem management. The frontend integrates seamlessly through an API client that handles multipart payloads and consistent error reporting. Access control ensures only authorised roles can upload, and download availability is gated by round state. For production readiness, consider implementing file size limits, memory usage monitoring, and proper error handling for cloud storage operations.
+The system implements a robust dual-file upload mechanism for examination papers and memo answer keys using Multer with memory storage for direct upload to Supabase Storage. Files are now stored in cloud buckets with automatic public URL generation, eliminating the need for local filesystem management. The frontend integrates seamlessly through an API client that handles multipart payloads and consistent error reporting. Access control ensures only authorised roles can upload, and download availability is gated by round state. For production readiness, consider implementing file size limits, memory usage monitoring, and proper error handling for cloud storage operations. The migration to cloud storage provides better scalability, reliability, and eliminates the complexity of managing local file systems across multiple deployment environments.

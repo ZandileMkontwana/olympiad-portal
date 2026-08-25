@@ -1,9 +1,27 @@
 ---
 sidebar_position: 1
 ---
-![Backend Coverage](https://img.shields.io/badge/backend%20coverage-98.5%25-brightgreen)
-![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-98.8%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-117%20passing-brightgreen)
+![Backend Coverage](https://img.shields.io/badge/backend%20coverage-98.4%25-brightgreen)
+![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-100%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-108%20passing-brightgreen)
+
+## Code Coverage
+
+| Metric | Backend | Frontend |
+|--------|---------|----------|
+| Statements | 98.43% | 98.76% |
+| Branches | 95.65% | 93.93% |
+| Functions | 95.83% | 100% |
+| Lines | 98.41% | 100% |
+
+Run coverage locally:
+```bash
+# Backend
+cd backend && npx vitest run --coverage
+
+# Frontend
+cd frontend && npx vitest run --coverage
+```
 
 # Getting Started — Backend
 

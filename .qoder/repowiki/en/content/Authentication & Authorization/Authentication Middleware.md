@@ -2,24 +2,24 @@
 
 <cite>
 **Referenced Files in This Document**
-- [middleware.js](file://frontend/src/middleware.js)
 - [index.js](file://backend/src/index.js)
 - [auth.js (routes)](file://backend/src/routes/auth.js)
 - [papers.js](file://backend/src/routes/papers.js)
 - [submissions.js](file://backend/src/routes/submissions.js)
-- [rounds.js](file://backend/src/routes/rounds.js)
+- [middleware.js](file://frontend/src/middleware.js)
 - [package.json](file://backend/package.json)
-- [package-lock.json](file://frontend/package-lock.json)
+- [test-setup.js](file://backend/src/test-setup.js)
+- [auth.test.js](file://backend/src/routes/auth.test.js)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Updated authentication architecture from custom JWT validation to Clerk's built-in middleware
-- Replaced cookie-based token validation with Clerk session management
-- Updated frontend middleware configuration for Clerk integration
-- Modified backend routes to use Clerk's requireAuth middleware
-- Updated dependency management to include @clerk/express packages
-- Maintained backward compatibility where needed while migrating to new system
+- Complete migration from custom JWT-based authentication to Clerk's managed authentication service
+- Replaced cookie-based token validation with Clerk's session management via `clerkMiddleware()`
+- Updated all routes to use Clerk's `requireAuth()` middleware instead of custom JWT validation
+- Integrated Clerk's Next.js middleware for frontend route protection
+- Added comprehensive test infrastructure with Clerk mocking and environment variables
+- Maintained backward compatibility for legacy role-based access control where needed
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -34,7 +34,7 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document explains the Express.js authentication middleware implementation using Clerk's built-in authentication system. The application has migrated from custom JWT-based cookie validation to Clerk's managed authentication service, providing enhanced security and simplified session management. The middleware chain pattern ensures consistent authentication across all protected routes, with role-based access control for different user types.
+This document explains the Express.js authentication middleware implementation using Clerk's built-in authentication system. The application has successfully migrated from custom JWT-based cookie validation to Clerk's managed authentication service, providing enhanced security, simplified session management, and reduced maintenance overhead. The middleware chain pattern ensures consistent authentication across all protected routes, with role-based access control maintained through database-driven checks.
 
 ## Project Structure
 The backend is an Express application that integrates Clerk's authentication middleware globally, providing session management and user context to all routes. The frontend uses Clerk's Next.js middleware for client-side route protection.
@@ -72,7 +72,7 @@ H --> L["Custom Role Check<br/>Legacy System"]
 
 Key behaviors:
 - Session source: Clerk-managed cookies and tokens
-- User context: `req.auth()` provides authenticated user information
+- User context: `req.auth()` provides authenticated user information including `userId`
 - Error responses: Standardized 401/403 responses for unauthorized/unauthorized access
 - Role management: Database-driven role checking for legacy endpoints
 
@@ -257,7 +257,6 @@ CORS["cors"] --> App
 
 **Diagram sources**
 - [package.json:19-34](file://backend/package.json#L19-L34)
-- [package-lock.json:390-410](file://frontend/package-lock.json#L390-L410)
 
 **Section sources**
 - [package.json:19-34](file://backend/package.json#L19-L34)
@@ -283,7 +282,7 @@ Testing strategies:
 - Verify role-based access control with different user types
 
 **Section sources**
-- [auth.test.js:1-109](file://backend/src/middleware/auth.test.js#L1-L109)
+- [auth.test.js:1-177](file://backend/src/routes/auth.test.js#L1-L177)
 
 ## Conclusion
 The authentication system has successfully migrated from custom JWT validation to Clerk's managed authentication service. This provides enhanced security, simplified session management, and reduced maintenance overhead. The hybrid approach maintains backward compatibility while gradually transitioning to the new system. Routes can be protected using Clerk's `requireAuth()` middleware, with custom role checking available for legacy functionality.
@@ -307,15 +306,26 @@ The authentication system has successfully migrated from custom JWT validation t
 - Implement custom role guards by combining Clerk auth with database queries
 - Centralize error formatting by wrapping responses consistently
 
-[No sources needed since this section provides general guidance]
-
 ### Migration Notes
 - Old JWT-based authentication is still present but not actively used in main routes
 - Legacy `requireRole` middleware maintains backward compatibility
 - Environment variables for Clerk should be configured instead of JWT_SECRET
 - Frontend uses Clerk's Next.js middleware for client-side protection
-- Testing infrastructure may need updates to work with Clerk's authentication system
+- Testing infrastructure includes Clerk mocking and environment variable setup
 
 **Section sources**
 - [index.js:11-24](file://backend/src/index.js#L11-L24)
 - [middleware.js:1-11](file://frontend/src/middleware.js#L1-L11)
+- [test-setup.js:1-10](file://backend/src/test-setup.js#L1-L10)
+
+### Environment Configuration
+Required environment variables for Clerk authentication:
+- `CLERK_SECRET_KEY`: Clerk secret key for server-side authentication
+- `PORT`: Server port (defaults to 5000)
+- `DATABASE_URL`: Database connection string
+- `SUPABASE_*`: Supabase configuration for file storage
+
+Test environment variables are automatically set in `test-setup.js` for development and testing purposes.
+
+**Section sources**
+- [test-setup.js:1-10](file://backend/src/test-setup.js#L1-L10)
