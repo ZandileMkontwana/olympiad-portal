@@ -2,14 +2,24 @@
 
 <cite>
 **Referenced Files in This Document**
-- [auth.js](file://backend/src/middleware/auth.js)
-- [auth.test.js](file://backend/src/middleware/auth.test.js)
-- [auth.js (routes)](file://backend/src/routes/auth.js)
+- [middleware.js](file://frontend/src/middleware.js)
 - [index.js](file://backend/src/index.js)
+- [auth.js (routes)](file://backend/src/routes/auth.js)
 - [papers.js](file://backend/src/routes/papers.js)
 - [submissions.js](file://backend/src/routes/submissions.js)
+- [rounds.js](file://backend/src/routes/rounds.js)
 - [package.json](file://backend/package.json)
+- [package-lock.json](file://frontend/package-lock.json)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated authentication architecture from custom JWT validation to Clerk's built-in middleware
+- Replaced cookie-based token validation with Clerk session management
+- Updated frontend middleware configuration for Clerk integration
+- Modified backend routes to use Clerk's requireAuth middleware
+- Updated dependency management to include @clerk/express packages
+- Maintained backward compatibility where needed while migrating to new system
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -24,255 +34,288 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document explains the Express.js authentication middleware implementation used to protect routes with JWT-based cookies. It focuses on the requireAuth function that validates tokens from cookies, decodes user information, and attaches it to the request object. It also covers the middleware chain pattern, error handling for invalid or expired tokens, integration with the Express request lifecycle, applying authentication to routes, consistent error handling, and extending the middleware for custom needs. Examples include protecting different route types, testing middleware behavior, and debugging common issues.
+This document explains the Express.js authentication middleware implementation using Clerk's built-in authentication system. The application has migrated from custom JWT-based cookie validation to Clerk's managed authentication service, providing enhanced security and simplified session management. The middleware chain pattern ensures consistent authentication across all protected routes, with role-based access control for different user types.
 
 ## Project Structure
-The backend is an Express application that:
-- Parses cookies and JSON bodies globally
-- Mounts routers under /api
-- Uses middleware to enforce authentication and authorization on specific routes
+The backend is an Express application that integrates Clerk's authentication middleware globally, providing session management and user context to all routes. The frontend uses Clerk's Next.js middleware for client-side route protection.
 
 ```mermaid
 graph TB
-A["Express App<br/>src/index.js"] --> B["Cookie Parser<br/>(cookie-parser)"]
-A --> C["JSON Body Parser<br/>(express.json)"]
-A --> D["CORS<br/>(cors)"]
-A --> E["Auth Router<br/>/api/auth"]
-A --> F["Papers Router<br/>/api/..."]
-A --> G["Submissions Router<br/>/api/..."]
-E --> H["requireAuth / requireRole<br/>src/middleware/auth.js"]
-F --> H
-G --> H
+A["Express App<br/>src/index.js"] --> B["CORS<br/>(cors)"]
+A --> C["Cookie Parser<br/>(cookie-parser)"]
+A --> D["JSON Body Parser<br/>(express.json)"]
+A --> E["Clerk Middleware<br/>@clerk/express"]
+A --> F["Auth Router<br/>/api/auth"]
+A --> G["Papers Router<br/>/api/..."]
+A --> H["Submissions Router<br/>/api/..."]
+E --> I["Session Validation"]
+I --> J["req.auth() Context"]
+F --> K["requireAuth()<br/>from @clerk/express"]
+G --> K
+H --> L["Custom Role Check<br/>Legacy System"]
 ```
 
 **Diagram sources**
-- [index.js:16-32](file://backend/src/index.js#L16-L32)
-- [auth.js:1-34](file://backend/src/middleware/auth.js#L1-L34)
-- [auth.js (routes):1-152](file://backend/src/routes/auth.js#L1-L152)
-- [papers.js:1-99](file://backend/src/routes/papers.js#L1-L99)
-- [submissions.js:1-89](file://backend/src/routes/submissions.js#L1-L89)
+- [index.js:16-30](file://backend/src/index.js#L16-L30)
+- [auth.js (routes):4-9](file://backend/src/routes/auth.js#L4-L9)
+- [papers.js:4-46](file://backend/src/routes/papers.js#L4-L46)
+- [submissions.js:3-9](file://backend/src/routes/submissions.js#L3-L9)
 
 **Section sources**
-- [index.js:1-43](file://backend/src/index.js#L1-L43)
+- [index.js:1-41](file://backend/src/index.js#L1-L41)
 
 ## Core Components
-- requireAuth: Extracts token from cookies, verifies it using a secret, attaches decoded payload to req.user, and continues the chain if valid. Returns 401 for missing or invalid/expired tokens.
-- requireRole(role): Returns a two-step middleware array that first enforces authentication via requireAuth, then checks that req.user.role matches the required role. Returns 403 when roles do not match.
+- **Clerk Middleware**: Global middleware that validates sessions and provides `req.auth()` context to all routes
+- **requireAuth()**: Route-level middleware from @clerk/express that ensures authenticated requests
+- **Custom Role Checking**: Legacy role-based access control system still used in specific routes
+- **Frontend Middleware**: Clerk's Next.js middleware for client-side route protection
 
 Key behaviors:
-- Token source: cookie named "token"
-- Secret source: environment variable JWT_SECRET
-- Error responses: standardized JSON errors with appropriate HTTP status codes
-- User context: decoded token payload attached as req.user
+- Session source: Clerk-managed cookies and tokens
+- User context: `req.auth()` provides authenticated user information
+- Error responses: Standardized 401/403 responses for unauthorized/unauthorized access
+- Role management: Database-driven role checking for legacy endpoints
 
 **Section sources**
-- [auth.js:1-34](file://backend/src/middleware/auth.js#L1-L34)
+- [index.js:11-24](file://backend/src/index.js#L11-L24)
+- [auth.js (routes):4-9](file://backend/src/routes/auth.js#L4-L9)
+- [papers.js:4-46](file://backend/src/routes/papers.js#L4-L46)
 
 ## Architecture Overview
-The authentication flow integrates with the Express request lifecycle through middleware functions executed before route handlers. The app sets up global parsing and CORS, then mounts routers. Protected routes use requireAuth or requireRole to gate access.
+The authentication flow integrates Clerk's managed authentication service with Express middleware. The global Clerk middleware handles session validation, while individual routes use `requireAuth()` for additional protection.
 
 ```mermaid
 sequenceDiagram
 participant Client as "Client"
-participant App as "Express App"
-participant AuthMW as "requireAuth"
+participant Frontend as "Next.js App"
+participant Backend as "Express App"
+participant Clerk as "Clerk Service"
 participant Route as "Route Handler"
-participant DB as "Database"
-Client->>App : HTTP Request (with cookie token)
-App->>AuthMW : Execute middleware
-AuthMW->>AuthMW : Read req.cookies.token
-AuthMW->>AuthMW : Verify token with JWT_SECRET
-alt Valid token
-AuthMW-->>App : Attach req.user and call next()
-App->>Route : Invoke handler
-Route->>DB : Query/update data
-DB-->>Route : Data
+Client->>Frontend : HTTP Request
+Frontend->>Backend : API Request (with Clerk session)
+Backend->>Clerk : Validate session via clerkMiddleware()
+alt Valid session
+Clerk-->>Backend : req.auth() context
+Backend->>Route : Execute handler with auth context
+Route->>Route : Custom role checks if needed
 Route-->>Client : Success response
-else Invalid/expired token
-AuthMW-->>Client : 401 { error }
+else Invalid/expired session
+Clerk-->>Backend : 401 Unauthorized
+Backend-->>Client : 401 { error }
 end
 ```
 
 **Diagram sources**
-- [auth.js:5-20](file://backend/src/middleware/auth.js#L5-L20)
-- [index.js:16-32](file://backend/src/index.js#L16-L32)
+- [index.js:11-24](file://backend/src/index.js#L11-L24)
+- [auth.js (routes):9-10](file://backend/src/routes/auth.js#L9-L10)
+- [papers.js:45-46](file://backend/src/routes/papers.js#L45-L46)
 
 ## Detailed Component Analysis
 
-### requireAuth Middleware
+### Clerk Middleware Integration
 Responsibilities:
-- Extract token from req.cookies.token
-- Validate token against JWT_SECRET
-- On success: attach decoded payload to req.user and proceed
-- On failure: respond with 401 and a JSON error
-
-Error handling:
-- Missing token: 401 Not authenticated
-- Invalid/expired token: 401 Invalid or expired token
-- Logs error details for debugging
+- Global session validation for all incoming requests
+- Provides `req.auth()` context with authenticated user information
+- Handles token verification and session management
+- Integrates with Clerk's authentication service
 
 Integration points:
-- Used directly on protected routes
-- Composed within requireRole for role-based protection
+- Mounted globally in Express app before routers
+- Used by individual routes via `requireAuth()` function
+- Provides user context through `req.auth()` method
 
 ```mermaid
 flowchart TD
-Start(["Enter requireAuth"]) --> CheckToken["Read 'token' from cookies"]
-CheckToken --> HasToken{"Token present?"}
-HasToken -- No --> Err401["Respond 401: Not authenticated"]
-HasToken -- Yes --> Verify["Verify token with JWT_SECRET"]
-Verify --> Verified{"Valid?"}
-Verified -- No --> Err401Exp["Respond 401: Invalid or expired token"]
-Verified -- Yes --> Attach["Attach decoded payload to req.user"]
-Attach --> Next["Call next()"]
+Start(["Enter Clerk Middleware"]) --> Validate["Validate session via Clerk"]
+Validate --> Valid{"Valid session?"}
+Valid -- No --> Err401["Respond 401: Not authenticated"]
+Valid -- Yes --> SetContext["Set req.auth() context"]
+SetContext --> Next["Call next()"]
 Next --> End(["Exit"])
 ```
 
 **Diagram sources**
-- [auth.js:5-20](file://backend/src/middleware/auth.js#L5-L20)
+- [index.js:11-24](file://backend/src/index.js#L11-L24)
 
 **Section sources**
-- [auth.js:5-20](file://backend/src/middleware/auth.js#L5-L20)
+- [index.js:11-24](file://backend/src/index.js#L11-L24)
 
-### requireRole Middleware Factory
+### Route-Level Authentication
 Responsibilities:
-- Return an array of two middleware functions
-- First: requireAuth to ensure identity
-- Second: check req.user.role equals the required role
-- Respond with 403 when role does not match
+- Ensures specific routes require authentication
+- Uses Clerk's `requireAuth()` middleware function
+- Provides consistent error handling for unauthenticated requests
+- Works alongside custom role checking systems
 
 Usage patterns:
-- Spread into route definitions to enforce role-based access control
-- Works with any route that requires a specific role
+- Applied to protected API endpoints
+- Used with spread operator for middleware arrays
+- Compatible with existing role-based access control
 
 ```mermaid
 classDiagram
-class RequireRoleFactory {
-+function requireRole(role) : Array<Middleware>
+class ClerkRequireAuth {
++function requireAuth() : Middleware
 }
-class RequireAuth {
-+function requireAuth(req,res,next)
+class AuthRoutes {
++POST /educators/complete-profile
++GET /auth/me
++DELETE /auth/account
 }
-class RoleChecker {
-+function(req,res,next)
+class PaperRoutes {
++POST /rounds/ : id/papers
 }
-RequireRoleFactory --> RequireAuth : "first step"
-RequireRoleFactory --> RoleChecker : "second step"
+ClerkRequireAuth --> AuthRoutes : "protects"
+ClerkRequireAuth --> PaperRoutes : "protects"
 ```
 
 **Diagram sources**
-- [auth.js:22-32](file://backend/src/middleware/auth.js#L22-L32)
+- [auth.js (routes):9-99](file://backend/src/routes/auth.js#L9-L99)
+- [papers.js:43-83](file://backend/src/routes/papers.js#L43-L83)
 
 **Section sources**
-- [auth.js:22-32](file://backend/src/middleware/auth.js#L22-L32)
+- [auth.js (routes):9-99](file://backend/src/routes/auth.js#L9-L99)
+- [papers.js:43-83](file://backend/src/routes/papers.js#L43-L83)
+
+### Legacy Role-Based Access Control
+Responsibilities:
+- Maintains backward compatibility for existing role checks
+- Uses database-driven role validation
+- Provides custom middleware for specific business logic
+- Bridges between Clerk authentication and legacy role system
+
+Implementation:
+- Custom `requireRole` middleware in legacy auth module
+- Database queries to validate user roles
+- Returns appropriate error codes for unauthorized access
+
+```mermaid
+flowchart TD
+Start(["Enter requireRole"]) --> GetAuth["Get user from req.auth()"]
+GetAuth --> QueryDB["Query user role from database"]
+QueryDB --> CheckRole{"Role matches required?"}
+CheckRole -- No --> Err403["Respond 403: Role access required"]
+CheckRole -- Yes --> Next["Call next()"]
+Next --> End(["Exit"])
+```
+
+**Diagram sources**
+- [submissions.js:3-9](file://backend/src/routes/submissions.js#L3-L9)
+
+**Section sources**
+- [submissions.js:3-9](file://backend/src/routes/submissions.js#L3-L9)
+
+### Frontend Middleware Configuration
+Responsibilities:
+- Configures Clerk's Next.js middleware for client-side authentication
+- Sets up route matching patterns for authentication
+- Protects frontend routes from unauthorized access
+
+Configuration:
+- Uses `clerkMiddleware()` for global authentication
+- Configures matcher patterns for API and static assets
+- Handles authentication redirects and session management
+
+**Section sources**
+- [middleware.js:1-11](file://frontend/src/middleware.js#L1-L11)
 
 ### Applying Authentication to Routes
-Protected endpoints demonstrate how to apply authentication and authorization:
-- Password reset and profile endpoints use requireAuth to ensure the requester is authenticated
-- Paper upload uses requireRole('organiser') to restrict to organizers
-- Submission creation uses requireRole('educator') to restrict to educators
+Protected endpoints demonstrate how to apply Clerk authentication:
+- Educational profile completion uses `requireAuth()` for authenticated users
+- User profile endpoints use `requireAuth()` for data access
+- Paper upload uses `requireAuth()` combined with custom role checking
+- Submission creation uses legacy role-based access control
 
 Examples:
-- POST /api/auth/reset-password: requires authentication
-- GET /api/auth/me: requires authentication
+- POST /api/educators/complete-profile: requires authentication
+- GET /api/auth/me: requires authentication  
 - DELETE /api/auth/account: requires authentication
-- POST /api/rounds/:id/papers: requires organiser role
-- POST /api/rounds/:id/submissions: requires educator role
+- POST /api/rounds/:id/papers: requires authentication + organiser role
+- POST /api/rounds/:id/submissions: requires educator role (legacy system)
 
 **Section sources**
-- [auth.js (routes):99-149](file://backend/src/routes/auth.js#L99-L149)
-- [papers.js:25-68](file://backend/src/routes/papers.js#L25-L68)
-- [submissions.js:8-86](file://backend/src/routes/submissions.js#L8-L86)
-
-### Cookie Handling and Security
-- Tokens are set as httpOnly cookies to reduce XSS risk
-- secure flag is enabled in production to enforce HTTPS
-- sameSite lax helps mitigate CSRF while allowing top-level navigation
-- maxAge set to one week for token lifetime
-
-**Section sources**
-- [auth.js (routes):13-20](file://backend/src/routes/auth.js#L13-L20)
-
-### Global Setup and Request Lifecycle
-- CORS configured to allow credentials from the frontend origin
-- cookieParser enables reading cookies in middleware
-- express.json parses incoming JSON payloads
-- Routers mounted under /api provide namespacing
-
-**Section sources**
-- [index.js:16-32](file://backend/src/index.js#L16-L32)
+- [auth.js (routes):9-99](file://backend/src/routes/auth.js#L9-L99)
+- [papers.js:43-83](file://backend/src/routes/papers.js#L43-L83)
+- [submissions.js:9-90](file://backend/src/routes/submissions.js#L9-L90)
 
 ## Dependency Analysis
 External dependencies relevant to authentication:
-- jsonwebtoken: signing and verifying JWTs
-- cookie-parser: parsing cookies from requests
-- cors: enabling cross-origin requests with credentials
-- bcrypt: hashing passwords during registration/login
-- dotenv: loading environment variables (e.g., JWT_SECRET)
+- @clerk/express: Clerk's Express middleware for server-side authentication
+- @clerk/nextjs: Clerk's Next.js integration for client-side authentication
+- jsonwebtoken: Still present but not actively used in main authentication flow
+- cookie-parser: For parsing cookies in Express middleware
+- cors: Enabling cross-origin requests with credentials
 
 ```mermaid
 graph LR
-JWT["jsonwebtoken"] --> AuthMW["requireAuth"]
-CP["cookie-parser"] --> App["Express App"]
+Clerk["@clerk/express"] --> App["Express App"]
+ClerkNext["@clerk/nextjs"] --> Frontend["Next.js App"]
+JWT["jsonwebtoken"] --> Legacy["Legacy Auth System"]
+CP["cookie-parser"] --> App
 CORS["cors"] --> App
-BC["bcrypt"] --> AuthRoutes["Auth Routes"]
-DOT["dotenv"] --> App
 ```
 
 **Diagram sources**
-- [package.json:19-31](file://backend/package.json#L19-L31)
-- [auth.js:1-3](file://backend/src/middleware/auth.js#L1-L3)
-- [auth.js (routes):1-11](file://backend/src/routes/auth.js#L1-L11)
-- [index.js:1-6](file://backend/src/index.js#L1-L6)
+- [package.json:19-34](file://backend/package.json#L19-L34)
+- [package-lock.json:390-410](file://frontend/package-lock.json#L390-L410)
 
 **Section sources**
-- [package.json:19-31](file://backend/package.json#L19-L31)
+- [package.json:19-34](file://backend/package.json#L19-L34)
 
 ## Performance Considerations
-- JWT verification is CPU-bound; keep payloads small to minimize processing time
-- Avoid unnecessary database calls inside middleware; only verify tokens there
-- Use environment-specific settings (e.g., secure cookies in production) to avoid overhead in development
-- Ensure logging is minimal in hot paths to prevent I/O bottlenecks
-
-[No sources needed since this section provides general guidance]
+- Clerk's managed authentication reduces server load by offloading token validation
+- Global middleware setup minimizes per-request overhead
+- Session caching improves performance for repeated requests
+- Avoid unnecessary database calls in authentication middleware
+- Use Clerk's built-in rate limiting and security features
 
 ## Troubleshooting Guide
 Common issues and resolutions:
-- Missing token: Ensure the client sends requests with credentials and includes the cookie. Verify CORS allows credentials and correct origin.
-- Invalid/expired token: Confirm JWT_SECRET matches between server and token issuer. Check token expiration and re-authenticate if necessary.
-- Role mismatches: Ensure the token contains the expected role claim and that the route requires the correct role.
-- Debugging: Inspect console logs for token verification errors and validate cookie presence in network inspector.
+- **Session validation errors**: Verify Clerk environment variables and network connectivity
+- **Authentication failures**: Check browser cookies and Clerk dashboard for session status
+- **Role mismatches**: Ensure user roles are properly set in the database
+- **CORS issues**: Configure allowed origins in both Clerk dashboard and server CORS settings
 
 Testing strategies:
-- Unit tests verify:
-  - 401 when no token is present
-  - 401 when jwt.verify throws
-  - Successful path sets req.user and calls next
-  - requireRole returns an array and enforces role checks
-- Integration tests can assert endpoint responses with and without valid cookies
+- Use Clerk's testing utilities for unit tests
+- Mock `req.auth()` for route-level testing
+- Test authentication flows with real Clerk sessions in integration tests
+- Verify role-based access control with different user types
 
 **Section sources**
-- [auth.test.js:11-55](file://backend/src/middleware/auth.test.js#L11-L55)
-- [auth.test.js:57-109](file://backend/src/middleware/auth.test.js#L57-L109)
+- [auth.test.js:1-109](file://backend/src/middleware/auth.test.js#L1-L109)
 
 ## Conclusion
-The authentication middleware provides a clear, composable way to protect Express routes using JWTs stored in cookies. requireAuth handles token validation and user context attachment, while requireRole extends protection with role-based access control. Consistent error handling and robust testing ensure reliability across different route types. By following the patterns shown here, you can confidently secure your API endpoints and extend authentication logic as needed.
+The authentication system has successfully migrated from custom JWT validation to Clerk's managed authentication service. This provides enhanced security, simplified session management, and reduced maintenance overhead. The hybrid approach maintains backward compatibility while gradually transitioning to the new system. Routes can be protected using Clerk's `requireAuth()` middleware, with custom role checking available for legacy functionality.
 
 ## Appendices
 
 ### How to Apply Authentication to New Routes
-- For any route requiring authentication, add requireAuth before the handler
-- For role-specific routes, use ...requireRole('roleName') to spread the middleware array
-- Ensure cookies are sent with credentials from the client side
+- For any route requiring authentication, add `requireAuth()` from `@clerk/express` before the handler
+- For role-specific routes, combine `requireAuth()` with custom role checking middleware
+- Ensure Clerk middleware is configured globally in the Express app
+- Use `req.auth()` to access authenticated user information in route handlers
 
 **Section sources**
-- [papers.js:25-33](file://backend/src/routes/papers.js#L25-L33)
-- [submissions.js:8-10](file://backend/src/routes/submissions.js#L8-L10)
-- [auth.js (routes):99-149](file://backend/src/routes/auth.js#L99-L149)
+- [auth.js (routes):9-99](file://backend/src/routes/auth.js#L9-L99)
+- [papers.js:43-83](file://backend/src/routes/papers.js#L43-L83)
+- [submissions.js:9-90](file://backend/src/routes/submissions.js#L9-L90)
 
 ### Extending the Middleware
-- Add additional claims checks by inspecting req.user after requireAuth
-- Create new role guards by composing requireAuth with custom checks
+- Create custom middleware that works alongside Clerk's authentication
+- Add additional claims checks by inspecting `req.auth()` after Clerk authentication
+- Implement custom role guards by combining Clerk auth with database queries
 - Centralize error formatting by wrapping responses consistently
 
 [No sources needed since this section provides general guidance]
+
+### Migration Notes
+- Old JWT-based authentication is still present but not actively used in main routes
+- Legacy `requireRole` middleware maintains backward compatibility
+- Environment variables for Clerk should be configured instead of JWT_SECRET
+- Frontend uses Clerk's Next.js middleware for client-side protection
+- Testing infrastructure may need updates to work with Clerk's authentication system
+
+**Section sources**
+- [index.js:11-24](file://backend/src/index.js#L11-L24)
+- [middleware.js:1-11](file://frontend/src/middleware.js#L1-L11)
