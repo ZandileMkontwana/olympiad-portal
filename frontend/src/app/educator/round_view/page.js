@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense,useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -152,5 +152,12 @@ function RoundViewContent() {
         )}
       </div>
     </main>
+  );
+}
+export default function RoundViewPage() {
+  return (
+    <Suspense fallback={<main className="round-page">Loading round...</main>}>
+      <RoundViewContent />
+    </Suspense>
   );
 }
