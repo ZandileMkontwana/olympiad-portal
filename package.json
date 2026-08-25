@@ -1,6 +1,6 @@
 {
   "name": "olympiad-portal",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "link to Olympiad Portal documentation: https://olympiad-portal-docs.netlify.app/",
   "main": "index.js",
   "scripts": {
