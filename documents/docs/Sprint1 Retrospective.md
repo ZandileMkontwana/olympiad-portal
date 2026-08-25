@@ -64,7 +64,6 @@ Docs site got deployed to Netlify when the task specifically named Cloudflare Pa
 
 
 - Add .env.example files to frontend/ and backend/ so a missing variable like JWT_SECRET can't fail silently again
-- Resolve the Cloudflare Pages vs. Netlify mismatch on the docs site deployment task
 - Result.releasedAt still isn't wired to anything — scores are visible immediately on scoring, not gated to "when the round closes" as the brief requires
 - No school-facing "view your results" page exists yet, even once release-gating is added
 - Non-multiple-choice marking (manual marker queue, partial credit) is entirely unbuilt — currently a submission without a memo answer key just has no Result created, with nothing to catch it later
