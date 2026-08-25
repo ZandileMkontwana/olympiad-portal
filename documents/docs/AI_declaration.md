@@ -22,6 +22,20 @@ AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) wa
 - **Git workflow support:** step-by-step guidance resolving merge conflicts across multiple files, and reviewing repository state (via provided project exports) to confirm what had and hadn't actually landed on shared branches before further debugging.
 
 All code was reviewed, tested in-browser, and verified against the live backend by the author before being committed. All product and design decisions (page content, visual direction, which fields to collect, how features should behave) were made by the author; AI assistance was used to implement, explain, and troubleshoot those decisions, not to originate them.
+
+
+## AI Declaration — Kutloano
+
+AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) was used throughout this sprint's full-stack work in the following ways:
+
+* Frontend development: guidance on building and wiring Next.js App Router pages, including the round view page, the paper upload form (with a manually-entered answer-key section), the MCQ submission table (spreadsheet import/export, live score preview, bulk submission, toast notifications, and a persistent receipt), and the organiser/educator dashboards.
+* Backend new Express endpoints (round entrants, single-round lookup, submission history), and building a cookie-based authentication system (`requireAuth`/`requireRole` middleware, login/register/logout/me routes) before the team's mid-sprint migration to Clerk.
+* Authentication migration support: guidance installing and wiring `@clerk/nextjs` middleware after the team's decision to adopt Clerk, and migrating backend file storage to Supabase after the team moved off local disk storage.
+* Debugging: extensive troubleshooting across both frontend and backend, including missing/misconfigured environment variables (`JWT_SECRET`, `.env` typos), Prisma/Windows file-lock errors, CORS and cookie-credential misconfiguration, Next.js routing mismatches between dynamic and flat routes, and files whose content didn't match what was expected after edits.
+* Dependency and security review: identifying a known unpatched vulnerability in the `xlsx` package and outlining mitigation options.
+* Planning: structuring a sprint retrospective and a categorized issue list for the team's tracker.
+
+All code was reviewed, tested, and verified against the live backend by the author before being committed. All architectural and design decisions (data model structure, API design, technology and library choices, including the Clerk and Supabase migrations) were made by the team; AI assistance was used to implement, explain, and troubleshoot those decisions, not to originate them.
 ---
 ## AI Declaration — Mlungisi
 
