@@ -19,6 +19,13 @@
 - [next.config.mjs](file://frontend/next.config.mjs)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Enhanced educator dashboard pages with React Suspense implementation for improved loading states
+- Added custom fallback messages "Loading round..." and "Loading..." for better user experience
+- Updated loading state management in round_view and submit pages
+- Improved error handling and user feedback during data fetching operations
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -31,7 +38,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document explains the Next.js routing and navigation system for the Olympiad Portal frontend. It covers file-based routing, dynamic routes for rounds and papers, nested routing patterns, role-based navigation guards, protected routes, authentication-driven redirects, programmatic navigation, route parameters, query strings, SEO metadata, layout composition, and performance considerations such as code splitting by route.
+This document explains the Next.js routing and navigation system for the Olympiad Portal frontend. It covers file-based routing, dynamic routes for rounds and papers, nested routing patterns, role-based navigation guards, protected routes, authentication-driven redirects, programmatic navigation, route parameters, query strings, SEO metadata, layout composition, and performance considerations such as code splitting by route. The system now includes enhanced loading states using React Suspense for improved user experience.
 
 ## Project Structure
 The application uses the Next.js App Router with a file-system based routing convention:
@@ -40,6 +47,7 @@ The application uses the Next.js App Router with a file-system based routing con
 - Role-specific dashboards are under /educator and /organiser.
 - Dynamic routes exist under /rounds/:id for paper uploads and closed-round views.
 - Shared UI is provided via a header component used across all pages.
+- Enhanced loading states with React Suspense provide better user feedback during data operations.
 
 ```mermaid
 graph TB
@@ -49,8 +57,8 @@ A --> D["Organiser Dashboard<br/>/organiser"]
 A --> E["Dynamic Routes<br/>/rounds/[id]/..."]
 E --> E1["Papers Upload<br/>/rounds/[id]/papers"]
 E --> E2["Closed Round View<br/>/rounds/[id]/closed_round"]
-C --> F["Round View<br/>/educator/round_view?id=..."]
-C --> G["Submit Results<br/>/educator/submit?id=..."]
+C --> F["Round View<br/>/educator/round_view?id=...<br/>Suspense: 'Loading round...'"]
+C --> G["Submit Results<br/>/educator/submit?id=...<br/>Suspense: 'Loading...'"]
 ```
 
 **Diagram sources**
@@ -61,8 +69,8 @@ C --> G["Submit Results<br/>/educator/submit?id=..."]
 - [organiser dashboard page.js:11-104](file://frontend/src/app/organiser/page.js#L11-L104)
 - [dynamic papers upload page.js:26-259](file://frontend/src/app/rounds/[id]/papers/page.js#L26-L259)
 - [dynamic closed round page.js:8-95](file://frontend/src/app/rounds/[id]/closed_round/page.js#L8-L95)
-- [round view page.js:19-156](file://frontend/src/app/educator/round_view/page.js#L19-L156)
-- [submit results page.js:8-529](file://frontend/src/app/educator/submit/page.js#L8-L529)
+- [round view page.js:159-165](file://frontend/src/app/educator/round_view/page.js#L159-L165)
+- [submit results page.js:531-537](file://frontend/src/app/educator/submit/page.js#L531-L537)
 
 **Section sources**
 - [layout.js:27-44](file://frontend/src/app/layout.js#L27-L44)
@@ -74,12 +82,14 @@ C --> G["Submit Results<br/>/educator/submit?id=..."]
 - SiteHeader: Renders public vs authenticated navigation links based on current pathname.
 - API client: Centralizes HTTP calls, error handling, and role-based redirect path mapping.
 - Auth hooks: Enforce authentication and role checks; redirect unauthenticated or misrouted users.
+- **Enhanced Loading States**: React Suspense provides consistent loading feedback with custom fallback messages.
 
 Key responsibilities:
 - Metadata management at the root level for consistent titles and descriptions.
 - Consistent navigation UX across public and authenticated areas.
 - Centralized API interactions with robust error propagation to UI.
 - Declarative protection of routes using React hooks.
+- **Improved User Experience**: Suspense boundaries ensure smooth transitions during data loading with contextual loading messages.
 
 **Section sources**
 - [layout.js:27-44](file://frontend/src/app/layout.js#L27-L44)
@@ -89,11 +99,12 @@ Key responsibilities:
 - [useAuthRedirect.js:9-31](file://frontend/src/hooks/useAuthRedirect.js#L9-L31)
 
 ## Architecture Overview
-The navigation architecture combines Next.js file-based routing with client-side guards:
+The navigation architecture combines Next.js file-based routing with client-side guards and enhanced loading states:
 - Public routes (/ and /login, /register) are accessible without authentication.
 - Protected routes (/educator, /organiser, /rounds/*) enforce authentication and role checks via hooks.
 - After successful login, users are redirected to their role-appropriate dashboard.
 - Dynamic routes use route parameters for round context; some pages also read query parameters for additional context.
+- **Enhanced Loading Experience**: React Suspense provides consistent loading states with contextual fallback messages.
 
 ```mermaid
 sequenceDiagram
@@ -102,17 +113,19 @@ participant L as "Login Page"
 participant A as "API Client"
 participant R as "Router"
 participant H as "Dashboard Hook"
+participant S as "Suspense Boundary"
 U->>L : Submit credentials
 L->>A : POST /api/auth/login
 A-->>L : { user }
 L->>R : Navigate to dashboardPathForRole(role)
-R->>H : Render protected dashboard
+R->>S : Render with Suspense boundary
+S->>H : Render protected dashboard
 H->>A : GET /api/auth/me
 A-->>H : { user }
 alt Unauthorized or wrong role
 H->>R : Redirect to /login or correct dashboard
 else Authorized and correct role
-H-->>U : Show dashboard content
+S-->>U : Show dashboard content with loading states
 end
 ```
 
@@ -120,6 +133,8 @@ end
 - [login page.js:25-41](file://frontend/src/app/login/page.js#L25-L41)
 - [api.js:121-145](file://frontend/src/lib/api.js#L121-L145)
 - [useRequireRole.js:12-35](file://frontend/src/hooks/useRequireRole.js#L12-L35)
+- [round view page.js:159-165](file://frontend/src/app/educator/round_view/page.js#L159-L165)
+- [submit results page.js:531-537](file://frontend/src/app/educator/submit/page.js#L531-L537)
 
 ## Detailed Component Analysis
 
@@ -141,7 +156,7 @@ Layout composition:
 
 ### Authentication and Role-Based Guards
 - Login page validates input, calls the API, and navigates to the appropriate dashboard based on user role.
-- Registration stores an auth token locally and indicates success; subsequent protected routes rely on session cookies via the API client’s credentials mode.
+- Registration stores an auth token locally and indicates success; subsequent protected routes rely on session cookies via the API client's credentials mode.
 - useRequireRole enforces that only users with the required role can access a route; otherwise, it redirects to login or the correct dashboard.
 - useRedirectIfAuthenticated prevents logged-in users from accessing login/register pages by redirecting them to their dashboard.
 
@@ -157,12 +172,16 @@ CheckAuth --> |Not logged in| ToLogin["Redirect to /login"]
 CheckAuth --> |Logged in| CheckRole{"Role matches required?"}
 CheckRole --> |No| ToDash["Redirect to role dashboard"]
 CheckRole --> |Yes| Allow["Render protected page"]
+Allow --> Suspense["Suspense Boundary<br/>Loading State"]
+Suspense --> Content["Protected Content"]
 ```
 
 **Diagram sources**
 - [useRequireRole.js:12-35](file://frontend/src/hooks/useRequireRole.js#L12-L35)
 - [useAuthRedirect.js:13-28](file://frontend/src/hooks/useAuthRedirect.js#L13-L28)
 - [api.js:128-145](file://frontend/src/lib/api.js#L128-L145)
+- [round view page.js:159-165](file://frontend/src/app/educator/round_view/page.js#L159-L165)
+- [submit results page.js:531-537](file://frontend/src/app/educator/submit/page.js#L531-L537)
 
 **Section sources**
 - [login page.js:25-41](file://frontend/src/app/login/page.js#L25-L41)
@@ -203,24 +222,25 @@ P-->>O : Success state or error feedback
 - [dynamic closed round page.js:8-95](file://frontend/src/app/rounds/[id]/closed_round/page.js#L8-L95)
 - [organiser dashboard page.js:72-99](file://frontend/src/app/organiser/page.js#L72-L99)
 
-### Nested Routing Patterns
+### Nested Routing Patterns with Enhanced Loading States
 - /educator/round_view and /educator/submit are nested under the educator namespace and use query parameters to scope behavior to a specific round.
 - These pages demonstrate how to combine nested routes with query strings for flexible data scoping.
+- **Enhanced Loading States**: Both pages now use React Suspense with custom fallback messages for improved user experience.
 
 ```mermaid
 graph LR
-ED["/educator"] --> RV["/educator/round_view?id={id}"]
-ED --> SUB["/educator/submit?id={id}"]
+ED["/educator"] --> RV["/educator/round_view?id={id}<br/>Suspense: 'Loading round...'"]
+ED --> SUB["/educator/submit?id={id}<br/>Suspense: 'Loading...'"]
 ```
 
 **Diagram sources**
 - [educator dashboard page.js:68-82](file://frontend/src/app/educator/page.js#L68-L82)
-- [round view page.js:19-156](file://frontend/src/app/educator/round_view/page.js#L19-L156)
-- [submit results page.js:8-529](file://frontend/src/app/educator/submit/page.js#L8-L529)
+- [round view page.js:159-165](file://frontend/src/app/educator/round_view/page.js#L159-L165)
+- [submit results page.js:531-537](file://frontend/src/app/educator/submit/page.js#L531-L537)
 
 **Section sources**
-- [round view page.js:19-156](file://frontend/src/app/educator/round_view/page.js#L19-L156)
-- [submit results page.js:8-529](file://frontend/src/app/educator/submit/page.js#L8-L529)
+- [round view page.js:19-166](file://frontend/src/app/educator/round_view/page.js#L19-L166)
+- [submit results page.js:8-538](file://frontend/src/app/educator/submit/page.js#L8-L538)
 
 ### Programmatic Navigation and Query String Management
 - Programmatic navigation:
@@ -256,21 +276,54 @@ Recommendations:
 - Next.js automatically splits code by route; each page module is loaded on demand.
 - Keep heavy dependencies (e.g., spreadsheet libraries) co-located with the pages that need them to minimize bundle size for other routes.
 - Avoid unnecessary re-renders by keeping state local to components and using efficient updates.
+- **Enhanced Loading States**: React Suspense provides better perceived performance by showing immediate feedback during data operations.
 
 Practical notes:
 - The submit results page imports a large library for spreadsheet operations; ensure it remains scoped to that route.
 - Use environment variables for API base URLs to avoid runtime configuration overhead.
+- **Suspense Implementation**: Both round_view and submit pages now wrap their content with Suspense boundaries, providing consistent loading states with contextual messages.
 
 **Section sources**
 - [submit results page.js:4-6](file://frontend/src/app/educator/submit/page.js#L4-L6)
 - [api.js:3-3](file://frontend/src/lib/api.js#L3-L3)
 - [next.config.mjs:1-7](file://frontend/next.config.mjs#L1-L7)
+- [round view page.js:159-165](file://frontend/src/app/educator/round_view/page.js#L159-L165)
+- [submit results page.js:531-537](file://frontend/src/app/educator/submit/page.js#L531-L537)
+
+### Enhanced Loading States with React Suspense
+**Updated** The educator dashboard pages now implement React Suspense for improved loading states and user experience.
+
+- **Round View Page**: Wraps the RoundViewContent component with Suspense, displaying "Loading round..." as the fallback message while data is being fetched.
+- **Submit Results Page**: Wraps the SubmissionTableContent component with Suspense, displaying "Loading..." as the fallback message during data operations.
+- **Consistent User Experience**: Both pages provide clear, contextual loading feedback that helps users understand what's happening during data operations.
+
+Implementation pattern:
+```javascript
+export default function PageComponent() {
+  return (
+    <Suspense fallback={<main className="round-page">Loading...</main>}>
+      <PageContent />
+    </Suspense>
+  );
+}
+```
+
+Benefits:
+- Immediate visual feedback during data fetching
+- Consistent loading experience across the application
+- Better perceived performance through progressive loading
+- Clear communication of application state to users
+
+**Section sources**
+- [round view page.js:159-165](file://frontend/src/app/educator/round_view/page.js#L159-L165)
+- [submit results page.js:531-537](file://frontend/src/app/educator/submit/page.js#L531-L537)
 
 ## Dependency Analysis
-The navigation system depends on a small set of core modules:
+The navigation system depends on a small set of core modules with enhanced loading state management:
 - API client centralizes HTTP requests and error handling.
 - Hooks encapsulate authentication and role logic.
-- Pages compose UI and orchestrate navigation and data fetching.
+- Pages compose UI and orchestrate navigation and data fetching with Suspense boundaries.
+- **Enhanced Dependencies**: React Suspense provides consistent loading states across educator dashboard pages.
 
 ```mermaid
 graph TB
@@ -281,8 +334,8 @@ EP["Educator Dashboard"]
 OP["Organiser Dashboard"]
 DP["Dynamic Papers Upload"]
 CP["Closed Round Page"]
-RV["Round View"]
-SV["Submit Results"]
+RV["Round View<br/>(Suspense)"]
+SV["Submit Results<br/>(Suspense)"]
 end
 subgraph "Hooks"
 UR["useRequireRole"]
@@ -291,6 +344,7 @@ end
 subgraph "Shared"
 SH["SiteHeader"]
 API["API Client"]
+SUS["React Suspense"]
 end
 LP --> API
 RP --> API
@@ -300,6 +354,8 @@ DP --> API
 CP --> API
 RV --> API
 SV --> API
+RV --> SUS
+SV --> SUS
 EP --> SH
 OP --> SH
 LP --> UA
@@ -313,8 +369,8 @@ RP --> UA
 - [organiser dashboard page.js:11-104](file://frontend/src/app/organiser/page.js#L11-L104)
 - [dynamic papers upload page.js:26-259](file://frontend/src/app/rounds/[id]/papers/page.js#L26-L259)
 - [dynamic closed round page.js:8-95](file://frontend/src/app/rounds/[id]/closed_round/page.js#L8-L95)
-- [round view page.js:19-156](file://frontend/src/app/educator/round_view/page.js#L19-L156)
-- [submit results page.js:8-529](file://frontend/src/app/educator/submit/page.js#L8-L529)
+- [round view page.js:19-166](file://frontend/src/app/educator/round_view/page.js#L19-L166)
+- [submit results page.js:8-538](file://frontend/src/app/educator/submit/page.js#L8-L538)
 - [useRequireRole.js:7-38](file://frontend/src/hooks/useRequireRole.js#L7-L38)
 - [useAuthRedirect.js:9-31](file://frontend/src/hooks/useAuthRedirect.js#L9-L31)
 - [SiteHeader.js:8-50](file://frontend/src/components/SiteHeader.js#L8-L50)
@@ -331,6 +387,13 @@ RP --> UA
 - Minimize network calls by batching requests where possible and caching responses appropriately.
 - Use environment variables for configuration to avoid runtime changes.
 - Prefer static metadata at the root level and add page-level metadata selectively.
+- **Enhanced Performance**: React Suspense improves perceived performance by providing immediate loading feedback and enabling progressive rendering.
+
+Best practices for Suspense implementation:
+- Place Suspense boundaries around components that perform data fetching
+- Provide meaningful fallback messages that inform users about the loading state
+- Ensure fallback components match the styling and layout of the main content
+- Consider implementing streaming SSR for even better performance
 
 [No sources needed since this section provides general guidance]
 
@@ -340,10 +403,12 @@ Common issues and resolutions:
 - Authentication failures: If fetchCurrentUser returns null, protected routes redirect to login. Ensure cookies/session are properly configured on the backend.
 - Role mismatches: useRequireRole redirects users to the correct dashboard or login if roles do not match.
 - Form validation: Pages validate inputs before submission; ensure field errors are displayed clearly to guide users.
+- **Loading State Issues**: If Suspense fallbacks aren't appearing, ensure components are wrapped correctly and data fetching is asynchronous.
 
 Operational tips:
 - Verify NEXT_PUBLIC_API_BASE_URL or NEXT_PUBLIC_API_URL environment variables point to a running backend.
 - Confirm credentials mode is enabled for cross-origin requests if necessary.
+- **Suspense Debugging**: Check that Suspense boundaries are properly placed and fallback components render correctly during data operations.
 
 **Section sources**
 - [api.js:17-45](file://frontend/src/lib/api.js#L17-L45)
@@ -353,4 +418,6 @@ Operational tips:
 - [register page.js:30-49](file://frontend/src/app/register/page.js#L30-L49)
 
 ## Conclusion
-The Olympiad Portal’s routing and navigation system leverages Next.js file-based routing, dynamic segments, and client-side guards to deliver a secure, role-aware experience. The root layout centralizes metadata and shared UI, while hooks enforce authentication and authorization consistently across protected routes. Dynamic routes handle round-specific workflows, and query parameters enable flexible scoping. With automatic code splitting and careful dependency scoping, the app balances usability and performance. Future enhancements can include page-level metadata, more granular role permissions, and expanded student-facing routes following the same patterns.
+The Olympiad Portal's routing and navigation system leverages Next.js file-based routing, dynamic segments, and client-side guards to deliver a secure, role-aware experience. The root layout centralizes metadata and shared UI, while hooks enforce authentication and authorization consistently across protected routes. Dynamic routes handle round-specific workflows, and query parameters enable flexible scoping. With automatic code splitting and careful dependency scoping, the app balances usability and performance. 
+
+**Enhanced Features**: The recent addition of React Suspense in educator dashboard pages significantly improves the user experience by providing immediate, contextual loading feedback during data operations. This enhancement demonstrates best practices for handling asynchronous operations in modern React applications while maintaining clean separation of concerns and consistent user interface patterns. Future enhancements can include page-level metadata, more granular role permissions, expanded student-facing routes following the same patterns, and potentially extending Suspense usage to other data-intensive pages throughout the application.

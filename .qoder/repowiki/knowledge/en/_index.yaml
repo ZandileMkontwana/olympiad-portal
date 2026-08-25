@@ -3,7 +3,7 @@ schema_version: 1
 locale: en-US
 branch: feature/round-lifecycle-setup
 nodes_managed: true
-exported_at: "2026-08-25T11:12:43Z"
+exported_at: "2026-08-25T11:44:19Z"
 modules:
     "":
         dir_name: Olympiad Portal Monorepo
