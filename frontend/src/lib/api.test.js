@@ -7,10 +7,7 @@ import {
   listRounds,
   getRound,
   uploadPaper,
-  register,
-  login,
   fetchCurrentUser,
-  logout,
   dashboardPathForRole,
 } from './api';
 
@@ -177,7 +174,7 @@ describe('api client', () => {
   });
 
   describe('uploadPaper', () => {
-    it('sends multipart form data', async () => {
+    it('sends multipart form data with Bearer token', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 201,
@@ -185,13 +182,14 @@ describe('api client', () => {
       });
       const paperFile = new File(['content'], 'paper.pdf');
       const memoFile = new File(['content'], 'memo.pdf');
-      const result = await uploadPaper('round-1', { paperFile, memoFile });
+      const result = await uploadPaper('round-1', { paperFile, memoFile }, 'test-token');
       expect(result).toEqual({ id: 'paper-1' });
       expect(fetchMock).toHaveBeenCalledWith(
         'http://localhost:5000/api/rounds/round-1/papers',
         expect.objectContaining({
           method: 'POST',
           credentials: 'include',
+          headers: { Authorization: 'Bearer test-token' },
         })
       );
     });
@@ -204,11 +202,15 @@ describe('api client', () => {
       });
       const paperFile = new File(['content'], 'paper.pdf');
       const memoFile = new File(['content'], 'memo.pdf');
-      await uploadPaper('round-1', {
-        paperFile,
-        memoFile,
-        memoAnswers: { q1: 'A' },
-      });
+      await uploadPaper(
+        'round-1',
+        {
+          paperFile,
+          memoFile,
+          memoAnswers: { q1: 'A' },
+        },
+        'test-token'
+      );
       // The body should be a FormData object
       const callArgs = fetchMock.mock.calls[0];
       expect(callArgs[1].body).toBeInstanceOf(FormData);
@@ -217,7 +219,7 @@ describe('api client', () => {
     it('throws ApiError on network failure', async () => {
       fetchMock.mockRejectedValue(new Error('Network'));
       try {
-        await uploadPaper('round-1', { paperFile: new File(['c'], 'p.pdf') });
+        await uploadPaper('round-1', { paperFile: new File(['c'], 'p.pdf') }, 'test-token');
         expect.fail('Should have thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(ApiError);
@@ -231,7 +233,7 @@ describe('api client', () => {
         json: () => Promise.resolve({ error: 'Missing files' }),
       });
       try {
-        await uploadPaper('round-1', { paperFile: new File(['c'], 'p.pdf') });
+        await uploadPaper('round-1', { paperFile: new File(['c'], 'p.pdf') }, 'test-token');
         expect.fail('Should have thrown');
       } catch (err) {
         expect(err.message).toBe('Missing files');
@@ -240,48 +242,30 @@ describe('api client', () => {
     });
   });
 
-  describe('register', () => {
-    it('sends POST with email and password', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        status: 201,
-        json: () => Promise.resolve({ user: {} }),
-      });
-      await register({ email: 'a@b.com', password: 'pass' });
-      expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:5000/api/auth/register',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ email: 'a@b.com', password: 'pass' }),
-        })
-      );
-    });
-  });
-
-  describe('login', () => {
-    it('sends POST with email and password', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ user: {} }),
-      });
-      await login({ email: 'a@b.com', password: 'pass' });
-      expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:5000/api/auth/login',
-        expect.objectContaining({ method: 'POST' })
-      );
-    });
-  });
-
   describe('fetchCurrentUser', () => {
-    it('returns user on success', async () => {
+    it('returns user on success with Bearer token', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
         json: () => Promise.resolve({ user: { id: '1', email: 'a@b.com' } }),
       });
-      const user = await fetchCurrentUser();
+      const user = await fetchCurrentUser('test-token');
       expect(user).toEqual({ id: '1', email: 'a@b.com' });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/auth/me',
+        expect.objectContaining({
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-token',
+          },
+        })
+      );
+    });
+
+    it('returns null when no token provided', async () => {
+      const user = await fetchCurrentUser();
+      expect(user).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('returns null on error response', async () => {
@@ -290,29 +274,14 @@ describe('api client', () => {
         status: 401,
         json: () => Promise.resolve({ error: 'Unauthorized' }),
       });
-      const user = await fetchCurrentUser();
+      const user = await fetchCurrentUser('test-token');
       expect(user).toBeNull();
     });
 
     it('returns null on network failure', async () => {
       fetchMock.mockRejectedValue(new Error('Network'));
-      const user = await fetchCurrentUser();
+      const user = await fetchCurrentUser('test-token');
       expect(user).toBeNull();
-    });
-  });
-
-  describe('logout', () => {
-    it('sends POST to logout endpoint', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ message: 'ok' }),
-      });
-      await logout();
-      expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:5000/api/auth/logout',
-        expect.objectContaining({ method: 'POST' })
-      );
     });
   });
 

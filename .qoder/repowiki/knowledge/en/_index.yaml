@@ -3,7 +3,7 @@ schema_version: 1
 locale: en-US
 branch: feature/round-lifecycle-setup
 nodes_managed: true
-exported_at: "2026-08-25T11:44:19Z"
+exported_at: "2026-08-25T13:01:19Z"
 modules:
     "":
         dir_name: Olympiad Portal Monorepo
@@ -44,8 +44,8 @@ modules:
         related_to:
             - path: frontend
     docs:
-        dir_name: Olympiad Portal Documentation Site (Docusaurus)
-        title: Olympiad Portal Documentation Site (Docusaurus)
+        dir_name: Olympiad Portal Documentation Site
+        title: Olympiad Portal Documentation Site
         scope:
             - documents/
         source_files: []

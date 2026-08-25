@@ -75,7 +75,7 @@ export function listRounds() {
 export function getRound(roundId) {
   return requestJson(`/api/rounds/${roundId}`);
 }
-export async function uploadPaper(roundId, { paperFile, memoFile, memoAnswers }) {
+export async function uploadPaper(roundId, { paperFile, memoFile, memoAnswers }, token) {
   const formData = new FormData();
   formData.append('paper', paperFile);
   if (memoFile) {
@@ -85,11 +85,17 @@ export async function uploadPaper(roundId, { paperFile, memoFile, memoAnswers })
     formData.append('memoAnswers', JSON.stringify(memoAnswers));
   }
 
+  const headers = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   let response;
   try {
     response = await fetch(`${API_BASE_URL}/api/rounds/${roundId}/papers`, {
       method: 'POST',
       credentials: 'include',
+      headers,
       body: formData,
     });
   } catch (networkError) {
@@ -111,31 +117,16 @@ export async function uploadPaper(roundId, { paperFile, memoFile, memoAnswers })
   return data;
 }
 
-export function register({ email, password, name, schoolName }) {
-  return requestJson('/api/auth/register', {
-    method: 'POST',
-    body: JSON.stringify({ email, password, name, schoolName }),
-  });
-}
-
-export function login({ email, password }) {
-  return requestJson('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-}
-
-export async function fetchCurrentUser() {
+export async function fetchCurrentUser(token) {
+  if (!token) return null;
   try {
-    const data = await requestJson('/api/auth/me');
+    const data = await requestJson('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return data.user;
   } catch {
     return null;
   }
-}
-
-export function logout() {
-  return requestJson('/api/auth/logout', { method: 'POST' });
 }
 
 export function dashboardPathForRole(role) {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import { uploadPaper, ApiError } from '@/lib/api';
 
 const MAX_FILE_SIZE_MB = 20;
@@ -25,6 +26,7 @@ function validateFiles(paperFile, memoFile) {
 
 export default function PaperUploadPage() {
   const { id: roundId } = useParams();
+  const { getToken } = useAuth();
 
   const [paperFile, setPaperFile] = useState(null);
   const [memoFile, setMemoFile] = useState(null);
@@ -67,7 +69,8 @@ export default function PaperUploadPage() {
 
     setStatus('submitting');
     try {
-      const paper = await uploadPaper(roundId, { paperFile, memoFile, memoAnswers });
+      const token = await getToken();
+      const paper = await uploadPaper(roundId, { paperFile, memoFile, memoAnswers }, token);
       setUploadedPaper(paper);
       setStatus('success');
     } catch (err) {
