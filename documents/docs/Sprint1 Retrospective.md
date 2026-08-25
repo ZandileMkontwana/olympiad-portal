@@ -28,9 +28,8 @@
 - Backfill the API reference doc with any newly added routes from teammates
 - Investigate the ES module vs CommonJS mismatch that just surfaced in the backend
 
-<<<<<<< HEAD
 
-## Kutloano 
+## Kutloano (paper download submission,marking,dashboards-frontend)
 
 ## Sprint Goal
 
@@ -69,7 +68,8 @@ Docs site got deployed to Netlify when the task specifically named Cloudflare Pa
 - No school-facing "view your results" page exists yet, even once release-gating is added
 - Non-multiple-choice marking (manual marker queue, partial credit) is entirely unbuilt — currently a submission without a memo answer key just has no Result created, with nothing to catch it later
 - Entrant registration is currently a one-step "create + register" action with no reusable roster — a student registered for Round 1 can't currently carry into Round 2 as the same record
-=======
+
+
 ## Mlungisi (Papers, Submissions & Marking)
 
 ### What went well
@@ -166,4 +166,3 @@ Docs site got deployed to Netlify when the task specifically named Cloudflare Pa
 - Confirm the `/rounds` vs `/round_view`/`/rounds_list` duplication with Person 4 is fully resolved, not just individually deprioritized
 
 - Follow up on standardizing the API base URL env var name across the whole frontend
->>>>>>> 5033af2bcbe982b73802730e8a68a97e04f27ec6
