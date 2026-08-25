@@ -13,12 +13,13 @@ const { clerkMiddleware } = require('@clerk/express');
 const app = express();
 
 // cors + cookieParser must come BEFORE the routers, or requests never reach them
-app.use(
-  cors({
-    origin: 'http://localhost:3000',
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'https://olympiad-portal-jk41dqffr-code-craftters.vercel.app',
+  ],
+  credentials: true,
+}));
 app.use(cookieParser());
 app.use(express.json());
 app.use(clerkMiddleware());
