@@ -1,7 +1,5 @@
 const express = require('express');
 const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('@clerk/express');
 
@@ -22,13 +20,12 @@ async function uploadToSupabase(file) {
     .from(BUCKET)
     .upload(uniqueName, file.buffer, { contentType: file.mimetype });
 
-  if (error){
+  if (error) {
     throw new Error(`Supabase upload failed: ${error.message}`);
   }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(uniqueName);
   return data.publicUrl;
-
 }
 
 async function requireOrganiserRole(req, res, next) {
@@ -41,7 +38,6 @@ async function requireOrganiserRole(req, res, next) {
 
   next();
 }
-
 
 // POST /rounds/:id/papers
 router.post(
@@ -63,20 +59,20 @@ router.post(
     const memoFile = req.files.memo[0];
 
     let memoAnswers = null;
-    if (req.body.memoAnswers){
-      try{
+    if (req.body.memoAnswers) {
+      try {
         memoAnswers = JSON.parse(req.body.memoAnswers);
-      } catch (err){
-        return res.status(400).json({ error: 'memoAnswers must be valid JSON'});
+      } catch {
+        return res.status(400).json({ error: 'memoAnswers must be valid JSON' });
       }
     }
 
-    try{
+    try {
       const fileUrl = await uploadToSupabase(paperFile);
       const memoUrl = await uploadToSupabase(memoFile);
 
       const paper = await prisma.paper.create({
-        data: { roundId , fileUrl ,memoUrl , memoAnswers },
+        data: { roundId, fileUrl, memoUrl, memoAnswers },
       });
       res.status(201).json(paper);
     } catch (err) {

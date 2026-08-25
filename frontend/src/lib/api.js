@@ -118,7 +118,6 @@ export function register({ email, password, name, schoolName }) {
   });
 }
 
-
 export function login({ email, password }) {
   return requestJson('/api/auth/login', {
     method: 'POST',

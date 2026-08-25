@@ -44,5 +44,3 @@ A feature is considered done when:
 ## Known Risks / Open Items
 
 - CI/CD pipeline is written but not yet running due to no available Gitea Actions runners — awaiting confirmation from the course on shared runner availability
-- Frontend deployment not yet complete
-- UI wireframes for the Initial Design & Dev Plan documentation still needed

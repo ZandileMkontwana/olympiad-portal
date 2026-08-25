@@ -27,10 +27,9 @@ export default function LoginPage() {
     async function redirectToDashboard() {
       try {
         const token = await getToken();
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/me`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const data = await res.json();
 
         if (!res.ok) {
@@ -54,7 +53,10 @@ export default function LoginPage() {
     return (
       <main className="mx-auto max-w-md px-8 py-24 text-center">
         {errorMessage ? (
-          <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div
+            role="alert"
+            className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          >
             {errorMessage}
           </div>
         ) : (

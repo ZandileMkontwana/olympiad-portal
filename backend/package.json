@@ -20,6 +20,7 @@
     "@clerk/express": "^2.1.61",
     "@prisma/client": "^5.22.0",
     "@sendgrid/mail": "^8.1.6",
+    "@supabase/supabase-js": "^2.109.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -32,7 +33,7 @@
     "passport-local": "^1.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.39.5",
     "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",

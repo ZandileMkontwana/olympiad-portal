@@ -68,7 +68,10 @@ function CompleteProfileForm() {
 
   if (status === 'success' && profile) {
     return (
-      <div role="status" className="relative rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm">
+      <div
+        role="status"
+        className="relative rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm"
+      >
         <div className="flex items-center justify-center gap-2">
           <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
           <h1 className="font-display text-xl font-semibold text-ink">Account created</h1>
@@ -132,7 +135,10 @@ function CompleteProfileForm() {
         </div>
 
         {status === 'error' && (
-          <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div
+            role="alert"
+            className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          >
             {errorMessage}
           </div>
         )}

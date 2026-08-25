@@ -28,7 +28,7 @@
 - Backfill the API reference doc with any newly added routes from teammates
 - Investigate the ES module vs CommonJS mismatch that just surfaced in the backend
 
-
+---
 ## Kutloano (paper download submission,marking,dashboards-frontend)
 
 ## Sprint Goal
@@ -69,7 +69,7 @@ Docs site got deployed to Netlify when the task specifically named Cloudflare Pa
 - Non-multiple-choice marking (manual marker queue, partial credit) is entirely unbuilt — currently a submission without a memo answer key just has no Result created, with nothing to catch it later
 - Entrant registration is currently a one-step "create + register" action with no reusable roster — a student registered for Round 1 can't currently carry into Round 2 as the same record
 
-
+---
 ## Mlungisi (Papers, Submissions & Marking)
 
 ### What went well
@@ -127,6 +127,7 @@ Docs site got deployed to Netlify when the task specifically named Cloudflare Pa
   intended flow (browser + real session) rather than assuming a
   simplified test (like a copied cookie in curl) will behave identically.
 
+---
 ## Ronie Hokwana (Organiser Console: round setup, paper upload, dashboard + accessibility/responsiveness pass)
 
 ## What went well
