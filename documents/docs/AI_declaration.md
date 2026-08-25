@@ -19,3 +19,14 @@ AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) wa
 - **Git workflow support:** step-by-step guidance resolving merge conflicts across multiple files, and reviewing repository state (via provided project exports) to confirm what had and hadn't actually landed on shared branches before further debugging.
 
 All code was reviewed, tested in-browser, and verified against the live backend by the author before being committed. All product and design decisions (page content, visual direction, which fields to collect, how features should behave) were made by the author; AI assistance was used to implement, explain, and troubleshoot those decisions, not to originate them.
+
+## AI Declaration — Mlungisi
+
+AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) was used throughout this sprint's backend work in the following ways:
+
+- **Backend development:** guidance on building the paper upload/download endpoints, submission handling with idempotency logic, MCQ automarking, SendGrid email integration, and the authentication system — including a mid-sprint migration to Clerk per the client's requirement.
+- **File storage:** guidance implementing file storage via Supabase Storage for paper/memo uploads.
+- **Debugging:** help resolving schema and dependency issues after merges, and general troubleshooting of backend errors during development.
+- **Git workflow:** help resolving merge conflicts in shared files.
+
+All code was reviewed, tested, and verified against the live backend by the author before being committed. All architectural and design decisions were made by the author and team; AI assistance was used to implement, explain, and troubleshoot those decisions, not to originate them.
