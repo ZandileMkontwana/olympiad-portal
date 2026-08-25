@@ -1,11 +1,11 @@
 // app/rounds/[id]/submit/page.js
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { Suspense,useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import * as XLSX from 'xlsx';
 
-export default function SubmissionTablePage() {
+function SubmissionTableContent()  {
   const searchParams = useSearchParams();
   const roundId = searchParams.get('id');
 
@@ -517,5 +517,13 @@ export default function SubmissionTablePage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function SubmissionTablePage() {
+  return (
+    <Suspense fallback={<main className="round-page">Loading...</main>}>
+      <SubmissionTableContent />
+    </Suspense>
   );
 }
