@@ -1,4 +1,4 @@
-# Sprint 1 Retrospective 
+# Sprint 1 Retrospective
 
 ## Zandile (Round Lifecycle & Data Core)
 
@@ -28,6 +28,7 @@
 - Backfill the API reference doc with any newly added routes from teammates
 - Investigate the ES module vs CommonJS mismatch that just surfaced in the backend
 
+<<<<<<< HEAD
 
 ## Kutloano 
 
@@ -68,3 +69,101 @@ Docs site got deployed to Netlify when the task specifically named Cloudflare Pa
 - No school-facing "view your results" page exists yet, even once release-gating is added
 - Non-multiple-choice marking (manual marker queue, partial credit) is entirely unbuilt — currently a submission without a memo answer key just has no Result created, with nothing to catch it later
 - Entrant registration is currently a one-step "create + register" action with no reusable roster — a student registered for Round 1 can't currently carry into Round 2 as the same record
+=======
+## Mlungisi (Papers, Submissions & Marking)
+
+### What went well
+
+- Delivered the full backend scope I owned: paper upload/download, submissions
+  with idempotency handling, MCQ automarking, receipt emails via SendGrid,
+  and the full authentication system (including a mid-sprint migration from
+  our own JWT-based auth to Clerk per the client's requirement).
+- Caught and fixed several real bugs before they caused bigger problems -
+  a duplicate schema.prisma model that would have broken everyone's local
+  setup, a broken seed script after the auth migration, and a silent typo
+  (`module.export` instead of `module.exports`) that caused a confusing
+  runtime crash.
+- Got comfortable with the full git branch/PR/merge-conflict workflow -
+  resolved several real conflicts in shared files (schema.prisma,
+  package.json) without losing work or breaking main.
+
+### What was challenging
+
+- Coordinating schema changes with a teammate in real time - we hit the
+  same file (schema.prisma) independently multiple times, which caused
+  duplicate definitions and blocked everyone until resolved. Better
+  upfront communication before touching shared schema would have avoided
+  this.
+- The Clerk migration was bigger than expected - it touched almost every
+  file I'd built for auth, and testing it properly required the frontend
+  integration to exist first, which meant a period of backend work I
+  couldn't fully verify on my own.
+- Windows-specific tooling friction (file locks during `prisma generate`
+  while the server was running, PowerShell's handling of quotes and
+  special characters in curl commands) cost real time that had nothing
+  to do with the actual feature work.
+
+### What I'd do differently
+
+- Run `npx prisma generate` as a required check before opening any PR
+  that touches schema.prisma, to catch duplicate/broken definitions
+  before they reach main.
+- Raise significant architecture changes (like the Clerk migration) with
+  the team as a proper discussion before starting, rather than mid-flight -
+  worked out fine this time, but was more improvised than ideal.
+- Keep scratch/test files out of the working directory more consistently
+  rather than relying on remembering not to `git add` them each time.
+
+### What I learned
+
+- How JWT-based authentication actually works under the hood (signing,
+  verifying, hashing with bcrypt) before also learning what a managed
+  auth provider like Clerk abstracts away, which gave me a much better
+  understanding of why that abstraction is valuable.
+- Real experience resolving git merge conflicts under time pressure,
+  including in generated/lockfile-adjacent files where the right move
+  is often to regenerate rather than hand-edit.
+- The importance of testing auth-protected endpoints through the actual
+  intended flow (browser + real session) rather than assuming a
+  simplified test (like a copied cookie in curl) will behave identically.
+
+## Ronie Hokwana (Organiser Console: round setup, paper upload, dashboard + accessibility/responsiveness pass)
+
+## What went well
+
+- **Delivered my full ticket set for the sprint: #23, #24, #25, #26, #27, #46, #47, #48.** Round/olympiad creation (#23) and the dashboard (#24) were both wired to real endpoints (`POST /rounds`, `POST /olympiads`, `GET /rounds/:id`, `GET /olympiads/:id/rounds`) rather than mocks. Validation and loading/error states (#26/#27) weren't left as separate follow-up work — they were folded directly into each screen as it was built, so every page shipped with proper handling from day one instead of needing a second pass later.
+
+- **Paper upload UI (#25) shipped and merged early**, tested end-to-end and wired to the real `POST /api/rounds/:id/papers` endpoint rather than mocked data, unblocking downstream testing for the team.
+
+- **Full auth-facing frontend delivered and verified end-to-end.** Landing page (#46), registration (#47), and login (#48) were all built, styled, and — after the mid-sprint Clerk migration — re-verified working live: sign-up, profile completion, and login-to-dashboard redirect all confirmed working against the real backend, not just in isolation.
+
+- **Built a coherent design system from scratch** — a consistent lavender/gold/Fraunces "exam paper" visual language applied across landing, register, login, and the shared nav header, including a custom-derived brand mark (redrawn from a reference logo, stripped of third-party branding) used consistently at multiple scales.
+
+- **Adapted the entire auth frontend to a mid-sprint architecture change.** When the backend migrated from custom JWT/bcrypt auth to Clerk, rebuilt login/register around Clerk's `SignIn`/`SignUp` components, wired the `complete-profile` follow-up call for name/school collection, and fixed the resulting role-based redirect logic — none of which existed in the original plan.
+
+- **Found and diagnosed several real, non-obvious bugs** rather than just working around them: a duplicate `name` field in the Prisma schema causing 500s, an `.env`-var naming mismatch (`NEXT_PUBLIC_API_URL` vs `NEXT_PUBLIC_API_BASE_URL`) that was silently breaking API calls across the app, a broken `.gitignore` that had `package.json` accidentally excluded from version control, and a broken logout flow on both dashboards left over from the pre-Clerk auth system.
+
+## What was harder than expected
+
+- **Local environment drift caused repeated false starts.** More than once, a bug I was debugging turned out to be stale local code — a branch that hadn't actually picked up a teammate's fix despite an apparently successful `git pull` — rather than a real defect, costing real time before the actual state was confirmed.
+
+- **The Clerk migration landed mid-sprint with no advance notice**, meaning auth pages built and tested against the old system had to be substantially reworked, and the new integration (session tokens, protected routes, the `complete-profile` handshake) had to be pieced together by reading backend route code directly rather than from any shared spec.
+
+- **Cross-teammate inconsistencies surfaced late** — an env var named two different ways across files, and duplicate `/rounds`-style pages built independently by two people using different design systems — neither of which was visible until actually integrating and testing the full flow.
+
+## What I'd do differently
+
+- **Confirm a branch/pull is actually current before debugging** — checking `git log` against the specific commit a fix landed in would have caught the "stale local code" issue immediately instead of after several rounds of guessing.
+
+- **Push for a shared `.env.example` file earlier** — the env var naming split existed for weeks before it actually broke something; a committed example file would have surfaced the inconsistency on day one.
+
+- **Ask for a heads-up before major architecture changes land** (e.g. the Clerk migration) so in-progress frontend work can be paused rather than needing significant rework after the fact.
+
+## Carried into next sprint
+
+- **#28 — run the accessibility/responsiveness pass (Lighthouse/axe)** across all console pages. This was blocked on the auth pages settling, and stayed blocked longer than expected once the Clerk migration reset that work partway through — now that login/register are stable again, this is next.
+
+- Confirm the `/rounds` vs `/round_view`/`/rounds_list` duplication with Person 4 is fully resolved, not just individually deprioritized
+
+- Follow up on standardizing the API base URL env var name across the whole frontend
+>>>>>>> 5033af2bcbe982b73802730e8a68a97e04f27ec6
