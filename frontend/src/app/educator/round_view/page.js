@@ -16,7 +16,7 @@ function formatRemaining(ms) {
   return `${seconds}s`;
 }
 
-export default function RoundView() {
+function RoundViewContent() {
   const searchParams = useSearchParams();
   const roundId = searchParams.get('id');
 
