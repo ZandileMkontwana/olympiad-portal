@@ -40,6 +40,7 @@ describe('Papers routes', () => {
   beforeEach(() => {
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.paper, 'upsert');
+    vi.spyOn(prisma.paper, 'findMany');
     vi.spyOn(prisma.round, 'findUnique');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: user is an organiser
@@ -229,6 +230,72 @@ describe('Papers routes', () => {
       const res = await request(app).get('/api/rounds/round-1/papers');
       expect(res.status).toBe(200);
       expect(res.body).toEqual(paper);
+    });
+  });
+
+  describe('GET /api/papers/archive', () => {
+    it('returns archived papers from closed and released rounds', async () => {
+      prisma.paper.findMany.mockResolvedValue([
+        {
+          id: 'paper-1',
+          roundId: 'round-1',
+          fileUrl: 'https://test.supabase.co/paper1.pdf',
+          memoUrl: 'https://test.supabase.co/memo1.pdf',
+          uploadedAt: '2026-08-01T00:00:00Z',
+          round: {
+            name: 'Round 1',
+            closeTime: '2026-08-10T00:00:00Z',
+            state: 'closed',
+            olympiad: { name: 'Maths Olympiad' },
+          },
+        },
+        {
+          id: 'paper-2',
+          roundId: 'round-2',
+          fileUrl: 'https://test.supabase.co/paper2.pdf',
+          memoUrl: null,
+          uploadedAt: '2026-07-15T00:00:00Z',
+          round: {
+            name: 'Round 2',
+            closeTime: '2026-07-20T00:00:00Z',
+            state: 'released',
+            olympiad: { name: 'Science Olympiad' },
+          },
+        },
+      ]);
+
+      const res = await request(app).get('/api/papers/archive');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(2);
+      expect(res.body[0]).toEqual({
+        id: 'paper-1',
+        roundId: 'round-1',
+        roundName: 'Round 1',
+        olympiadName: 'Maths Olympiad',
+        closeTime: '2026-08-10T00:00:00Z',
+        fileUrl: 'https://test.supabase.co/paper1.pdf',
+        memoUrl: 'https://test.supabase.co/memo1.pdf',
+        uploadedAt: '2026-08-01T00:00:00Z',
+      });
+      expect(prisma.paper.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { round: { state: { in: ['closed', 'released'] } } },
+        })
+      );
+    });
+
+    it('returns empty array when no archived papers exist', async () => {
+      prisma.paper.findMany.mockResolvedValue([]);
+      const res = await request(app).get('/api/papers/archive');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('returns 500 on database error', async () => {
+      prisma.paper.findMany.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).get('/api/papers/archive');
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Failed to fetch/);
     });
   });
 });

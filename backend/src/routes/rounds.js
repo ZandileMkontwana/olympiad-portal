@@ -20,6 +20,11 @@ router.post('/olympiads', async (req, res) => {
 router.get('/olympiads', async (req, res) => {
   try {
     const olympiads = await prisma.olympiad.findMany({
+      include: {
+        rounds: {
+          orderBy: { openTime: 'asc' },
+        },
+      },
       orderBy: { name: 'asc' },
     });
     res.json(olympiads);
