@@ -44,6 +44,10 @@ async function requestJson(path, options = {}) {
   return data;
 }
 
+export function listOlympiads() {
+  return requestJson('/api/olympiads');
+}
+
 export function createOlympiad({ name, timezone }) {
   return requestJson('/api/olympiads', {
     method: 'POST',
@@ -64,6 +68,25 @@ export function listOlympiadRounds(olympiadId) {
 
 export function listRounds() {
   return requestJson('/api/rounds');
+}
+
+/**
+ * Fetches all papers from closed or released rounds.
+ * Wired to GET /api/papers/archive (backend/src/routes/papers.js).
+ *
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   roundId: string,
+ *   roundName: string,
+ *   olympiadName: string,
+ *   closeTime: string,
+ *   fileUrl: string,
+ *   memoUrl: string|null,
+ *   uploadedAt: string,
+ * }>>}
+ */
+export function fetchArchivedPapers() {
+  return requestJson('/api/papers/archive');
 }
 /**
  * Fetches a single round by id.

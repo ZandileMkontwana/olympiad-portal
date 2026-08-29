@@ -113,4 +113,44 @@ router.get('/rounds/:id/papers', async (req, res) => {
   res.status(200).json(round.paper);
 });
 
+// GET /papers/archive
+// Returns all papers from closed or released rounds — the past-paper archive
+// accessible to both organisers and educators.
+router.get('/papers/archive', async (req, res) => {
+  try {
+    const papers = await prisma.paper.findMany({
+      where: {
+        round: {
+          state: { in: ['closed', 'released'] },
+        },
+      },
+      include: {
+        round: {
+          include: { olympiad: true },
+        },
+      },
+      orderBy: {
+        uploadedAt: 'desc',
+      },
+    });
+
+    // Flatten into a simpler shape for the frontend archive list
+    const archive = papers.map((p) => ({
+      id: p.id,
+      roundId: p.roundId,
+      roundName: p.round.name,
+      olympiadName: p.round.olympiad.name,
+      closeTime: p.round.closeTime,
+      fileUrl: p.fileUrl,
+      memoUrl: p.memoUrl,
+      uploadedAt: p.uploadedAt,
+    }));
+
+    res.json(archive);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch archived papers' });
+  }
+});
+
 module.exports = router;

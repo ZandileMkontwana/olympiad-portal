@@ -9,19 +9,17 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
 
-  const headerClass = isPublicPage ? 'bg-lavender-deep' : 'border-b border-lavender/20 bg-surface';
+  const headerClass = 'bg-lavender-deep';
 
   return (
     <header className={headerClass}>
       <nav className="mx-auto flex max-w-3xl items-center justify-between px-8 py-4">
         <Link
           href="/"
-          className={`flex items-center gap-2 font-display text-lg font-semibold ${
-            isPublicPage ? 'text-white' : 'text-ink'
-          }`}
+          className="flex items-center gap-2 font-display text-lg font-semibold text-white"
         >
           <img
-            src={isPublicPage ? '/tree-mark-white.png' : '/tree-mark.png'}
+            src="/tree-mark-white.png"
             alt=""
             className="h-6 w-6 object-contain"
             aria-hidden="true"
@@ -40,8 +38,11 @@ export default function SiteHeader() {
           </div>
         ) : (
           <div className="flex gap-4 text-sm">
-            <Link href="/organiser" className="nav-link text-ink-soft">
-              Rounds
+            <Link href="/organiser" className="nav-link-light text-white/70">
+              Olympiads
+            </Link>
+            <Link href="/archive" className="nav-link-light text-white/70">
+              Archive
             </Link>
           </div>
         )}

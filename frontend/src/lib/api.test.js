@@ -7,6 +7,7 @@ import {
   listRounds,
   getRound,
   uploadPaper,
+  fetchArchivedPapers,
   fetchCurrentUser,
   dashboardPathForRole,
 } from './api';
@@ -282,6 +283,63 @@ describe('api client', () => {
       fetchMock.mockRejectedValue(new Error('Network'));
       const user = await fetchCurrentUser('test-token');
       expect(user).toBeNull();
+    });
+  });
+
+  describe('fetchArchivedPapers', () => {
+    it('sends GET to correct archive path', async () => {
+      const archiveData = [{ id: 'p1', roundName: 'Round 1', olympiadName: 'Maths' }];
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(archiveData),
+      });
+      const result = await fetchArchivedPapers();
+      expect(result).toEqual(archiveData);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/papers/archive',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+    });
+
+    it('returns empty array when no papers are archived', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+      });
+      const result = await fetchArchivedPapers();
+      expect(result).toEqual([]);
+    });
+
+    it('throws ApiError on network failure', async () => {
+      fetchMock.mockRejectedValue(new Error('Network'));
+      try {
+        await fetchArchivedPapers();
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err.status).toBe(0);
+      }
+    });
+
+    it('throws ApiError on non-2xx response', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ error: 'Failed to fetch archived papers' }),
+      });
+      try {
+        await fetchArchivedPapers();
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err.message).toBe('Failed to fetch archived papers');
+        expect(err.status).toBe(500);
+      }
     });
   });
 

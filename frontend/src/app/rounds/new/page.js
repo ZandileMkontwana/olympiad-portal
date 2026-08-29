@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createOlympiad, createRound, ApiError } from '@/lib/api';
 
 // Best-effort list of IANA timezones for the datalist. Falls back to a
@@ -10,13 +12,7 @@ function getTimezoneOptions() {
   try {
     return Intl.supportedValuesOf('timeZone');
   } catch {
-    return [
-      'Africa/Johannesburg',
-      'Europe/London',
-      'America/New_York',
-      'Asia/Tokyo',
-      'UTC',
-    ];
+    return ['Africa/Johannesburg', 'Europe/London', 'America/New_York', 'Asia/Tokyo', 'UTC'];
   }
 }
 
@@ -44,10 +40,17 @@ function validateRound(name, openTime, closeTime) {
   return errors;
 }
 
-export default function NewRoundPage() {
+function NewRoundForm() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const presetOlympiadId = searchParams.get('olympiadId');
+  const presetOlympiadName = searchParams.get('olympiadName');
+
   const timezoneOptions = useMemo(() => getTimezoneOptions(), []);
 
-  const [step, setStep] = useState(1); // 1 = olympiad, 2 = round
+  // If an olympiad ID was passed via query params, skip step 1
+  const hasPresetOlympiad = Boolean(presetOlympiadId);
+  const [step, setStep] = useState(hasPresetOlympiad ? 2 : 1); // 1 = olympiad, 2 = round
   const [olympiadMode, setOlympiadMode] = useState('create'); // 'create' | 'existing'
 
   // Step 1 fields
@@ -58,8 +61,10 @@ export default function NewRoundPage() {
   const [olympiadStatus, setOlympiadStatus] = useState('idle');
   const [olympiadErrorMessage, setOlympiadErrorMessage] = useState('');
 
-  // Resolved olympiad (from creation response, or the manually entered ID)
-  const [olympiad, setOlympiad] = useState(null);
+  // Resolved olympiad (from creation response, the manually entered ID, or the query param)
+  const [olympiad, setOlympiad] = useState(
+    hasPresetOlympiad ? { id: presetOlympiadId, name: presetOlympiadName } : null
+  );
 
   // Step 2 fields
   const [roundName, setRoundName] = useState('');
@@ -90,9 +95,7 @@ export default function NewRoundPage() {
         setStep(2);
       } catch (err) {
         setOlympiadStatus('error');
-        setOlympiadErrorMessage(
-          err instanceof ApiError ? err.message : 'Something went wrong.'
-        );
+        setOlympiadErrorMessage(err instanceof ApiError ? err.message : 'Something went wrong.');
       }
     } else {
       const errors = validateExistingId(existingOlympiadId);
@@ -127,9 +130,7 @@ export default function NewRoundPage() {
       setRoundStatus('success');
     } catch (err) {
       setRoundStatus('error');
-      setRoundErrorMessage(
-        err instanceof ApiError ? err.message : 'Something went wrong.'
-      );
+      setRoundErrorMessage(err instanceof ApiError ? err.message : 'Something went wrong.');
     }
   }
 
@@ -144,6 +145,12 @@ export default function NewRoundPage() {
   }
 
   function handleStartOver() {
+    // If the user came from the organiser dashboard with a preset olympiad,
+    // "start over" means go back to the dashboard
+    if (hasPresetOlympiad) {
+      router.push('/organiser');
+      return;
+    }
     setStep(1);
     setOlympiadMode('create');
     setOlympiadName('');
@@ -168,31 +175,23 @@ export default function NewRoundPage() {
         <li className="flex items-center gap-2">
           <span
             className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium ${
-              step === 1
-                ? 'bg-lavender-deep text-white'
-                : 'bg-lavender/20 text-lavender-deep'
+              step === 1 ? 'bg-lavender-deep text-white' : 'bg-lavender/20 text-lavender-deep'
             }`}
           >
             1
           </span>
-          <span className={step === 1 ? 'text-ink' : 'text-ink-soft'}>
-            Olympiad
-          </span>
+          <span className={step === 1 ? 'text-ink' : 'text-ink-soft'}>Olympiad</span>
         </li>
         <li aria-hidden="true" className="h-px w-6 bg-lavender/30" />
         <li className="flex items-center gap-2">
           <span
             className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium ${
-              step === 2
-                ? 'bg-lavender-deep text-white'
-                : 'bg-lavender/20 text-lavender-deep'
+              step === 2 ? 'bg-lavender-deep text-white' : 'bg-lavender/20 text-lavender-deep'
             }`}
           >
             2
           </span>
-          <span className={step === 2 ? 'text-ink' : 'text-ink-soft'}>
-            Round details
-          </span>
+          <span className={step === 2 ? 'text-ink' : 'text-ink-soft'}>Round details</span>
         </li>
       </ol>
 
@@ -298,8 +297,8 @@ export default function NewRoundPage() {
                 className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-3 py-2 font-mono text-sm text-ink placeholder:font-sans placeholder:text-ink-soft/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
               />
               <p className="mt-1 text-xs text-ink-soft">
-                There&apos;s no olympiad picker yet — paste the ID directly.
-                It&apos;ll be verified when you create the round.
+                There&apos;s no olympiad picker yet — paste the ID directly. It&apos;ll be verified
+                when you create the round.
               </p>
               {olympiadErrors.olympiadId && (
                 <p id="existing-id-error" role="alert" className="mt-1 text-sm text-red-600">
@@ -310,7 +309,10 @@ export default function NewRoundPage() {
           )}
 
           {olympiadStatus === 'error' && (
-            <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div
+              role="alert"
+              className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+            >
               {olympiadErrorMessage}
             </div>
           )}
@@ -338,13 +340,23 @@ export default function NewRoundPage() {
             ) : (
               <span className="font-mono text-ink">{olympiad.id}</span>
             )}
-            <button
-              type="button"
-              onClick={handleStartOver}
-              className="ml-2 text-lavender-deep underline underline-offset-2 hover:opacity-80"
-            >
-              change
-            </button>
+            {!hasPresetOlympiad && (
+              <button
+                type="button"
+                onClick={handleStartOver}
+                className="ml-2 text-lavender-deep underline underline-offset-2 hover:opacity-80"
+              >
+                change
+              </button>
+            )}
+            {hasPresetOlympiad && (
+              <Link
+                href="/organiser"
+                className="ml-2 text-lavender-deep underline underline-offset-2 hover:opacity-80"
+              >
+                back
+              </Link>
+            )}
           </p>
 
           <div>
@@ -411,7 +423,10 @@ export default function NewRoundPage() {
           </div>
 
           {roundStatus === 'error' && (
-            <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div
+              role="alert"
+              className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+            >
               {roundErrorMessage}
             </div>
           )}
@@ -428,7 +443,10 @@ export default function NewRoundPage() {
 
       {createdRound && (
         <div className="mt-8">
-          <div role="status" className="rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm">
+          <div
+            role="status"
+            className="rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm"
+          >
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
               <h2 className="font-display text-xl font-semibold text-ink">Round created</h2>
@@ -475,5 +493,19 @@ export default function NewRoundPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function NewRoundPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-xl px-8 py-12">
+          <p>Loading...</p>
+        </main>
+      }
+    >
+      <NewRoundForm />
+    </Suspense>
   );
 }
