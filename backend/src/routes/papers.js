@@ -71,8 +71,11 @@ router.post(
       const fileUrl = await uploadToSupabase(paperFile);
       const memoUrl = await uploadToSupabase(memoFile);
 
-      const paper = await prisma.paper.create({
-        data: { roundId, fileUrl, memoUrl, memoAnswers },
+      // Upsert so an organiser can replace a previously uploaded paper
+      const paper = await prisma.paper.upsert({
+        where: { roundId },
+        create: { roundId, fileUrl, memoUrl, memoAnswers },
+        update: { fileUrl, memoUrl, memoAnswers },
       });
       res.status(201).json(paper);
     } catch (err) {

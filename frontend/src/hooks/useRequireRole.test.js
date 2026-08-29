@@ -7,6 +7,12 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
+// Mock @clerk/nextjs
+const mockUseAuth = vi.fn();
+vi.mock('@clerk/nextjs', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 // Mock @/lib/api
 vi.mock('@/lib/api', () => ({
   fetchCurrentUser: vi.fn(),
@@ -23,16 +29,26 @@ import { useRequireRole } from './useRequireRole';
 describe('useRequireRole', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      getToken: vi.fn().mockResolvedValue('mock-token'),
+    });
   });
 
   it('redirects to /login when not authenticated', async () => {
-    fetchCurrentUser.mockResolvedValue(null);
+    mockUseAuth.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+      getToken: vi.fn(),
+    });
 
     renderHook(() => useRequireRole('educator'));
 
     await vi.waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/login');
     });
+    expect(fetchCurrentUser).not.toHaveBeenCalled();
   });
 
   it('redirects to dashboard when role does not match', async () => {
@@ -82,5 +98,15 @@ describe('useRequireRole', () => {
     // Give microtasks a chance to flush
     await new Promise((r) => setTimeout(r, 0));
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('passes Clerk token to fetchCurrentUser', async () => {
+    fetchCurrentUser.mockResolvedValue({ id: '1', role: 'educator' });
+
+    renderHook(() => useRequireRole('educator'));
+
+    await vi.waitFor(() => {
+      expect(fetchCurrentUser).toHaveBeenCalledWith('mock-token');
+    });
   });
 });

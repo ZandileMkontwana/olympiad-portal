@@ -39,7 +39,7 @@ describe('Papers routes', () => {
 
   beforeEach(() => {
     vi.spyOn(prisma.user, 'findUnique');
-    vi.spyOn(prisma.paper, 'create');
+    vi.spyOn(prisma.paper, 'upsert');
     vi.spyOn(prisma.round, 'findUnique');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: user is an organiser
@@ -96,8 +96,8 @@ describe('Papers routes', () => {
       expect(res.body.error).toMatch(/valid JSON/);
     });
 
-    it('creates paper and returns 201', async () => {
-      prisma.paper.create.mockResolvedValue({
+    it('upserts paper and returns 201', async () => {
+      prisma.paper.upsert.mockResolvedValue({
         id: 'paper-1',
         roundId: 'round-1',
         fileUrl: 'https://test.supabase.co/test-bucket/file.pdf',
@@ -112,12 +112,12 @@ describe('Papers routes', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.id).toBe('paper-1');
-      expect(prisma.paper.create).toHaveBeenCalled();
+      expect(prisma.paper.upsert).toHaveBeenCalled();
       expect(mockUpload).toHaveBeenCalledTimes(2);
     });
 
-    it('creates paper without memoAnswers when not provided', async () => {
-      prisma.paper.create.mockResolvedValue({
+    it('upserts paper without memoAnswers when not provided', async () => {
+      prisma.paper.upsert.mockResolvedValue({
         id: 'paper-2',
         roundId: 'round-1',
       });
@@ -128,9 +128,10 @@ describe('Papers routes', () => {
         .attach('memo', Buffer.from('fake'), 'memo.pdf');
 
       expect(res.status).toBe(201);
-      expect(prisma.paper.create).toHaveBeenCalledWith(
+      expect(prisma.paper.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ memoAnswers: null }),
+          create: expect.objectContaining({ memoAnswers: null }),
+          update: expect.objectContaining({ memoAnswers: null }),
         })
       );
     });
@@ -148,7 +149,7 @@ describe('Papers routes', () => {
     });
 
     it('returns 500 when prisma fails', async () => {
-      prisma.paper.create.mockRejectedValue(new Error('DB error'));
+      prisma.paper.upsert.mockRejectedValue(new Error('DB error'));
 
       const res = await request(app)
         .post('/api/rounds/round-1/papers')

@@ -4,6 +4,8 @@ sidebar_position: 6
 
 # Sprint 1 Planning
 
+![Sprint 1 Planning Board](./Untitled-2026-08-23-1323.png)
+
 ## Sprint Goal
 
 Deliver a working, demoable slice of the basic tier centered on the round lifecycle — the piece the brief identifies as the core the rest of the portal depends on — along with the foundational tooling, documentation, and infrastructure the course requires.
