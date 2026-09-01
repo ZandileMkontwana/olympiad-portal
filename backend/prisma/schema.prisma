@@ -26,6 +26,7 @@ model Round {
   olympiad      Olympiad       @relation(fields: [olympiadId], references: [id])
   roundEntrants RoundEntrant[]
   submissions   Submission[]
+  sittings      Sitting[]
 }
 
 model User {
@@ -63,6 +64,7 @@ model Entrant {
   school        School         @relation(fields: [schoolId], references: [id])
   roundEntrants RoundEntrant[]
   submissions   Submission[]
+  sittings      Sitting[]
 }
 
 model Paper {
@@ -102,6 +104,23 @@ model RoundEntrant {
   registeredAt DateTime @default(now())
   entrant      Entrant  @relation(fields: [entrantId], references: [id])
   round        Round    @relation(fields: [roundId], references: [id])
+
+  @@unique([roundId, entrantId])
+}
+
+// An online test-taking session for an entrant in a round.
+// One sitting per entrant per round — an in-progress sitting can be
+// resumed (A4) by POSTing to /rounds/:id/sittings again.
+model Sitting {
+  id          String    @id @default(uuid())
+  entrantId   String
+  roundId     String
+  answers     Json?
+  startedAt   DateTime  @default(now())
+  expiresAt   DateTime
+  completedAt DateTime?
+  entrant     Entrant   @relation(fields: [entrantId], references: [id])
+  round       Round     @relation(fields: [roundId], references: [id])
 
   @@unique([roundId, entrantId])
 }

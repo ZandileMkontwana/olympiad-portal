@@ -6,6 +6,8 @@ require('dotenv').config();
 const papersRouter = require('./routes/papers');
 const roundsRouter = require('./routes/rounds');
 const submissionsRouter = require('./routes/submissions');
+const sittingsRouter = require('./routes/sittings');
+const entrantsRouter = require('./routes/entrants');
 const authRouter = require('./routes/auth');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
@@ -27,6 +29,8 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api', papersRouter);
 app.use('/api', roundsRouter);
 app.use('/api', submissionsRouter);
+app.use('/api', sittingsRouter);
+app.use('/api', entrantsRouter);
 app.use('/api', authRouter);
 
 if (require.main === module) {

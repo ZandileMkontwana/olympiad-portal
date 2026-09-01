@@ -88,6 +88,104 @@ export function listRounds() {
 export function fetchArchivedPapers() {
   return requestJson('/api/papers/archive');
 }
+
+/**
+ * Fetches the entrants registered for a round.
+ * Wired to GET /api/rounds/:id/entrants (backend/src/routes/rounds.js).
+ *
+ * @param {string} roundId
+ * @returns {Promise<Array<{id: string, name: string, grade: string, schoolId: string}>>}
+ */
+export function fetchRoundEntrants(roundId) {
+  return requestJson(`/api/rounds/${roundId}/entrants`);
+}
+
+/**
+ * Lists the students (entrants) registered at the signed-in educator's school.
+ * Wired to GET /api/entrants (backend/src/routes/entrants.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{id: string, name: string, grade: string, schoolId: string}>>}
+ */
+export function listSchoolEntrants(token) {
+  return requestJson('/api/entrants', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Adds a student (entrant) to the signed-in educator's school.
+ * Wired to POST /api/entrants (backend/src/routes/entrants.js).
+ *
+ * @param {{name: string, grade: string}} entrant
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{id: string, name: string, grade: string, schoolId: string}>}
+ */
+export function createEntrant({ name, grade }, token) {
+  return requestJson('/api/entrants', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, grade }),
+  });
+}
+
+/**
+ * Registers one of the educator's own students to sit a round.
+ * Wired to POST /api/rounds/:id/entrants (backend/src/routes/rounds.js).
+ * Only accepted while the round is scheduled or open.
+ *
+ * @param {string} roundId
+ * @param {string} entrantId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{id: string, roundId: string, entrantId: string, registeredAt: string}>}
+ */
+export function registerRoundEntrant(roundId, entrantId, token) {
+  return requestJson(`/api/rounds/${roundId}/entrants`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ entrantId }),
+  });
+}
+
+/**
+ * Starts (or resumes) an online sitting for an entrant in an open round.
+ * Wired to POST /api/rounds/:id/sittings (backend/src/routes/sittings.js).
+ * The response includes the paper URL and question IDs, but never the
+ * memo answer key.
+ *
+ * @param {string} roundId
+ * @param {string} entrantId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   sitting: { id: string, entrantId: string, roundId: string, answers: object|null, startedAt: string, expiresAt: string, completedAt: string|null },
+ *   round: { id: string, name: string, closeTime: string },
+ *   paper: { fileUrl: string, questions: string[] },
+ * }>}
+ */
+export function createSitting(roundId, entrantId, token) {
+  return requestJson(`/api/rounds/${roundId}/sittings`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ entrantId }),
+  });
+}
+
+/**
+ * Auto-saves answers for an in-progress sitting (Story A3).
+ * Wired to PATCH /api/sittings/:id/answers (backend/src/routes/sittings.js).
+ * The backend merges these answers into whatever is already stored.
+ *
+ * @param {string} sittingId
+ * @param {Record<string, string>} answers
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function saveSittingAnswers(sittingId, answers, token) {
+  return requestJson(`/api/sittings/${sittingId}/answers`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ answers }),
+  });
+}
 /**
  * Fetches a single round by id.
  * Wired to GET /api/rounds/:id (backend/src/routes/rounds.js).
