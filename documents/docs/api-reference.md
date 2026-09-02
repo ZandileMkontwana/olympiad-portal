@@ -345,9 +345,9 @@ Requires auth. Starts an online sitting for an entrant in an open round. One sit
 }
 ```
 
-`expiresAt` mirrors the round's `closeTime` — the sitting ends when the round closes. `questions` lists the question IDs taken from the paper's memo answer key (only the IDs, never the answers). `answers` carries the student's previously auto-saved answers when resuming.
+`expiresAt` mirrors the round's `closeTime` — the sitting ends when the round closes. Once past `expiresAt` the sitting can no longer be resumed or saved to. `questions` lists the question IDs taken from the paper's memo answer key (only the IDs, never the answers). `answers` carries the student's previously auto-saved answers when resuming.
 
-**Errors:** `400` if `entrantId` is missing, `403` if the round is not `open`, the entrant is not registered for the round, or the sitting was already completed, `404` if the round or its paper does not exist.
+**Errors:** `400` if `entrantId` is missing, `403` if the round is not `open`, the entrant is not registered for the round, the sitting was already completed, or the sitting has expired, `404` if the round or its paper does not exist.
 
 ---
 
@@ -364,7 +364,7 @@ Requires auth. Auto-save for an in-progress sitting: merges the given answers in
 
 **Response (200):** `{ "sitting": { ... } }` — the same `sitting` object as above, with the merged `answers`.
 
-**Errors:** `400` if `answers` is missing or not an object, `403` if the sitting is already completed, `404` if no sitting matches the given ID.
+**Errors:** `400` if `answers` is missing or not an object, `403` if the sitting is already completed or has expired, `404` if no sitting matches the given ID.
 
 ---
 

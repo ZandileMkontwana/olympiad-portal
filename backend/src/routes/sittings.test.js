@@ -181,6 +181,26 @@ describe('Sittings routes', () => {
       expect(prisma.sitting.create).not.toHaveBeenCalled();
     });
 
+    it('returns 403 when resuming a sitting past its expiry', async () => {
+      prisma.sitting.findUnique.mockResolvedValue({
+        id: 'sitting-existing',
+        entrantId: 'entrant-1',
+        roundId: 'round-1',
+        answers: { 1: 'B' },
+        startedAt: new Date('2026-01-01T00:00:00.000Z'),
+        expiresAt: new Date('2026-01-01T01:00:00.000Z'),
+        completedAt: null,
+      });
+
+      const res = await request(app)
+        .post('/api/rounds/round-1/sittings')
+        .send({ entrantId: 'entrant-1' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/expired/);
+      expect(prisma.sitting.create).not.toHaveBeenCalled();
+    });
+
     it('returns 401 when not authenticated', async () => {
       const unauthApp = express();
       unauthApp.use(express.json());
@@ -278,6 +298,21 @@ describe('Sittings routes', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('Sitting already completed');
+      expect(prisma.sitting.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the sitting has expired', async () => {
+      prisma.sitting.findUnique.mockResolvedValue({
+        ...activeSitting,
+        expiresAt: new Date('2026-01-01T01:00:00.000Z'),
+      });
+
+      const res = await request(app)
+        .patch('/api/sittings/sitting-1/answers')
+        .send({ answers: { 1: 'A' } });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/expired/);
       expect(prisma.sitting.update).not.toHaveBeenCalled();
     });
 

@@ -53,6 +53,10 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 
     // The sitting expires when the round closes (the round's time limit).
     // An in-progress sitting past expiresAt can no longer be resumed.
+    if (existing && new Date(existing.expiresAt) < new Date()) {
+      return res.status(403).json({ error: 'Sitting expired - it can no longer be resumed' });
+    }
+
     const sitting =
       existing ||
       (await prisma.sitting.create({
@@ -92,7 +96,7 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 // PATCH /sittings/:id/answers
 // Auto-save (Story A3): merges partial answers into the sitting's stored
 // answers, so a refresh or disconnect never loses progress.
-// Completed sittings can no longer be updated.
+// Completed or expired sittings can no longer be updated.
 router.patch('/sittings/:id/answers', requireAuth, async (req, res) => {
   try {
     const { answers } = req.body;
@@ -111,6 +115,10 @@ router.patch('/sittings/:id/answers', requireAuth, async (req, res) => {
 
     if (sitting.completedAt) {
       return res.status(403).json({ error: 'Sitting already completed' });
+    }
+
+    if (new Date(sitting.expiresAt) < new Date()) {
+      return res.status(403).json({ error: 'Sitting expired - answers can no longer be saved' });
     }
 
     const updated = await prisma.sitting.update({
