@@ -95,6 +95,31 @@ Downloadable when round `state` is `open` or `released`. Blocked when `scheduled
 **Response (200):** same shape as upload response.
 **Errors:** `404` round or paper not found, `403` round not in a downloadable state.
 
+### GET /api/papers/archive
+
+No auth required at the API level (the archive page itself requires sign-in). Returns the past-paper archive: every paper from rounds whose state is `closed` or `released`, most recently uploaded first.
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": "string",
+    "roundId": "string",
+    "roundName": "Round 1",
+    "olympiadName": "string",
+    "closeTime": "ISO date",
+    "fileUrl": "string",
+    "memoUrl": "string",
+    "uploadedAt": "ISO date"
+  }
+]
+```
+
+Both `fileUrl` (paper) and `memoUrl` (memo) are direct download links.
+
+**Errors:** `500` DB error.
+
 ---
 
 ## Submissions
