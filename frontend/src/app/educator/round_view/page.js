@@ -145,6 +145,10 @@ function RoundViewContent() {
             </button>
             {downloadError && <p className="message">{downloadError}</p>}
 
+            <Link href={`/student/sit?id=${roundId}`} className="button">
+              Sit Paper Online
+            </Link>
+
             <p className="description">Submissions are open. Closes in {timeRemaining}.</p>
 
             <Link href={`/educator/submit?id=${roundId}`} className="button">

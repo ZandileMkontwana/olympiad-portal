@@ -12,11 +12,13 @@ erDiagram
   ROUND ||--o| PAPER : uses
   ROUND ||--o{ SUBMISSION : receives
   ROUND ||--o{ ROUNDENTRANT : has
+  ROUND ||--o{ SITTING : has
   SCHOOL ||--o{ EDUCATOR : employs
   SCHOOL ||--o{ ENTRANT : registers
   USER ||--o| EDUCATOR : is
   ENTRANT ||--o{ SUBMISSION : makes
   ENTRANT ||--o{ ROUNDENTRANT : has
+  ENTRANT ||--o{ SITTING : takes
   SUBMISSION ||--|| RESULT : produces
 
   OLYMPIAD {
@@ -82,6 +84,15 @@ erDiagram
     string entrantId FK
     datetime registeredAt
   }
+  SITTING {
+    string id PK
+    string roundId FK
+    string entrantId FK
+    json answers "optional"
+    datetime startedAt
+    datetime expiresAt
+    datetime completedAt "optional"
+  }
 ```
 
 ## Tables
@@ -112,6 +123,9 @@ An educator's results for their entrants. `idempotencyKey` prevents the same sub
 
 ### RoundEntrant
 Tracks which entrants are registered to sit a specific round — required since the brief specifies entrants are put forward and registered against individual rounds, not just against the olympiad generally. A unique constraint on `(roundId, entrantId)` prevents duplicate registration. This table is what powers the "Submit Results" flow — an educator's submission page lists only entrants registered for that round.
+
+### Sitting
+An entrant's online test-taking session for a round — the online counterpart to sitting the paper physically. A unique constraint on `(roundId, entrantId)` enforces one sitting per entrant per round; requesting a sitting again returns the existing in-progress one, so a reconnect resumes where the student left off. `answers` holds the student's auto-saved work as they type, `expiresAt` mirrors the round's `closeTime`, and `completedAt` is set once the sitting is submitted.
 
 ### Result
 The mark for a submission. `releasedAt` stays empty until the round closes, so scores aren't visible to schools early.

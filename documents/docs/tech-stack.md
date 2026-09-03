@@ -15,9 +15,9 @@ Used for the organiser console and educator portal. Chosen for role-based routin
 Kept as a genuinely separate application from the frontend, satisfying the non-monolithic frontend/backend requirement. Chosen to stay in one language (JavaScript) across the whole stack, and because Node's event-loop concurrency model suits the round open/close load spikes the brief specifically calls out as the hardest requirement. All API routes are hand-written, satisfying the Hand-Written API requirement.
 
 ## Database
-**PostgreSQL, hosted on Railway**
+**PostgreSQL, hosted on Supabase**
 
-Chosen because the data model is inherently relational (Olympiad → Round → School → Entrant → Submission → Result, linked by foreign keys), and Postgres gives transaction and constraint guarantees (e.g. a unique constraint preventing duplicate round registrations) that the concurrency requirements depend on. Railway was chosen for zero-setup hosting with a shared connection string the whole team can point at.
+Chosen because the data model is inherently relational (Olympiad → Round → School → Entrant → Submission → Result, linked by foreign keys), and Postgres gives transaction and constraint guarantees (e.g. a unique constraint preventing duplicate round registrations) that the concurrency requirements depend on. Supabase was chosen for its generous free tier (500MB database, no time limit) and consolidated infrastructure — both our PostgreSQL database and file storage live in the same Supabase project, simplifying configuration and team access.
 
 ## ORM
 **Prisma**
@@ -30,15 +30,9 @@ Schema-first modelling, type-safe generated client, and built-in migrations — 
 Powers the round lifecycle — ticks every 30 seconds, comparing the current time (in UTC) against each round's `openTime`/`closeTime` to transition state automatically. Chosen for simplicity: no separate job queue infrastructure needed at this scale, and it's easy to demo and reason about.
 
 ## Authentication
-**bcrypt + JWT**
+**Clerk**
 
-Chosen because it's simpler and more direct for what we actually need. Passport is a plugin framework — it's most useful when you need to support many different login methods (Google, Facebook, local email/password, etc.) through one consistent interface. We only need one method: email + password. Passport would add a layer of abstraction (strategies, serialization/deserialization) without really buying us anything extra for that single case.
-
-bcrypt + JWT directly does exactly what we need:
-
-bcrypt hashes passwords securely before storing them
-JWT creates a signed token that proves who's logged in, without the server needing to store session state in memory or a database
-httpOnly cookies keep that token safe from being stolen by malicious JS in the browser
+Chosen for robust session management with built-in support for multi-factor authentication, social logins, and secure token-based sessions. Clerk handles user registration, login, and session management, providing JWT tokens that our backend validates for API authorization. This replaces our initial bcrypt + JWT implementation with a more production-ready solution that handles edge cases like token refresh, session invalidation, and security best practices without custom implementation.
 
 ## File storage
 **Supabase Storage**

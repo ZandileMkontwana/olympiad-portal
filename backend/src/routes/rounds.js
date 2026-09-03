@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -58,6 +59,7 @@ router.post('/rounds', async (req, res) => {
 router.get('/rounds', async (req, res) => {
   try {
     const rounds = await prisma.round.findMany({
+      include: { olympiad: true },
       orderBy: { openTime: 'asc' },
     });
     res.json(rounds);
@@ -91,13 +93,67 @@ router.get('/olympiads/:id/rounds', async (req, res) => {
   }
 });
 
+// POST /rounds/:id/entrants
+// Registers one of the educator's own entrants to sit a round. Registration
+// is only accepted while the round is scheduled or open.
+router.post('/rounds/:id/entrants', ...requireRole('educator'), async (req, res) => {
+  try {
+    const { entrantId } = req.body;
+    if (!entrantId) {
+      return res.status(400).json({ error: 'entrantId is required' });
+    }
+
+    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    if (round.state !== 'scheduled' && round.state !== 'open') {
+      return res.status(403).json({
+        error: `Registration not accepted - round is currently '${round.state}'`,
+      });
+    }
+
+    const educator = await prisma.educator.findUnique({
+      where: { userId: req.user.id },
+    });
+    if (!educator) {
+      return res.status(403).json({ error: 'No school linked to this account' });
+    }
+
+    const entrant = await prisma.entrant.findUnique({ where: { id: entrantId } });
+    if (!entrant) {
+      return res.status(404).json({ error: 'Entrant not found' });
+    }
+
+    if (entrant.schoolId !== educator.schoolId) {
+      return res.status(403).json({ error: 'Entrant belongs to a different school' });
+    }
+
+    const existing = await prisma.roundEntrant.findUnique({
+      where: { roundId_entrantId: { roundId: round.id, entrantId } },
+    });
+    if (existing) {
+      return res.status(409).json({ error: 'Entrant is already registered for this round' });
+    }
+
+    const registration = await prisma.roundEntrant.create({
+      data: { roundId: round.id, entrantId },
+    });
+    res.status(201).json(registration);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not register entrant' });
+  }
+});
+
 router.get('/rounds/:id/entrants', async (req, res) => {
   try {
     const roundEntrants = await prisma.roundEntrant.findMany({
       where: { roundId: req.params.id },
-      include: { Entrant: true }, // <-- capital E, matches what Prisma generated
+      include: { entrant: true },
     });
-    res.json(roundEntrants.map((re) => re.Entrant)); // <-- also capital E here
+    res.json(roundEntrants.map((re) => re.entrant));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch entrants' });

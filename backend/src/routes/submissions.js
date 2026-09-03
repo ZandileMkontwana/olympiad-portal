@@ -60,7 +60,8 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
 
     res.status(201).json({ submission, result });
 
-    const requester = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    // requireRole() already loaded the requester's DB record onto req.user
+    const requester = req.user;
     const entrant = await prisma.entrant.findUnique({ where: { id: entrantId } });
 
     if (requester) {

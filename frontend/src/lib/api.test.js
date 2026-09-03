@@ -9,6 +9,9 @@ import {
   uploadPaper,
   fetchArchivedPapers,
   fetchCurrentUser,
+  listSchoolEntrants,
+  createEntrant,
+  registerRoundEntrant,
   dashboardPathForRole,
 } from './api';
 
@@ -339,6 +342,108 @@ describe('api client', () => {
         expect(err).toBeInstanceOf(ApiError);
         expect(err.message).toBe('Failed to fetch archived papers');
         expect(err.status).toBe(500);
+      }
+    });
+  });
+
+  describe('listSchoolEntrants', () => {
+    it('sends GET to /api/entrants with Bearer token', async () => {
+      const entrants = [{ id: 'e1', name: 'Alice', grade: '10', schoolId: 's1' }];
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(entrants),
+      });
+      const result = await listSchoolEntrants('test-token');
+      expect(result).toEqual(entrants);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/entrants',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-token',
+          },
+        })
+      );
+    });
+  });
+
+  describe('createEntrant', () => {
+    it('sends POST with correct body and Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: 'e1', name: 'Alice', grade: '10' }),
+      });
+      const result = await createEntrant({ name: 'Alice', grade: '10' }, 'test-token');
+      expect(result.id).toBe('e1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/entrants',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-token',
+          },
+          body: JSON.stringify({ name: 'Alice', grade: '10' }),
+        })
+      );
+    });
+
+    it('throws ApiError when the school link is missing', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ error: 'No school linked to this account' }),
+      });
+      try {
+        await createEntrant({ name: 'Alice', grade: '10' }, 'test-token');
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err.status).toBe(403);
+        expect(err.message).toBe('No school linked to this account');
+      }
+    });
+  });
+
+  describe('registerRoundEntrant', () => {
+    it('sends POST to the round entrants path with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: 're1', roundId: 'round-1', entrantId: 'e1' }),
+      });
+      const result = await registerRoundEntrant('round-1', 'e1', 'test-token');
+      expect(result.roundId).toBe('round-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/entrants',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-token',
+          },
+          body: JSON.stringify({ entrantId: 'e1' }),
+        })
+      );
+    });
+
+    it('throws ApiError on duplicate registration', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: () => Promise.resolve({ error: 'Entrant is already registered for this round' }),
+      });
+      try {
+        await registerRoundEntrant('round-1', 'e1', 'test-token');
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err.status).toBe(409);
+        expect(err.message).toMatch(/already registered/);
       }
     });
   });

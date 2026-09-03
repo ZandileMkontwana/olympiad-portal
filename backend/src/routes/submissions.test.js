@@ -1,16 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
-import cookieParser from 'cookie-parser';
 import request from 'supertest';
-const jwt = require('jsonwebtoken');
 const sgMail = require('@sendgrid/mail');
 const prisma = require('../lib/prisma');
 const submissionsRouter = require('./submissions');
 
-function createApp() {
+// Simulate Clerk's clerkMiddleware() having run: req.auth() returns the
+// signed-in Clerk user. requireRole() (middleware/auth.js) then loads the
+// matching database record to check the role and set req.user.
+function createApp(authenticated = true) {
   const app = express();
   app.use(express.json());
-  app.use(cookieParser());
+  if (authenticated) {
+    app.use((req, _res, next) => {
+      req.auth = () => ({ userId: 'clerk-user-1' });
+      next();
+    });
+  }
   app.use('/api', submissionsRouter);
   return app;
 }
@@ -19,7 +25,6 @@ describe('Submissions routes', () => {
   let app;
 
   beforeEach(() => {
-    vi.spyOn(jwt, 'verify');
     vi.spyOn(sgMail, 'send');
     vi.spyOn(prisma.round, 'findUnique');
     vi.spyOn(prisma.submission, 'create');
@@ -28,9 +33,14 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    process.env.JWT_SECRET = 'test-secret';
-    jwt.verify.mockReturnValue({ userId: 'user-1', role: 'educator' });
     sgMail.send.mockResolvedValue({});
+    // Default: the Clerk user maps to an educator in our database
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@b.com',
+      role: 'educator',
+      name: 'Educator One',
+    });
     app = createApp();
   });
 
@@ -39,10 +49,28 @@ describe('Submissions routes', () => {
   });
 
   describe('POST /api/rounds/:id/submissions', () => {
+    it('returns 401 when not authenticated (no Clerk session)', async () => {
+      const unauthApp = createApp(false);
+      const res = await request(unauthApp)
+        .post('/api/rounds/round-1/submissions')
+        .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
+      expect(res.status).toBe(401);
+      expect(prisma.submission.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the Clerk user has no database record', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      const res = await request(app)
+        .post('/api/rounds/round-1/submissions')
+        .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('User not found');
+      expect(prisma.submission.create).not.toHaveBeenCalled();
+    });
+
     it('returns 400 when fields are missing', async () => {
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1' });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/required/);
@@ -52,7 +80,6 @@ describe('Submissions routes', () => {
       prisma.round.findUnique.mockResolvedValue(null);
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
       expect(res.status).toBe(404);
       expect(res.body.error).toBe('Round not found');
@@ -67,10 +94,24 @@ describe('Submissions routes', () => {
       });
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
       expect(res.status).toBe(403);
       expect(res.body.error).toMatch(/closed/);
+    });
+
+    it('returns 403 when user is not an educator', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'a@b.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+      const res = await request(app)
+        .post('/api/rounds/round-1/submissions')
+        .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('educator access required');
+      expect(prisma.submission.create).not.toHaveBeenCalled();
     });
 
     it('creates submission without result when no memoAnswers', async () => {
@@ -85,12 +126,10 @@ describe('Submissions routes', () => {
         roundId: 'round-1',
         submittedAt: new Date('2026-01-01'),
       });
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'a@b.com' });
       prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice' });
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
 
       expect(res.status).toBe(201);
@@ -112,12 +151,10 @@ describe('Submissions routes', () => {
         submittedAt: new Date('2026-01-01'),
       });
       prisma.result.create.mockResolvedValue({ id: 'r-1', score: 50 });
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'a@b.com' });
       prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice' });
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1', answers: { q1: 'A', q2: 'C' }, idempotencyKey: 'key-1' });
 
       expect(res.status).toBe(201);
@@ -139,12 +176,10 @@ describe('Submissions routes', () => {
         submittedAt: new Date('2026-01-01'),
       });
       prisma.result.create.mockResolvedValue({ id: 'r-1', score: 0 });
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'a@b.com' });
       prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice' });
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1', answers: { q1: 'C', q2: 'D' }, idempotencyKey: 'key-1' });
 
       expect(res.status).toBe(201);
@@ -169,7 +204,6 @@ describe('Submissions routes', () => {
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'dup-key' });
 
       expect(res.status).toBe(200);
@@ -191,23 +225,19 @@ describe('Submissions routes', () => {
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
 
       expect(res.status).toBe(500);
       expect(res.body.error).toMatch(/Could not save/);
     });
 
-    it('returns 403 without educator role', async () => {
-      jwt.verify.mockReturnValue({ userId: 'user-1', role: 'organiser' });
-      const res = await request(app)
-        .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
-        .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
-      expect(res.status).toBe(403);
-    });
-
     it('sends receipt with requester email and entrant name', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'teacher@school.com',
+        role: 'educator',
+        name: 'Teacher',
+      });
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         state: 'open',
@@ -219,12 +249,10 @@ describe('Submissions routes', () => {
         id: 'sub-1',
         submittedAt,
       });
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'teacher@school.com' });
       prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice' });
 
       await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
 
       expect(sgMail.send).toHaveBeenCalledWith(
@@ -246,12 +274,10 @@ describe('Submissions routes', () => {
         id: 'sub-1',
         submittedAt: new Date('2026-01-01'),
       });
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'a@b.com' });
       prisma.entrant.findUnique.mockResolvedValue(null);
 
       await request(app)
         .post('/api/rounds/round-1/submissions')
-        .set('Cookie', 'token=valid')
         .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
 
       expect(sgMail.send).toHaveBeenCalledWith(

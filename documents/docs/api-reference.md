@@ -236,7 +236,7 @@ Returns all rounds belonging to a specific olympiad, ordered by `openTime` ascen
 ## Round Entrants
 
 ### POST /api/rounds/:id/entrants
-Registers an entrant to sit a specific round.
+Requires auth, role `educator`. Registers one of the educator's own entrants to sit a specific round — accepted while the round is `scheduled` or `open`.
 
 **Body:**
 ```json
@@ -255,7 +255,7 @@ Registers an entrant to sit a specific round.
 }
 ```
 
-**Errors:** `400` if `entrantId` is missing. `409` if the entrant is already registered for this round.
+**Errors:** `400` if `entrantId` is missing. `403` if the round is no longer accepting registrations (`closed`/`released`) or the entrant belongs to a different school. `404` if the round or entrant does not exist. `409` if the entrant is already registered for this round.
 
 ---
 
@@ -273,6 +273,99 @@ Returns all entrants registered for a specific round — this is what powers the
   }
 ]
 ```
+---
+
+## Entrants
+
+### POST /api/entrants
+
+Requires auth, role `educator`. Creates an entrant at the authenticated educator's school.
+
+**Body:**
+```json
+{
+  "name": "Test Student",
+  "grade": "10"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": "7ed46f5b-d100-471c-adc8-89a983114e7a",
+  "schoolId": "b9d2ac33-eee5-4de4-9bd4-929d75551cee",
+  "name": "Test Student",
+  "grade": "10"
+}
+```
+
+**Errors:** `400` if `name` or `grade` is missing, `403` if the account has no educator profile.
+
+---
+
+### GET /api/entrants
+
+Requires auth, role `educator`. Lists the entrants registered at the authenticated educator's school, ordered by name ascending.
+
+**Response (200):** array of entrant objects, same shape as the `POST /api/entrants` response.
+
+**Errors:** `403` if the account has no educator profile.
+
+---
+
+## Sittings
+
+An online sitting is an entrant's test-taking session for a round — the online counterpart to sitting the paper physically.
+
+### POST /api/rounds/:id/sittings
+
+Requires auth. Starts an online sitting for an entrant in an open round. One sitting per entrant per round: if an in-progress sitting already exists it is returned instead (with its saved answers), so a reconnect resumes where the student left off.
+
+**Body:**
+```json
+{
+  "entrantId": "7ed46f5b-d100-471c-adc8-89a983114e7a"
+}
+```
+
+**Response (201 for a new sitting, `200` when resuming):**
+```json
+{
+  "sitting": {
+    "id": "string",
+    "entrantId": "string",
+    "roundId": "string",
+    "answers": { "1": "B" },
+    "startedAt": "ISO date",
+    "expiresAt": "ISO date",
+    "completedAt": null
+  },
+  "round": { "id": "string", "name": "Round 1", "closeTime": "ISO date" },
+  "paper": { "fileUrl": "string", "questions": ["1", "2", "3"] }
+}
+```
+
+`expiresAt` mirrors the round's `closeTime` — the sitting ends when the round closes. Once past `expiresAt` the sitting can no longer be resumed or saved to. `questions` lists the question IDs taken from the paper's memo answer key (only the IDs, never the answers). `answers` carries the student's previously auto-saved answers when resuming.
+
+**Errors:** `400` if `entrantId` is missing, `403` if the round is not `open`, the entrant is not registered for the round, the sitting was already completed, or the sitting has expired, `404` if the round or its paper does not exist.
+
+---
+
+### PATCH /api/sittings/:id/answers
+
+Requires auth. Auto-save for an in-progress sitting: merges the given answers into whatever is already stored, so a refresh or disconnect never loses progress.
+
+**Body:**
+```json
+{
+  "answers": { "3": "A" }
+}
+```
+
+**Response (200):** `{ "sitting": { ... } }` — the same `sitting` object as above, with the merged `answers`.
+
+**Errors:** `400` if `answers` is missing or not an object, `403` if the sitting is already completed or has expired, `404` if no sitting matches the given ID.
+
 ---
 
 ## Notes
