@@ -393,6 +393,41 @@ Requires auth. Auto-save for an in-progress sitting: merges the given answers in
 
 ---
 
+### POST /api/sittings/:id/submit
+
+Requires auth. Submits the sitting for marking: the sitting's stored answers become a `Submission`, automarked immediately against the paper's memo answer key when one exists (same marking as the educator submission flow), and the sitting is marked `completedAt`.
+
+The submission's `idempotencyKey` is derived from the sitting ID, so a retried request after a lost response returns the existing submission with `200` instead of creating a duplicate.
+
+**Body:** none.
+
+**Response (201, or `200` for an idempotent retry):**
+
+```json
+{
+  "submission": {
+    "id": "string",
+    "roundId": "string",
+    "entrantId": "string",
+    "answers": { "1": "B" },
+    "idempotencyKey": "sitting:string",
+    "submittedAt": "ISO date",
+    "result": {
+      "id": "string",
+      "submissionId": "string",
+      "score": 66.67
+    }
+  },
+  "result": { "id": "string", "submissionId": "string", "score": 66.67 }
+}
+```
+
+`result` is `null` when the paper has no memo answer key (no automarking possible). The score is a percentage; the student-facing UI does not display it — results are released after marking.
+
+**Errors:** `403` if the sitting is already completed (with no existing submission to return) or has expired, `404` if no sitting matches the given ID, `500` DB error.
+
+---
+
 ## Notes
 
 - All timestamps are ISO 8601 strings.
