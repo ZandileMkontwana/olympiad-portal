@@ -44,6 +44,8 @@ describe('Sittings routes', () => {
     vi.spyOn(prisma.sitting, 'findUnique');
     vi.spyOn(prisma.sitting, 'create');
     vi.spyOn(prisma.sitting, 'update');
+    vi.spyOn(prisma.submission, 'findUnique');
+    vi.spyOn(prisma.submission, 'create');
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     // Defaults: round is open with a paper, entrant is registered,
@@ -51,6 +53,8 @@ describe('Sittings routes', () => {
     prisma.round.findUnique.mockResolvedValue(openRound);
     prisma.roundEntrant.findUnique.mockResolvedValue({ id: 're-1' });
     prisma.sitting.findUnique.mockResolvedValue(null);
+    prisma.submission.findUnique.mockResolvedValue(null);
+    prisma.submission.create.mockResolvedValue(null);
     prisma.sitting.create.mockResolvedValue({
       id: 'sitting-1',
       entrantId: 'entrant-1',
@@ -325,6 +329,152 @@ describe('Sittings routes', () => {
 
       expect(res.status).toBe(500);
       expect(res.body.error).toMatch(/Could not save answers/);
+    });
+  });
+
+  describe('POST /api/sittings/:id/submit', () => {
+    const submittableSitting = () => ({
+      id: 'sitting-1',
+      entrantId: 'entrant-1',
+      roundId: 'round-1',
+      answers: { 1: 'A', 2: 'C' },
+      startedAt: new Date('2026-01-01T00:00:00.000Z'),
+      expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+      completedAt: null,
+      round: openRound, // paper.memoAnswers: { 1: 'A', 2: 'C', 3: 'B' }
+    });
+
+    const createdSubmission = (result) => ({
+      id: 'sub-1',
+      roundId: 'round-1',
+      entrantId: 'entrant-1',
+      answers: { 1: 'A', 2: 'C' },
+      idempotencyKey: 'sitting:sitting-1',
+      submittedAt: new Date('2026-09-04T00:00:00.000Z'),
+      result,
+    });
+
+    it('submits the sitting, automarks, and returns 201', async () => {
+      prisma.sitting.findUnique.mockResolvedValue(submittableSitting());
+      prisma.submission.create.mockResolvedValue(
+        createdSubmission({ id: 'result-1', submissionId: 'sub-1', score: 200 / 3 })
+      );
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(201);
+      // 2 of 3 answers correct -> 66.67%
+      expect(prisma.submission.create).toHaveBeenCalledWith({
+        data: {
+          roundId: 'round-1',
+          entrantId: 'entrant-1',
+          answers: { 1: 'A', 2: 'C' },
+          idempotencyKey: 'sitting:sitting-1',
+          result: { create: { score: expect.closeTo(200 / 3, 5) } },
+        },
+        include: { result: true },
+      });
+      expect(prisma.sitting.update).toHaveBeenCalledWith({
+        where: { id: 'sitting-1' },
+        data: { completedAt: expect.any(Date) },
+      });
+      expect(res.body.submission.id).toBe('sub-1');
+      expect(res.body.result.score).toBeCloseTo(200 / 3, 5);
+    });
+
+    it('creates the submission without a result when there is no memo answer key', async () => {
+      prisma.sitting.findUnique.mockResolvedValue({
+        ...submittableSitting(),
+        round: { ...openRound, paper: { ...openRound.paper, memoAnswers: null } },
+      });
+      prisma.submission.create.mockResolvedValue(createdSubmission(null));
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(201);
+      expect(prisma.submission.create).toHaveBeenCalledWith({
+        data: {
+          roundId: 'round-1',
+          entrantId: 'entrant-1',
+          answers: { 1: 'A', 2: 'C' },
+          idempotencyKey: 'sitting:sitting-1',
+          result: null,
+        },
+        include: { result: true },
+      });
+      expect(res.body.result).toBeNull();
+    });
+
+    it('submits an empty answer set when nothing was saved', async () => {
+      prisma.sitting.findUnique.mockResolvedValue({ ...submittableSitting(), answers: null });
+      prisma.submission.create.mockResolvedValue(
+        createdSubmission({ id: 'result-1', submissionId: 'sub-1', score: 0 })
+      );
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(201);
+      expect(prisma.submission.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ answers: {} }) })
+      );
+    });
+
+    it('returns 404 when sitting not found', async () => {
+      const res = await request(app).post('/api/sittings/nope/submit');
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Sitting not found');
+    });
+
+    it('returns 403 when already completed and no submission exists', async () => {
+      prisma.sitting.findUnique.mockResolvedValue({
+        ...submittableSitting(),
+        completedAt: new Date('2026-01-02T00:00:00.000Z'),
+      });
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Sitting already completed');
+      expect(prisma.submission.create).not.toHaveBeenCalled();
+    });
+
+    it('returns the existing submission (200) on an idempotent retry', async () => {
+      prisma.sitting.findUnique.mockResolvedValue({
+        ...submittableSitting(),
+        completedAt: new Date('2026-01-02T00:00:00.000Z'),
+      });
+      const existing = createdSubmission({ id: 'result-1', submissionId: 'sub-1', score: 50 });
+      prisma.submission.findUnique.mockResolvedValue(existing);
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(200);
+      expect(res.body.submission.id).toBe('sub-1');
+      expect(res.body.result.score).toBe(50);
+      expect(prisma.submission.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the sitting has expired', async () => {
+      prisma.sitting.findUnique.mockResolvedValue({
+        ...submittableSitting(),
+        expiresAt: new Date('2026-01-01T01:00:00.000Z'),
+      });
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/expired/);
+      expect(prisma.submission.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when prisma fails', async () => {
+      prisma.sitting.findUnique.mockRejectedValue(new Error('DB error'));
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Could not submit sitting/);
     });
   });
 });

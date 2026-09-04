@@ -21,12 +21,13 @@ vi.mock('@clerk/nextjs', () => ({
 vi.mock('@/lib/api', () => ({
   createSitting: vi.fn(),
   saveSittingAnswers: vi.fn(),
+  submitSitting: vi.fn(),
   fetchRoundEntrants: vi.fn(),
   ApiError: class ApiError extends Error {},
 }));
 
 import SitPage from './page';
-import { createSitting, saveSittingAnswers, fetchRoundEntrants } from '@/lib/api';
+import { createSitting, saveSittingAnswers, submitSitting, fetchRoundEntrants, ApiError } from '@/lib/api';
 
 const sittingResponse = (answers) => ({
   sitting: {
@@ -103,5 +104,65 @@ describe('SitPage auto-save (Story A3)', () => {
 
     // Restored answers are not dirty - no save fires until something changes.
     expect(saveSittingAnswers).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SitPage submit (Story A5)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchRoundEntrants.mockResolvedValue([{ id: 'entrant-1', name: 'Alice', grade: '11' }]);
+    saveSittingAnswers.mockResolvedValue({});
+    submitSitting.mockResolvedValue({ submission: { id: 'sub-1' }, result: null });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('submits the sitting and shows a confirmation', async () => {
+    await startSitting({ q1: 'A', q2: 'B' });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /submit sitting/i }));
+    });
+
+    expect(submitSitting).toHaveBeenCalledWith('sitting-1', 'mock-token');
+    expect(screen.getByText(/submission received/i)).toBeTruthy();
+    // The answer form is gone once submitted
+    expect(screen.queryByLabelText(/answer for question q1/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /submit sitting/i })).toBeNull();
+  });
+
+  it('flushes unsaved answers before submitting', async () => {
+    await startSitting(null);
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/answer for question q1/i), {
+        target: { value: 'a' },
+      });
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /submit sitting/i }));
+    });
+
+    expect(submitSitting).toHaveBeenCalledWith('sitting-1', 'mock-token');
+    // The typed answer was flushed to the server before the submit
+    expect(saveSittingAnswers).toHaveBeenCalledWith('sitting-1', { q1: 'A' }, 'mock-token');
+    expect(saveSittingAnswers).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the backend error and keeps the form when submission fails', async () => {
+    submitSitting.mockRejectedValue(new ApiError('Sitting already completed', 403));
+
+    await startSitting({ q1: 'A' });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /submit sitting/i }));
+    });
+
+    expect(screen.getByText(/sitting already completed/i)).toBeTruthy();
+    expect(screen.queryByText(/submission received/i)).toBeNull();
+    // The form is still there so the student can retry
+    expect(screen.getByLabelText(/answer for question q1/i)).toBeTruthy();
   });
 });

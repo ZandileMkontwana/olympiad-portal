@@ -12,6 +12,7 @@ import {
   listSchoolEntrants,
   createEntrant,
   registerRoundEntrant,
+  submitSitting,
   dashboardPathForRole,
 } from './api';
 
@@ -445,6 +446,31 @@ describe('api client', () => {
         expect(err.status).toBe(409);
         expect(err.message).toMatch(/already registered/);
       }
+    });
+  });
+
+  describe('submitSitting', () => {
+    it('sends POST to the sitting submit path with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ submission: { id: 'sub-1' }, result: { score: 100 } }),
+      });
+
+      const result = await submitSitting('sitting-1', 'test-token');
+
+      expect(result.submission.id).toBe('sub-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/sittings/sitting-1/submit',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-token',
+          },
+        })
+      );
     });
   });
 

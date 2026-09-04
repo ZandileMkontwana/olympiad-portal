@@ -145,4 +145,79 @@ router.patch('/sittings/:id/answers', requireAuth, async (req, res) => {
   }
 });
 
+// POST /sittings/:id/submit
+// Submits the sitting (Story A5): the stored answers become a Submission,
+// automarked immediately against the paper's memo answer key when one
+// exists, and the sitting is marked completed. The idempotencyKey is
+// derived from the sitting ID, so a retried request after a lost response
+// returns the existing submission instead of creating a duplicate.
+router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
+  try {
+    const sitting = await prisma.sitting.findUnique({
+      where: { id: req.params.id },
+      include: { round: { include: { paper: true } } },
+    });
+
+    if (!sitting) {
+      return res.status(404).json({ error: 'Sitting not found' });
+    }
+
+    if (sitting.completedAt) {
+      const existing = await prisma.submission.findUnique({
+        where: { idempotencyKey: `sitting:${sitting.id}` },
+        include: { result: true },
+      });
+      if (existing) {
+        return res.status(200).json({ submission: existing, result: existing.result });
+      }
+      return res.status(403).json({ error: 'Sitting already completed' });
+    }
+
+    if (new Date(sitting.expiresAt) < new Date()) {
+      return res.status(403).json({ error: 'Sitting expired - it can no longer be submitted' });
+    }
+
+    const answers = sitting.answers || {};
+
+    // Automark immediately if the round's paper has a memo answer key
+    let resultData = null;
+
+    if (sitting.round.paper && sitting.round.paper.memoAnswers) {
+      const memo = sitting.round.paper.memoAnswers;
+      const totalQuestions = Object.keys(memo).length;
+      let correctCount = 0;
+
+      for (const questionId in memo) {
+        if (answers[questionId] === memo[questionId]) {
+          correctCount++;
+        }
+      }
+
+      const score = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+      resultData = { create: { score } };
+    }
+
+    const submission = await prisma.submission.create({
+      data: {
+        roundId: sitting.roundId,
+        entrantId: sitting.entrantId,
+        answers,
+        idempotencyKey: `sitting:${sitting.id}`,
+        result: resultData,
+      },
+      include: { result: true },
+    });
+
+    await prisma.sitting.update({
+      where: { id: sitting.id },
+      data: { completedAt: new Date() },
+    });
+
+    res.status(201).json({ submission, result: submission.result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not submit sitting' });
+  }
+});
+
 module.exports = router;

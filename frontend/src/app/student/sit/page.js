@@ -8,7 +8,13 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
-import { createSitting, saveSittingAnswers, fetchRoundEntrants, ApiError } from '@/lib/api';
+import {
+  createSitting,
+  saveSittingAnswers,
+  submitSitting,
+  fetchRoundEntrants,
+  ApiError,
+} from '@/lib/api';
 
 function SitContent() {
   const searchParams = useSearchParams();
@@ -26,6 +32,8 @@ function SitContent() {
   const [error, setError] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const dirtyRef = useRef(false);
 
   // Require sign-in
@@ -123,6 +131,30 @@ function SitContent() {
     setAnswers((prev) => ({ ...prev, [questionId]: value.toUpperCase() }));
   }
 
+  // Submit (Story A5): flush any unsaved answers first so the server marks
+  // what the student sees on screen, then submit the sitting for marking.
+  async function handleSubmitSitting() {
+    setSubmitting(true);
+    setError('');
+
+    try {
+      const token = await getToken();
+
+      if (dirtyRef.current) {
+        dirtyRef.current = false;
+        await saveSittingAnswers(sittingData.sitting.id, answers, token);
+      }
+
+      await submitSitting(sittingData.sitting.id, token);
+      setSubmitted(true);
+    } catch (err) {
+      dirtyRef.current = true;
+      setError(err instanceof ApiError ? err.message : 'Could not submit the sitting.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const answeredCount = questions.filter((q) => answers[q]).length;
 
   if (!isLoaded || !isSignedIn) {
@@ -192,7 +224,7 @@ function SitContent() {
         </>
       )}
 
-      {phase === 'sitting' && sittingData && (
+      {phase === 'sitting' && sittingData && !submitted && (
         <>
           <p className="description" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <span>
@@ -271,9 +303,35 @@ function SitContent() {
           </p>
 
           <p className="description" style={{ marginTop: '16px', fontStyle: 'italic' }}>
-            Your answers auto-save as you type. Submitting the sitting (A5) comes next.
+            Your answers auto-save as you type — nothing is final until you submit.
           </p>
+
+          <button
+            type="button"
+            onClick={handleSubmitSitting}
+            disabled={submitting || timeRemaining === 'expired'}
+            className="button"
+            style={{ marginTop: '8px' }}
+          >
+            {submitting ? 'Submitting…' : 'Submit sitting'}
+          </button>
         </>
+      )}
+
+      {phase === 'sitting' && sittingData && submitted && (
+        <div className="card" style={{ padding: '24px' }}>
+          <h2 style={{ marginTop: 0 }}>Submission received</h2>
+          <p className="description">
+            Your answers for {sittingData.round.name} have been submitted —{' '}
+            {questions.length > 0
+              ? `${answeredCount} of ${questions.length} questions answered.`
+              : 'no questions were answerable for this paper.'}
+          </p>
+          <p className="description">
+            Results are released after the round closes and marking completes — your educator will
+            have them.
+          </p>
+        </div>
       )}
 
       <p style={{ marginTop: '24px' }}>

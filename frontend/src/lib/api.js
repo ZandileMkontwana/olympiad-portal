@@ -186,6 +186,24 @@ export function saveSittingAnswers(sittingId, answers, token) {
     body: JSON.stringify({ answers }),
   });
 }
+
+/**
+ * Submits a completed sitting for marking (Story A5).
+ * Wired to POST /api/sittings/:id/submit (backend/src/routes/sittings.js).
+ * The backend converts the sitting's stored answers into a Submission
+ * (automarked when the paper has a memo answer key) and completes the
+ * sitting. Retrying after a lost response returns the existing submission.
+ *
+ * @param {string} sittingId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{submission: object, result: object|null}>}
+ */
+export function submitSitting(sittingId, token) {
+  return requestJson(`/api/sittings/${sittingId}/submit`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
 /**
  * Fetches a single round by id.
  * Wired to GET /api/rounds/:id (backend/src/routes/rounds.js).
