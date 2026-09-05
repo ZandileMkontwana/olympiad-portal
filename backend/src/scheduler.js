@@ -29,8 +29,8 @@ function startScheduler() {
     }
 
     await sendBeforeCloseNotifications(now);
-    await sendResultsReleasedNotifications(now);
-    await sendMissingSubmissionNotifications(now);
+    await sendResultsReleasedNotifications();
+    await sendMissingSubmissionNotifications();
   });
   console.log('Round scheduler started — ticking every 30s');
 }
@@ -93,7 +93,7 @@ async function sendBeforeCloseNotifications(now) {
   }
 }
 
-async function sendResultsReleasedNotifications(now) {
+async function sendResultsReleasedNotifications() {
   // "Results released" = round is closed AND at least one Result in it
   // has a non-null releasedAt. We notify once per round, when we first
   // detect any released result for it.
@@ -130,7 +130,7 @@ async function sendResultsReleasedNotifications(now) {
   }
 }
 
-async function sendMissingSubmissionNotifications(now) {
+async function sendMissingSubmissionNotifications() {
   const recentlyClosedRounds = await prisma.round.findMany({
     where: { state: 'closed' },
     include: {
