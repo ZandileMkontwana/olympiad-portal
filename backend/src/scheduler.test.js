@@ -188,5 +188,118 @@ describe('startScheduler', () => {
       expect(sgMail.send).not.toHaveBeenCalled();
       expect(prisma.notificationLog.create).not.toHaveBeenCalled();
     });
+
+    it('notifies the educator of each school once across multiple schools', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany.mockResolvedValueOnce([
+        {
+          id: 'round-1',
+          name: 'Round One',
+          openTime: new Date(Date.now() + 30 * 60 * 1000),
+          roundEntrants: [
+            {
+              entrant: {
+                school: {
+                  educators: [{ user: { email: 'educator@school-a.com' } }],
+                },
+              },
+            },
+            {
+              entrant: {
+                school: {
+                  educators: [{ user: { email: 'educator@school-b.com' } }],
+                },
+              },
+            },
+          ],
+        },
+      ]);
+      prisma.notificationLog.findUnique.mockResolvedValue(null);
+
+      await scheduledCallback();
+
+      expect(sgMail.send).toHaveBeenCalledTimes(2);
+      expect(sgMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'educator@school-a.com' })
+      );
+      expect(sgMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'educator@school-b.com' })
+      );
+    });
+
+    it('dispatches for each upcoming round independently', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany.mockResolvedValueOnce([
+        {
+          id: 'round-1',
+          name: 'Round One',
+          openTime: new Date(Date.now() + 30 * 60 * 1000),
+          roundEntrants: [
+            {
+              entrant: {
+                school: {
+                  educators: [{ user: { email: 'educator@round-one.com' } }],
+                },
+              },
+            },
+          ],
+        },
+        {
+          id: 'round-2',
+          name: 'Round Two',
+          openTime: new Date(Date.now() + 45 * 60 * 1000),
+          roundEntrants: [
+            {
+              entrant: {
+                school: {
+                  educators: [{ user: { email: 'educator@round-two.com' } }],
+                },
+              },
+            },
+          ],
+        },
+      ]);
+      prisma.notificationLog.findUnique.mockResolvedValue(null);
+
+      await scheduledCallback();
+
+      expect(sgMail.send).toHaveBeenCalledTimes(2);
+      expect(prisma.notificationLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            roundId: 'round-1',
+            recipientEmail: 'educator@round-one.com',
+          }),
+        })
+      );
+      expect(prisma.notificationLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            roundId: 'round-2',
+            recipientEmail: 'educator@round-two.com',
+          }),
+        })
+      );
+    });
+
+    it('sends nothing for an upcoming round with no entrants', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany.mockResolvedValueOnce([
+        {
+          id: 'round-1',
+          name: 'Round One',
+          openTime: new Date(Date.now() + 30 * 60 * 1000),
+          roundEntrants: [],
+        },
+      ]);
+
+      await scheduledCallback();
+
+      expect(sgMail.send).not.toHaveBeenCalled();
+      expect(prisma.notificationLog.create).not.toHaveBeenCalled();
+    });
   });
 });
