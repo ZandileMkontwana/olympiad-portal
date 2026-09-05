@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const cron = require('node-cron');
+const sgMail = require('@sendgrid/mail');
 const prisma = require('./lib/prisma');
 const { startScheduler } = require('./scheduler');
 
@@ -11,6 +12,10 @@ describe('startScheduler', () => {
       scheduledCallback = fn;
     });
     vi.spyOn(prisma.round, 'updateMany');
+    vi.spyOn(prisma.round, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.notificationLog, 'findUnique').mockResolvedValue(null);
+    vi.spyOn(prisma.notificationLog, 'create').mockResolvedValue({ id: 'log-1' });
+    vi.spyOn(sgMail, 'send').mockResolvedValue({});
     vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
@@ -86,5 +91,102 @@ describe('startScheduler', () => {
     const closedLogs = console.log.mock.calls.filter((c) => c[0]?.includes?.('Closed'));
     expect(openedLogs).toHaveLength(0);
     expect(closedLogs).toHaveLength(0);
+  });
+
+  describe('before-open reminder emails', () => {
+    // Two entrants from the same school — their shared educator should only
+    // get one reminder email.
+    const upcomingRound = () => ({
+      id: 'round-1',
+      name: 'Round One',
+      openTime: new Date(Date.now() + 30 * 60 * 1000),
+      roundEntrants: [
+        {
+          entrant: {
+            school: {
+              educators: [{ user: { email: 'educator@school.com' } }],
+            },
+          },
+        },
+        {
+          entrant: {
+            school: {
+              educators: [{ user: { email: 'educator@school.com' } }],
+            },
+          },
+        },
+      ],
+    });
+
+    it('queries rounds opening within the next hour', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+
+      await scheduledCallback();
+
+      expect(prisma.round.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            state: 'scheduled',
+            openTime: { gte: expect.any(Date), lte: expect.any(Date) },
+          },
+        })
+      );
+    });
+
+    it('sends one reminder per unique educator email and logs it as before_open', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany.mockResolvedValueOnce([upcomingRound()]);
+      prisma.notificationLog.findUnique.mockResolvedValue(null);
+
+      await scheduledCallback();
+
+      expect(sgMail.send).toHaveBeenCalledTimes(1);
+      expect(sgMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'educator@school.com', subject: 'Round One opens soon' })
+      );
+      expect(prisma.notificationLog.create).toHaveBeenCalledTimes(1);
+      expect(prisma.notificationLog.create).toHaveBeenCalledWith({
+        data: {
+          roundId: 'round-1',
+          entrantId: null,
+          triggerType: 'before_open',
+          recipientEmail: 'educator@school.com',
+          status: 'sent',
+        },
+      });
+    });
+
+    it('skips educators who were already notified for the round', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany.mockResolvedValueOnce([upcomingRound()]);
+      prisma.notificationLog.findUnique.mockResolvedValue({ id: 'existing-log' });
+
+      await scheduledCallback();
+
+      expect(prisma.notificationLog.findUnique).toHaveBeenCalledWith({
+        where: {
+          roundId_triggerType_recipientEmail: {
+            roundId: 'round-1',
+            triggerType: 'before_open',
+            recipientEmail: 'educator@school.com',
+          },
+        },
+      });
+      expect(sgMail.send).not.toHaveBeenCalled();
+      expect(prisma.notificationLog.create).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing when no rounds are upcoming', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+
+      await scheduledCallback();
+
+      expect(sgMail.send).not.toHaveBeenCalled();
+      expect(prisma.notificationLog.create).not.toHaveBeenCalled();
+    });
   });
 });

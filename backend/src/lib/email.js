@@ -36,7 +36,7 @@ async function sendRoundOpeningNotification({ toEmail, roundId , roundName, open
       data: {
         roundId,
         entrantId: entrantId || null,
-        triggerType: 'before_opens',
+        triggerType: 'before_open',
         recipientEmail: toEmail,
         status: 'sent',
       },
@@ -48,7 +48,7 @@ async function sendRoundOpeningNotification({ toEmail, roundId , roundName, open
       data: {
         roundId,
         entrantId: entrantId || null,
-        triggerType: 'before_opens',
+        triggerType: 'before_open',
         recipientEmail: toEmail,
         status: 'failed',
         error: err.message,
