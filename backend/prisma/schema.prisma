@@ -16,17 +16,18 @@ model Olympiad {
 }
 
 model Round {
-  id            String         @id @default(uuid())
-  olympiadId    String
-  name          String
-  openTime      DateTime
-  closeTime     DateTime
-  state         String         @default("scheduled")
-  paper         Paper?
-  olympiad      Olympiad       @relation(fields: [olympiadId], references: [id])
-  roundEntrants RoundEntrant[]
-  submissions   Submission[]
-  sittings      Sitting[]
+  id               String            @id @default(uuid())
+  olympiadId       String
+  name             String
+  openTime         DateTime
+  closeTime        DateTime
+  state            String            @default("scheduled")
+  paper            Paper?
+  olympiad         Olympiad          @relation(fields: [olympiadId], references: [id])
+  roundEntrants    RoundEntrant[]
+  submissions      Submission[]
+  sittings         Sitting[]
+  notificationLogs NotificationLog[]
 }
 
 model User {
@@ -57,14 +58,15 @@ model Educator {
 }
 
 model Entrant {
-  id            String         @id @default(uuid())
-  schoolId      String
-  name          String
-  grade         String
-  school        School         @relation(fields: [schoolId], references: [id])
-  roundEntrants RoundEntrant[]
-  submissions   Submission[]
-  sittings      Sitting[]
+  id               String            @id @default(uuid())
+  schoolId         String
+  name             String
+  grade            String
+  school           School            @relation(fields: [schoolId], references: [id])
+  roundEntrants    RoundEntrant[]
+  submissions      Submission[]
+  sittings         Sitting[]
+  notificationLogs NotificationLog[]
 }
 
 model Paper {
@@ -123,4 +125,19 @@ model Sitting {
   round       Round     @relation(fields: [roundId], references: [id])
 
   @@unique([roundId, entrantId])
+}
+
+model NotificationLog {
+  id             String   @id @default(uuid())
+  roundId        String
+  entrantId      String?
+  triggerType    String // 'before_open' | 'before_close' | 'missing_submission' | 'results_released'
+  recipientEmail String
+  status         String   @default("sent") // 'sent' | 'failed'
+  error          String?
+  sentAt         DateTime @default(now())
+  round          Round    @relation(fields: [roundId], references: [id])
+  entrant        Entrant? @relation(fields: [entrantId], references: [id])
+
+  @@unique([roundId, triggerType, recipientEmail])
 }
