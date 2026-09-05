@@ -5,6 +5,7 @@ const {
   sendSubmissionReceipt,
   sendRoundClosingNotification,
   sendResultsReleasedNotification,
+  sendMissingSubmissionNotification,
 } = require('./email');
 
 describe('sendSubmissionReceipt', () => {
@@ -184,6 +185,101 @@ describe('sendRoundClosingNotification', () => {
         roundId: 'round-1',
         entrantId: null,
         triggerType: 'before_close',
+        recipientEmail: 'educator@school.com',
+        status: 'failed',
+        error: 'SendGrid down',
+      },
+    });
+  });
+});
+
+describe('sendMissingSubmissionNotification', () => {
+  withNotificationLogMocks();
+
+  it('renders subject and body with round name and entrant name', async () => {
+    await sendMissingSubmissionNotification({
+      toEmail: 'educator@school.com',
+      roundId: 'round-1',
+      roundName: 'Round One',
+      entrantName: 'Alice',
+      entrantId: 'entrant-1',
+    });
+
+    expect(sgMail.send).toHaveBeenCalledWith({
+      to: 'educator@school.com',
+      from: 'from@test.com',
+      subject: 'Missing submission for Alice - Round One',
+      text: expect.stringContaining('no submission was received for Alice'),
+      html: expect.stringContaining('<strong>Alice</strong>'),
+    });
+  });
+
+  it('states the round has closed', async () => {
+    await sendMissingSubmissionNotification({
+      toEmail: 'educator@school.com',
+      roundId: 'round-1',
+      roundName: 'Round One',
+      entrantName: 'Alice',
+      entrantId: 'entrant-1',
+    });
+
+    expect(sgMail.send).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('has closed') })
+    );
+  });
+
+  it('logs a sent attempt with triggerType missing_submission', async () => {
+    await sendMissingSubmissionNotification({
+      toEmail: 'educator@school.com',
+      roundId: 'round-1',
+      roundName: 'Round One',
+      entrantName: 'Alice',
+      entrantId: 'entrant-1',
+    });
+
+    expect(prisma.notificationLog.create).toHaveBeenCalledWith({
+      data: {
+        roundId: 'round-1',
+        entrantId: 'entrant-1',
+        triggerType: 'missing_submission',
+        recipientEmail: 'educator@school.com',
+        status: 'sent',
+      },
+    });
+  });
+
+  it('passes the entrantId through to the log', async () => {
+    await sendMissingSubmissionNotification({
+      toEmail: 'educator@school.com',
+      roundId: 'round-1',
+      roundName: 'Round One',
+      entrantName: 'Bob',
+      entrantId: 'entrant-99',
+    });
+
+    expect(prisma.notificationLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ entrantId: 'entrant-99' }) })
+    );
+  });
+
+  it('logs a failed attempt without throwing when SendGrid rejects', async () => {
+    sgMail.send.mockRejectedValue(new Error('SendGrid down'));
+
+    await expect(
+      sendMissingSubmissionNotification({
+        toEmail: 'educator@school.com',
+        roundId: 'round-1',
+        roundName: 'Round One',
+        entrantName: 'Alice',
+        entrantId: 'entrant-1',
+      })
+    ).resolves.not.toThrow();
+
+    expect(prisma.notificationLog.create).toHaveBeenCalledWith({
+      data: {
+        roundId: 'round-1',
+        entrantId: 'entrant-1',
+        triggerType: 'missing_submission',
         recipientEmail: 'educator@school.com',
         status: 'failed',
         error: 'SendGrid down',
