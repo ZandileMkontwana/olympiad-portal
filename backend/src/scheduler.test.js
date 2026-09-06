@@ -302,4 +302,200 @@ describe('startScheduler', () => {
       expect(prisma.notificationLog.create).not.toHaveBeenCalled();
     });
   });
+
+  describe('before-close reminder emails', () => {
+    it('sends one reminder per unique educator for rounds closing within the hour', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([])  // before_open
+        .mockResolvedValueOnce([{
+          id: 'round-1',
+          name: 'Round One',
+          closeTime: new Date(Date.now() + 30 * 60 * 1000),
+          roundEntrants: [
+            { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
+          ],
+        }])
+        .mockResolvedValueOnce([])  // results_released
+        .mockResolvedValueOnce([]);  // missing_submission
+
+      await scheduledCallback();
+
+      expect(sgMail.send).toHaveBeenCalledTimes(1);
+      expect(sgMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ subject: 'Round One closes soon' })
+      );
+      expect(prisma.notificationLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            roundId: 'round-1',
+            triggerType: 'before_close',
+            recipientEmail: 'educator@school.com',
+          }),
+        })
+      );
+    });
+
+    it('queries only open rounds closing within the next hour', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+
+      await scheduledCallback();
+
+      expect(prisma.round.findMany).toHaveBeenNthCalledWith(2,
+        expect.objectContaining({
+          where: { state: 'open', closeTime: { gte: expect.any(Date), lte: expect.any(Date) } },
+        })
+      );
+    });
+
+    it('skips educators who were already notified', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{
+          id: 'round-1',
+          name: 'Round One',
+          closeTime: new Date(Date.now() + 30 * 60 * 1000),
+          roundEntrants: [
+            { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
+          ],
+        }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+      prisma.notificationLog.findUnique.mockResolvedValue({ id: 'existing-log' });
+
+      await scheduledCallback();
+
+      expect(sgMail.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('results-released notifications', () => {
+    it('notifies educators when a closed round has released results', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([])  // before_open
+        .mockResolvedValueOnce([])  // before_close
+        .mockResolvedValueOnce([{
+          id: 'round-1',
+          name: 'Round One',
+          roundEntrants: [
+            { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
+          ],
+        }])
+        .mockResolvedValueOnce([]);  // missing_submission
+
+      await scheduledCallback();
+
+      expect(sgMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ subject: 'Results are out for Round One' })
+      );
+      expect(prisma.notificationLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            triggerType: 'results_released',
+            recipientEmail: 'educator@school.com',
+          }),
+        })
+      );
+    });
+
+    it('queries only closed rounds with released results', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+
+      await scheduledCallback();
+
+      expect(prisma.round.findMany).toHaveBeenNthCalledWith(3,
+        expect.objectContaining({
+          where: {
+            state: 'closed',
+            submissions: { some: { result: { releasedAt: { not: null } } } },
+          },
+        })
+      );
+    });
+  });
+
+  describe('missing-submission notifications', () => {
+    it('notifies educators for entrants who did not submit', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([])  // before_open
+        .mockResolvedValueOnce([])  // before_close
+        .mockResolvedValueOnce([])  // results_released
+        .mockResolvedValueOnce([{
+          id: 'round-1',
+          name: 'Round One',
+          roundEntrants: [
+            {
+              entrant: {
+                id: 'entrant-1',
+                name: 'Alice',
+                school: { educators: [{ user: { email: 'educator@school.com' } }] },
+                submissions: [],
+              },
+            },
+          ],
+        }]);
+
+      await scheduledCallback();
+
+      expect(sgMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ subject: 'Missing submission for Alice - Round One' })
+      );
+      expect(prisma.notificationLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            triggerType: 'missing_submission',
+            entrantId: 'entrant-1',
+            recipientEmail: 'educator@school.com',
+          }),
+        })
+      );
+    });
+
+    it('skips entrants who already submitted', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{
+          id: 'round-1',
+          name: 'Round One',
+          roundEntrants: [
+            {
+              entrant: {
+                id: 'entrant-1',
+                name: 'Alice',
+                school: { educators: [{ user: { email: 'educator@school.com' } }] },
+                submissions: [{ roundId: 'round-1' }],
+              },
+            },
+          ],
+        }]);
+
+      await scheduledCallback();
+
+      expect(sgMail.send).not.toHaveBeenCalled();
+    });
+
+    it('queries only closed rounds', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+
+      await scheduledCallback();
+
+      expect(prisma.round.findMany).toHaveBeenNthCalledWith(4,
+        expect.objectContaining({ where: { state: 'closed' } })
+      );
+    });
+  });
 });
