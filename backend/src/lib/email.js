@@ -20,6 +20,43 @@ async function sendSubmissionReceipt({ toEmail, entrantName, roundName, submitte
   }
 }
 
+// Sends a "round opening soon" notification and logs the attempt.
+async function sendRoundOpeningNotification({ toEmail, roundId, roundName, opensAt, entrantId }) {
+  const msg = {
+    to: toEmail,
+    from: process.env.SENDGRID_FROM_EMAIL,
+    subject: `${roundName} opens soon`,
+    text: `${roundName} opens at ${opensAt}. Make sure you're ready to download the paper once it opens.`,
+    html: `<p><strong>${roundName}</strong> opens at ${opensAt}. Make sure you're ready to download the paper once it opens.</p>`,
+  };
+
+  try {
+    await sgMail.send(msg);
+    await prisma.notificationLog.create({
+      data: {
+        roundId,
+        entrantId: entrantId || null,
+        triggerType: 'before_open',
+        recipientEmail: toEmail,
+        status: 'sent',
+      },
+    });
+    console.log(`Round opening notification sent to ${toEmail}`);
+  } catch (err) {
+    console.error('Failed to send round opening notification:', err.message);
+    await prisma.notificationLog.create({
+      data: {
+        roundId,
+        entrantId: entrantId || null,
+        triggerType: 'before_open',
+        recipientEmail: toEmail,
+        status: 'failed',
+        error: err.message,
+      },
+    });
+  }
+}
+
 // Sends a "round closing soon" notification and logs the attempt.
 async function sendRoundClosingNotification({ toEmail, roundId, roundName, closesAt, entrantId }) {
   const msg = {
@@ -118,9 +155,9 @@ async function sendMissingSubmissionNotification({ toEmail, roundId, roundName, 
   }
 }
 
-
 module.exports = {
   sendSubmissionReceipt,
+  sendRoundOpeningNotification,
   sendRoundClosingNotification,
   sendResultsReleasedNotification,
   sendMissingSubmissionNotification,

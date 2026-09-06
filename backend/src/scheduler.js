@@ -1,11 +1,13 @@
 const cron = require('node-cron');
 const prisma = require('./lib/prisma');
 const {
+  sendRoundOpeningNotification,
   sendRoundClosingNotification,
   sendResultsReleasedNotification,
   sendMissingSubmissionNotification,
 } = require('./lib/email');
 
+const NOTIFY_BEFORE_OPEN_MS = 60 * 60 * 1000; // 1 hour
 const NOTIFY_BEFORE_CLOSE_MS = 60 * 60 * 1000; // 1 hour
 
 function startScheduler() {
@@ -28,6 +30,7 @@ function startScheduler() {
       console.log(`Closed ${closed.count} round(s) at ${now.toISOString()}`);
     }
 
+    await sendBeforeOpenNotifications(now);
     await sendBeforeCloseNotifications(now);
     await sendResultsReleasedNotifications();
     await sendMissingSubmissionNotifications();
@@ -60,6 +63,43 @@ const roundIncludeForNotifications = {
     },
   },
 };
+
+async function sendBeforeOpenNotifications(now) {
+  const windowEnd = new Date(now.getTime() + NOTIFY_BEFORE_OPEN_MS);
+
+  const upcomingRounds = await prisma.round.findMany({
+    where: {
+      state: 'scheduled',
+      openTime: { gte: now, lte: windowEnd },
+    },
+    include: roundIncludeForNotifications,
+  });
+
+  for (const round of upcomingRounds) {
+    const recipientEmails = await getRecipientsForRound(round);
+
+    for (const email of recipientEmails) {
+      const alreadyNotified = await prisma.notificationLog.findUnique({
+        where: {
+          roundId_triggerType_recipientEmail: {
+            roundId: round.id,
+            triggerType: 'before_open',
+            recipientEmail: email,
+          },
+        },
+      });
+
+      if (!alreadyNotified) {
+        await sendRoundOpeningNotification({
+          toEmail: email,
+          roundId: round.id,
+          roundName: round.name,
+          opensAt: round.openTime.toISOString(),
+        });
+      }
+    }
+  }
+}
 
 async function sendBeforeCloseNotifications(now) {
   const windowEnd = new Date(now.getTime() + NOTIFY_BEFORE_CLOSE_MS);

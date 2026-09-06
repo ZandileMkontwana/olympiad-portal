@@ -3,6 +3,7 @@ const sgMail = require('@sendgrid/mail');
 const prisma = require('./prisma');
 const {
   sendSubmissionReceipt,
+  sendRoundOpeningNotification,
   sendRoundClosingNotification,
   sendResultsReleasedNotification,
   sendMissingSubmissionNotification,
@@ -101,6 +102,101 @@ function withNotificationLogMocks() {
   });
   afterEach(() => vi.restoreAllMocks());
 }
+
+describe('sendRoundOpeningNotification', () => {
+  withNotificationLogMocks();
+
+  it('renders subject and body with the round name and opening time', async () => {
+    await sendRoundOpeningNotification({
+      toEmail: 'educator@school.com',
+      roundId: 'round-1',
+      roundName: 'Round One',
+      opensAt: '2026-01-01T10:00:00.000Z',
+    });
+
+    expect(sgMail.send).toHaveBeenCalledWith({
+      to: 'educator@school.com',
+      from: 'from@test.com',
+      subject: 'Round One opens soon',
+      text: expect.stringContaining('Round One opens at 2026-01-01T10:00:00.000Z'),
+      html: expect.stringContaining('<strong>Round One</strong> opens at 2026-01-01T10:00:00.000Z'),
+    });
+  });
+
+  it('includes the download-the-paper prompt in the body', async () => {
+    await sendRoundOpeningNotification({
+      toEmail: 'educator@school.com',
+      roundId: 'round-1',
+      roundName: 'Round One',
+      opensAt: '2026-01-01T10:00:00.000Z',
+    });
+
+    expect(sgMail.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('ready to download the paper once it opens'),
+      })
+    );
+  });
+
+  it('logs a sent attempt with triggerType before_open', async () => {
+    await sendRoundOpeningNotification({
+      toEmail: 'educator@school.com',
+      roundId: 'round-1',
+      roundName: 'Round One',
+      opensAt: '2026-01-01T10:00:00.000Z',
+      entrantId: 'entrant-1',
+    });
+
+    expect(prisma.notificationLog.create).toHaveBeenCalledWith({
+      data: {
+        roundId: 'round-1',
+        entrantId: 'entrant-1',
+        triggerType: 'before_open',
+        recipientEmail: 'educator@school.com',
+        status: 'sent',
+      },
+    });
+  });
+
+  it('stores a null entrantId when no entrant is provided', async () => {
+    await sendRoundOpeningNotification({
+      toEmail: 'educator@school.com',
+      roundId: 'round-1',
+      roundName: 'Round One',
+      opensAt: '2026-01-01T10:00:00.000Z',
+    });
+
+    expect(prisma.notificationLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ entrantId: null }),
+      })
+    );
+  });
+
+  it('logs a failed attempt without throwing when SendGrid rejects', async () => {
+    sgMail.send.mockRejectedValue(new Error('SendGrid down'));
+
+    await expect(
+      sendRoundOpeningNotification({
+        toEmail: 'educator@school.com',
+        roundId: 'round-1',
+        roundName: 'Round One',
+        opensAt: '2026-01-01T10:00:00.000Z',
+      })
+    ).resolves.not.toThrow();
+
+    expect(prisma.notificationLog.create).toHaveBeenCalledWith({
+      data: {
+        roundId: 'round-1',
+        entrantId: null,
+        triggerType: 'before_open',
+        recipientEmail: 'educator@school.com',
+        status: 'failed',
+        error: 'SendGrid down',
+      },
+    });
+  });
+});
 
 describe('sendRoundClosingNotification', () => {
   withNotificationLogMocks();
