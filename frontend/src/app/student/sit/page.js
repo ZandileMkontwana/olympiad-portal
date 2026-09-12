@@ -109,6 +109,14 @@ function SitContent() {
   async function handleStartSitting() {
     if (!selectedEntrantId) return;
 
+    if (
+      !window.confirm(
+        'Start this test now? You can leave and come back any time — your answers are saved automatically.'
+      )
+    ) {
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -119,7 +127,7 @@ function SitContent() {
       setAnswers(data.sitting.answers || {});
       setPhase('sitting');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not start the sitting.');
+      setError(err instanceof ApiError ? err.message : 'Could not start the test.');
     } finally {
       setLoading(false);
     }
@@ -132,8 +140,16 @@ function SitContent() {
   }
 
   // Submit (Story A5): flush any unsaved answers first so the server marks
-  // what the student sees on screen, then submit the sitting for marking.
+  // what the student sees on screen, then submit the test for marking.
   async function handleSubmitSitting() {
+    if (
+      !window.confirm(
+        `Submit your answers? You answered ${answeredCount} of ${questions.length} questions. This can't be undone.`
+      )
+    ) {
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -149,7 +165,7 @@ function SitContent() {
       setSubmitted(true);
     } catch (err) {
       dirtyRef.current = true;
-      setError(err instanceof ApiError ? err.message : 'Could not submit the sitting.');
+      setError(err instanceof ApiError ? err.message : 'Could not submit the test.');
     } finally {
       setSubmitting(false);
     }
@@ -181,27 +197,35 @@ function SitContent() {
 
       {phase === 'picking' && (
         <>
-          <p className="description">
+          <p className="description" style={{ fontSize: '1.1rem' }}>
             Select your name to start. You must be registered for this round, and the round must be
             open.
           </p>
 
           {entrants.length === 0 && !error && (
-            <p className="description">
+            <p className="description" style={{ fontSize: '1.1rem' }}>
               No entrants registered for this round yet. Ask your educator to register you.
             </p>
           )}
 
           {entrants.length > 0 && (
-            <div className="card" style={{ padding: '16px' }}>
-              <label htmlFor="entrant-select" style={{ display: 'block', marginBottom: '8px' }}>
+            <div className="card" style={{ padding: '24px' }}>
+              <label
+                htmlFor="entrant-select"
+                style={{ display: 'block', marginBottom: '10px', fontSize: '1.1rem' }}
+              >
                 Who are you?
               </label>
               <select
                 id="entrant-select"
                 value={selectedEntrantId}
                 onChange={(e) => setSelectedEntrantId(e.target.value)}
-                style={{ width: '100%', padding: '8px', marginBottom: '12px' }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  marginBottom: '16px',
+                  fontSize: '1.05rem',
+                }}
               >
                 <option value="">— Select your name —</option>
                 {entrants.map((entrant) => (
@@ -216,8 +240,9 @@ function SitContent() {
                 onClick={handleStartSitting}
                 disabled={!selectedEntrantId || loading}
                 className="button"
+                style={{ fontSize: '17px' }}
               >
-                {loading ? 'Starting…' : 'Start sitting'}
+                {loading ? 'Starting…' : 'Start test'}
               </button>
             </div>
           )}
@@ -226,7 +251,10 @@ function SitContent() {
 
       {phase === 'sitting' && sittingData && !submitted && (
         <>
-          <p className="description" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <p
+            className="description"
+            style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '1.1rem' }}
+          >
             <span>
               Time remaining:{' '}
               <strong style={{ color: timeRemaining === 'expired' ? '#dc2626' : undefined }}>
@@ -247,7 +275,7 @@ function SitContent() {
 
           {timeRemaining === 'expired' && (
             <p className="message">
-              This sitting has expired — the round has closed. Your saved answers remain on record.
+              This test has expired — the round has closed. Your saved answers remain on record.
             </p>
           )}
 
@@ -256,19 +284,19 @@ function SitContent() {
               No answerable questions found for this paper yet. You can still view the paper below.
             </p>
           ) : (
-            <div className="card" style={{ padding: '16px' }}>
+            <div className="card" style={{ padding: '24px' }}>
               {questions.map((q) => (
                 <div
                   key={q}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
-                    padding: '10px 0',
+                    gap: '16px',
+                    padding: '14px 0',
                     borderBottom: '1px solid rgba(139, 92, 246, 0.15)',
                   }}
                 >
-                  <strong style={{ minWidth: '40px' }}>Q{q}</strong>
+                  <strong style={{ minWidth: '56px', fontSize: '1.15rem' }}>Q{q}</strong>
                   <input
                     type="text"
                     maxLength={1}
@@ -277,9 +305,10 @@ function SitContent() {
                     onChange={(e) => updateAnswer(q, e.target.value)}
                     disabled={timeRemaining === 'expired'}
                     style={{
-                      width: '48px',
+                      width: '60px',
                       textAlign: 'center',
-                      padding: '8px',
+                      padding: '10px',
+                      fontSize: '1.15rem',
                     }}
                     aria-label={`Answer for question ${q}`}
                   />
@@ -311,9 +340,9 @@ function SitContent() {
             onClick={handleSubmitSitting}
             disabled={submitting || timeRemaining === 'expired'}
             className="button"
-            style={{ marginTop: '8px' }}
+            style={{ marginTop: '8px', fontSize: '17px' }}
           >
-            {submitting ? 'Submitting…' : 'Submit sitting'}
+            {submitting ? 'Submitting…' : 'Submit test'}
           </button>
         </>
       )}
@@ -335,8 +364,8 @@ function SitContent() {
       )}
 
       <p style={{ marginTop: '24px' }}>
-        <Link href={`/educator/round_view?id=${roundId}`} className="button">
-          ← Back to round
+        <Link href="/student" className="button">
+          ← Back to dashboard
         </Link>
       </p>
     </main>

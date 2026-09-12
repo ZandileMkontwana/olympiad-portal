@@ -25,11 +25,11 @@ function formatDate(isoString) {
   });
 }
 
-// A sitting is completed once submitted, expired when its window passed
+// A test is completed once submitted, expired when its window passed
 // without submitting, otherwise it can still be resumed.
-function sittingStatus(sitting) {
-  if (sitting.completedAt) return 'completed';
-  if (new Date(sitting.expiresAt) < new Date()) return 'expired';
+function testStatus(test) {
+  if (test.completedAt) return 'completed';
+  if (new Date(test.expiresAt) < new Date()) return 'expired';
   return 'in-progress';
 }
 
@@ -51,61 +51,124 @@ function scoreStyle(score) {
   return 'text-red-600';
 }
 
-function StatCard({ label, value, accent }) {
+function StatCard({ icon, label, value, accent }) {
   return (
-    <div className="rounded-lg border border-lavender/20 bg-surface p-4 text-center shadow-sm">
-      <p className={`font-display text-2xl font-semibold ${accent || 'text-ink'}`}>{value}</p>
-      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-soft">{label}</p>
+    <div className="rounded-xl border border-lavender/20 bg-surface p-6 text-center shadow-sm">
+      <span className="text-3xl" aria-hidden="true">
+        {icon}
+      </span>
+      <p className={`mt-2 font-display text-3xl font-semibold ${accent || 'text-ink'}`}>
+        {value}
+      </p>
+      <p className="mt-1 text-sm font-medium uppercase tracking-wide text-ink-soft">{label}</p>
     </div>
   );
 }
 
-function SittingsSection({ sittings }) {
-  const inProgress = sittings.filter((s) => sittingStatus(s) === 'in-progress').length;
+function HeroBanner({ name, school, inProgressCount, resumeHref }) {
+  return (
+    <section className="relative mt-8 overflow-hidden rounded-2xl bg-gradient-to-br from-lavender-deep to-lavender px-8 py-10 text-white shadow-md sm:px-10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/10"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-16 -left-6 h-40 w-40 rounded-full bg-white/5"
+      />
+      <p className="text-sm font-semibold uppercase tracking-widest text-white/75">
+        Student dashboard
+      </p>
+      <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+        Welcome back, {name}
+      </h1>
+      {school && <p className="mt-2 text-lg font-medium text-white/85">{school}</p>}
+
+      <div className="mt-6 flex flex-wrap items-center gap-4">
+        {inProgressCount > 0 ? (
+          <>
+            <p className="text-lg font-medium">
+              You have {inProgressCount} test{inProgressCount > 1 ? 's' : ''} to finish — keep
+              going!
+            </p>
+            {resumeHref && (
+              <Link
+                href={resumeHref}
+                onClick={(e) => {
+                  if (!window.confirm('Continue this test? Your answers are saved.')) {
+                    e.preventDefault();
+                  }
+                }}
+                className="rounded-lg bg-white px-5 py-2.5 text-base font-semibold text-lavender-deep transition-opacity hover:opacity-90"
+              >
+                Resume test →
+              </Link>
+            )}
+          </>
+        ) : (
+          <p className="text-lg font-medium text-white/90">
+            All tests submitted — marks appear here once your teacher releases them.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TestsSection({ tests }) {
+  const inProgress = tests.filter((t) => testStatus(t) === 'in-progress').length;
 
   return (
-    <section aria-labelledby="sittings-heading" className="relative">
+    <section aria-labelledby="tests-heading" className="relative">
       <div className="flex items-baseline justify-between">
-        <h2 id="sittings-heading" className="font-display text-xl font-semibold text-ink">
-          My sittings
+        <h2 id="tests-heading" className="font-display text-2xl font-semibold text-ink">
+          My tests
         </h2>
         {inProgress > 0 && (
-          <span className="text-xs font-medium text-sage">{inProgress} to finish</span>
+          <span className="text-sm font-medium text-sage">{inProgress} to finish</span>
         )}
       </div>
 
-      {sittings.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm">
-          <p className="text-sm text-ink-soft">
-            No sittings yet. Once your teacher registers you for a round and it opens,
-            you&apos;ll sit it from here.
+      {tests.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
+          <span className="text-3xl" aria-hidden="true">
+            📝
+          </span>
+          <p className="mt-2 text-base text-ink-soft">
+            No tests yet. Once your teacher registers you for a round and it opens,
+            you&apos;ll take the test from here.
           </p>
         </div>
       ) : (
         <ul className="mt-4 space-y-3">
-          {sittings.map((sitting) => {
-            const status = sittingStatus(sitting);
+          {tests.map((test) => {
+            const status = testStatus(test);
             return (
               <li
-                key={sitting.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-lavender/20 bg-surface p-4 shadow-sm"
+                key={test.id}
+                className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm"
               >
                 <div>
-                  <p className="font-medium text-ink">{sitting.round.name}</p>
-                  <p className="mt-0.5 text-xs text-ink-soft">
-                    Started {formatDate(sitting.startedAt)}
+                  <p className="text-lg font-semibold text-ink">{test.round.name}</p>
+                  <p className="mt-0.5 text-sm text-ink-soft">
+                    Started {formatDate(test.startedAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLES[status]}`}
+                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium ${STATUS_STYLES[status]}`}
                   >
                     {STATUS_LABELS[status]}
                   </span>
                   {status === 'in-progress' && (
                     <Link
-                      href={`/student/sit?id=${sitting.roundId}`}
-                      className="rounded-md bg-lavender-deep px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                      href={`/student/sit?id=${test.roundId}`}
+                      onClick={(e) => {
+                        if (!window.confirm('Continue this test? Your answers are saved.')) {
+                          e.preventDefault();
+                        }
+                      }}
+                      className="rounded-lg bg-lavender-deep px-5 py-2.5 text-base font-medium text-white transition-opacity hover:opacity-90"
                     >
                       Resume
                     </Link>
@@ -126,19 +189,22 @@ function ResultsSection({ results }) {
   return (
     <section aria-labelledby="results-heading" className="relative">
       <div className="flex items-baseline justify-between">
-        <h2 id="results-heading" className="font-display text-xl font-semibold text-ink">
+        <h2 id="results-heading" className="font-display text-2xl font-semibold text-ink">
           My results
         </h2>
         {results.length > 0 && (
-          <span className="text-xs font-medium text-ink-soft">
+          <span className="text-sm font-medium text-ink-soft">
             Best: <span className={scoreStyle(best)}>{Math.round(best)}%</span>
           </span>
         )}
       </div>
 
       {results.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm">
-          <p className="text-sm text-ink-soft">
+        <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
+          <span className="text-3xl" aria-hidden="true">
+            🏆
+          </span>
+          <p className="mt-2 text-base text-ink-soft">
             No results released yet. Marks appear here as soon as your teacher releases them.
           </p>
         </div>
@@ -147,21 +213,79 @@ function ResultsSection({ results }) {
           {results.map((result) => (
             <li
               key={result.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-lavender/20 bg-surface p-4 shadow-sm"
+              className="rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm"
             >
-              <div>
-                <p className="font-medium text-ink">{result.round.name}</p>
-                <p className="mt-0.5 text-xs text-ink-soft">
-                  Submitted {formatDate(result.submittedAt)}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-lg font-semibold text-ink">{result.round.name}</p>
+                  <p className="mt-0.5 text-sm text-ink-soft">
+                    Submitted {formatDate(result.submittedAt)}
+                  </p>
+                </div>
+                <p className={`font-display text-3xl font-semibold ${scoreStyle(result.score)}`}>
+                  {Math.round(result.score)}%
                 </p>
               </div>
-              <p className={`font-display text-2xl font-semibold ${scoreStyle(result.score)}`}>
-                {Math.round(result.score)}%
-              </p>
+              <Link
+                href={`/student/result?id=${result.id}`}
+                className="mt-4 inline-block rounded-lg border border-lavender/40 px-5 py-2.5 text-base font-medium text-lavender-deep transition-colors hover:bg-lavender/10"
+              >
+                View test →
+              </Link>
             </li>
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+function HowItWorks() {
+  const steps = [
+    {
+      icon: '👤',
+      title: 'Get registered',
+      text: 'Your teacher registers you for a round at your school.',
+    },
+    {
+      icon: '✍️',
+      title: 'Take the test',
+      text: 'When the round opens, take the test here — answers save automatically as you go.',
+    },
+    {
+      icon: '📈',
+      title: 'See your marks',
+      text: 'Once marks are released, review every question and answer right here.',
+    },
+  ];
+
+  return (
+    <section aria-labelledby="how-it-works-heading" className="relative">
+      <h2
+        id="how-it-works-heading"
+        className="font-display text-2xl font-semibold text-ink"
+      >
+        How it works
+      </h2>
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        {steps.map((step, index) => (
+          <div
+            key={step.title}
+            className="rounded-xl border border-lavender/20 bg-surface p-6 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl" aria-hidden="true">
+                {step.icon}
+              </span>
+              <span className="font-display text-lg font-semibold text-lavender-deep">
+                Step {index + 1}
+              </span>
+            </div>
+            <p className="mt-3 text-base font-semibold text-ink">{step.title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-ink-soft">{step.text}</p>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -197,67 +321,75 @@ export default function StudentDashboard() {
   }, [checking, getToken]);
 
   async function handleLogout() {
+    if (!window.confirm('Log out of the Olympiad Portal?')) return;
     await signOut({ redirectUrl: '/login' });
   }
 
   if (checking || status === 'loading') {
     return (
-      <main className="mx-auto max-w-2xl px-8 py-24 text-center text-sm text-ink-soft">
+      <main className="mx-auto max-w-5xl px-8 py-24 text-center text-lg text-ink-soft">
         Loading…
       </main>
     );
   }
 
-  const completed = sittings.filter((s) => sittingStatus(s) === 'completed').length;
+  const completed = sittings.filter((s) => testStatus(s) === 'completed').length;
+  const inProgress = sittings.filter((s) => testStatus(s) === 'in-progress');
+  const resumeHref =
+    inProgress.length > 0 ? `/student/sit?id=${inProgress[0].roundId}` : null;
+  const bestScore =
+    results.length > 0 ? `${Math.round(Math.max(...results.map((r) => r.score)))}%` : '—';
 
   return (
-    <main className="relative mx-auto max-w-2xl overflow-hidden px-8 py-16">
+    <main className="relative mx-auto max-w-5xl overflow-hidden px-8 py-12">
       <Watermark />
 
-      <header className="relative flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-lavender">
-            Student dashboard
-          </p>
-          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">
-            Welcome back, {user.name}
-          </h1>
-          <p className="mt-1 text-sm text-ink-soft">{user.school}</p>
-        </div>
+      <header className="relative flex flex-wrap items-center justify-end gap-4">
         <button
           type="button"
           onClick={handleLogout}
-          className="rounded-md border border-lavender/30 bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-lavender/10"
+          className="rounded-lg border border-lavender/30 bg-surface px-5 py-2.5 text-base font-medium text-ink transition-colors hover:bg-lavender/10"
         >
           Log out
         </button>
       </header>
 
-      <div className="relative mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+      <HeroBanner
+        name={user.name}
+        school={user.school}
+        inProgressCount={inProgress.length}
+        resumeHref={resumeHref}
+      />
 
       {status === 'error' && (
         <div
           role="alert"
-          className="relative mt-8 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          className="relative mt-8 rounded-lg border border-red-200 bg-red-50 p-5 text-base text-red-800"
         >
-          Couldn&apos;t load your sittings or results. Try refreshing the page.
+          Couldn&apos;t load your tests or results. Try refreshing the page.
         </div>
       )}
 
       {status === 'ready' && (
         <>
-          <div className="relative mt-8 grid grid-cols-3 gap-3">
-            <StatCard label="Sittings" value={sittings.length} />
-            <StatCard label="Completed" value={completed} />
+          <div className="relative mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard icon="📝" label="Tests" value={sittings.length} />
+            <StatCard icon="✅" label="Completed" value={completed} />
             <StatCard
+              icon="🏆"
               label="Best score"
-              value={results.length > 0 ? `${Math.round(Math.max(...results.map((r) => r.score)))}%` : '—'}
+              value={bestScore}
+              accent={results.length > 0 ? scoreStyle(Math.max(...results.map((r) => r.score))) : undefined}
             />
           </div>
 
-          <div className="relative mt-10 space-y-10">
-            <SittingsSection sittings={sittings} />
+          <div className="relative mt-12 grid gap-12 lg:grid-cols-2">
+            <TestsSection tests={sittings} />
             <ResultsSection results={results} />
+          </div>
+
+          <div className="relative mt-12">
+            <HowItWorks />
           </div>
         </>
       )}

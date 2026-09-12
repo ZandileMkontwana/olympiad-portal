@@ -224,7 +224,7 @@ describe('Sittings routes', () => {
         .post('/api/rounds/round-1/sittings')
         .send({ entrantId: 'entrant-1' });
       expect(res.status).toBe(500);
-      expect(res.body.error).toMatch(/Could not start sitting/);
+      expect(res.body.error).toMatch(/Could not start the test/);
     });
   });
 
@@ -287,7 +287,7 @@ describe('Sittings routes', () => {
         .send({ answers: { 1: 'A' } });
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Sitting not found');
+      expect(res.body.error).toBe('Test not found');
     });
 
     it('returns 403 when the sitting is already completed', async () => {
@@ -301,7 +301,7 @@ describe('Sittings routes', () => {
         .send({ answers: { 1: 'A' } });
 
       expect(res.status).toBe(403);
-      expect(res.body.error).toBe('Sitting already completed');
+      expect(res.body.error).toBe('Test already completed');
       expect(prisma.sitting.update).not.toHaveBeenCalled();
     });
 
@@ -423,7 +423,7 @@ describe('Sittings routes', () => {
       const res = await request(app).post('/api/sittings/nope/submit');
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Sitting not found');
+      expect(res.body.error).toBe('Test not found');
     });
 
     it('returns 403 when already completed and no submission exists', async () => {
@@ -435,7 +435,7 @@ describe('Sittings routes', () => {
       const res = await request(app).post('/api/sittings/sitting-1/submit');
 
       expect(res.status).toBe(403);
-      expect(res.body.error).toBe('Sitting already completed');
+      expect(res.body.error).toBe('Test already completed');
       expect(prisma.submission.create).not.toHaveBeenCalled();
     });
 
@@ -474,7 +474,7 @@ describe('Sittings routes', () => {
       const res = await request(app).post('/api/sittings/sitting-1/submit');
 
       expect(res.status).toBe(500);
-      expect(res.body.error).toMatch(/Could not submit sitting/);
+      expect(res.body.error).toMatch(/Could not submit the test/);
     });
   });
 });

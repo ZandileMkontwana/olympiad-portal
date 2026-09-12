@@ -322,6 +322,29 @@ export function fetchMyResults(token) {
   });
 }
 
+/**
+ * Fetches one released result with a question-by-question review —
+ * the student's answer next to the correct answer for every question.
+ * Wired to GET /api/students/me/results/:resultId (backend/src/routes/students.js).
+ *
+ * @param {string} resultId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   id: string,
+ *   score: number,
+ *   submittedAt: string,
+ *   releasedAt: string,
+ *   round: { id: string, name: string },
+ *   paperFileUrl: string|null,
+ *   questions: Array<{questionId: string, correctAnswer: string, studentAnswer: string|null, isCorrect: boolean}>,
+ * }>}
+ */
+export function fetchMyResult(resultId, token) {
+  return requestJson(`/api/students/me/results/${resultId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export function dashboardPathForRole(role) {
   if (role === 'organiser') return '/organiser'; // TODO: confirm real path
   if (role === 'educator') return '/educator';

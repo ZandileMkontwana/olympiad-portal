@@ -92,10 +92,10 @@ function CompleteProfileForm() {
         className="relative rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm"
       >
         <div className="flex items-center justify-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-sage" aria-hidden="true" />
-          <h1 className="font-display text-xl font-semibold text-ink">Account created</h1>
+          <span className="h-2.5 w-2.5 rounded-full bg-sage" aria-hidden="true" />
+          <h1 className="font-display text-2xl font-semibold text-ink">Account created</h1>
         </div>
-        <p className="mt-2 text-sm text-ink-soft">
+        <p className="mt-3 text-base text-ink-soft">
           Welcome, {profile.name}. You&apos;re registered as a student at {profile.school}.
         </p>
       </div>
@@ -104,18 +104,18 @@ function CompleteProfileForm() {
 
   return (
     <div className="relative">
-      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
+      <h1 className="font-display text-3xl font-semibold tracking-tight text-ink text-center">
         Finish setting up your account
       </h1>
       <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
-      <p className="mt-4 text-center text-sm text-ink-soft">
+      <p className="mt-4 text-center text-base text-ink-soft">
         You&apos;re signed in — just need your name and school to finish. Your name and
         school must match an entrant record your educator already registered.
       </p>
 
-      <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
+      <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-6">
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-ink">
+          <label htmlFor="name" className="block text-base font-medium text-ink">
             Name <span className="text-gold">*</span>
           </label>
           <input
@@ -125,17 +125,17 @@ function CompleteProfileForm() {
             onChange={(e) => setName(e.target.value)}
             aria-invalid={Boolean(fieldErrors.name)}
             aria-describedby={fieldErrors.name ? 'name-error' : undefined}
-            className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
+            className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-4 py-3 text-base text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
           />
           {fieldErrors.name && (
-            <p id="name-error" role="alert" className="mt-1 text-sm text-red-600">
+            <p id="name-error" role="alert" className="mt-1.5 text-base text-red-600">
               {fieldErrors.name}
             </p>
           )}
         </div>
 
         <div>
-          <label htmlFor="schoolName" className="block text-sm font-medium text-ink">
+          <label htmlFor="schoolName" className="block text-base font-medium text-ink">
             School <span className="text-gold">*</span>
           </label>
           {schoolsFailed ? (
@@ -146,7 +146,7 @@ function CompleteProfileForm() {
               onChange={(e) => setSchoolName(e.target.value)}
               aria-invalid={Boolean(fieldErrors.schoolName)}
               aria-describedby={fieldErrors.schoolName ? 'schoolName-error' : undefined}
-              className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
+              className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-4 py-3 text-base text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
             />
           ) : (
             <select
@@ -155,7 +155,7 @@ function CompleteProfileForm() {
               onChange={(e) => setSchoolName(e.target.value)}
               aria-invalid={Boolean(fieldErrors.schoolName)}
               aria-describedby={fieldErrors.schoolName ? 'schoolName-error' : undefined}
-              className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
+              className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-4 py-3 text-base text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
             >
               <option value="" disabled>
                 {schools === null ? 'Loading schools…' : 'Select your school'}
@@ -168,7 +168,7 @@ function CompleteProfileForm() {
             </select>
           )}
           {fieldErrors.schoolName && (
-            <p id="schoolName-error" role="alert" className="mt-1 text-sm text-red-600">
+            <p id="schoolName-error" role="alert" className="mt-1.5 text-base text-red-600">
               {fieldErrors.schoolName}
             </p>
           )}
@@ -177,7 +177,7 @@ function CompleteProfileForm() {
         {status === 'error' && (
           <div
             role="alert"
-            className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+            className="rounded-md border border-red-200 bg-red-50 p-4 text-base text-red-800"
           >
             {errorMessage}
           </div>
@@ -186,7 +186,7 @@ function CompleteProfileForm() {
         <button
           type="submit"
           disabled={status === 'submitting'}
-          className="w-full rounded-md bg-lavender-deep px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-md bg-lavender-deep px-5 py-3 text-base font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {status === 'submitting' ? 'Saving…' : 'Finish setup'}
         </button>

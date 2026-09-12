@@ -78,4 +78,59 @@ router.get('/students/me/results', ...requireRole('student'), async (req, res) =
   }
 });
 
+// GET /students/me/results/:resultId
+// Full review of one released result: the student's answer next to the
+// correct answer for every question. Only released results are viewable,
+// and only by the student who owns them — findFirst scopes on entrantId.
+router.get('/students/me/results/:resultId', ...requireRole('student'), async (req, res) => {
+  try {
+    const entrant = await loadEntrant(req, res);
+    if (!entrant) return;
+
+    const submission = await prisma.submission.findFirst({
+      where: {
+        entrantId: entrant.id,
+        result: { id: req.params.resultId, releasedAt: { not: null } },
+      },
+      include: {
+        round: { select: { id: true, name: true } },
+        result: true,
+      },
+    });
+
+    if (!submission) {
+      return res.status(404).json({ error: 'Result not found or not released yet' });
+    }
+
+    const paper = await prisma.paper.findUnique({
+      where: { roundId: submission.roundId },
+      select: { fileUrl: true, memoAnswers: true },
+    });
+
+    const memo = paper && paper.memoAnswers ? paper.memoAnswers : {};
+    const answers = submission.answers || {};
+    const questions = Object.keys(memo)
+      .sort((a, b) => Number(a) - Number(b))
+      .map((questionId) => ({
+        questionId,
+        correctAnswer: memo[questionId],
+        studentAnswer: answers[questionId] ?? null,
+        isCorrect: answers[questionId] === memo[questionId],
+      }));
+
+    res.json({
+      id: submission.result.id,
+      score: submission.result.score,
+      submittedAt: submission.submittedAt,
+      releasedAt: submission.result.releasedAt,
+      round: submission.round,
+      paperFileUrl: paper ? paper.fileUrl : null,
+      questions,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch result' });
+  }
+});
+
 module.exports = router;
