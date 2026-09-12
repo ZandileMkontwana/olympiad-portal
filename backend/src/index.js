@@ -9,6 +9,7 @@ const submissionsRouter = require('./routes/submissions');
 const sittingsRouter = require('./routes/sittings');
 const entrantsRouter = require('./routes/entrants');
 const schoolsRouter = require('./routes/schools');
+const studentsRouter = require('./routes/students');
 const authRouter = require('./routes/auth');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
@@ -33,6 +34,7 @@ app.use('/api', submissionsRouter);
 app.use('/api', sittingsRouter);
 app.use('/api', entrantsRouter);
 app.use('/api', schoolsRouter);
+app.use('/api', studentsRouter);
 app.use('/api', authRouter);
 
 if (require.main === module) {
