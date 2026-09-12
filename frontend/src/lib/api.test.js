@@ -13,6 +13,7 @@ import {
   createEntrant,
   registerRoundEntrant,
   submitSitting,
+  listSchools,
   dashboardPathForRole,
 } from './api';
 
@@ -474,6 +475,28 @@ describe('api client', () => {
     });
   });
 
+  describe('listSchools', () => {
+    it('fetches the school list from /api/schools', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([
+          { id: 'school-1', name: 'Alpha School' },
+          { id: 'school-2', name: 'Beta School' },
+        ]),
+      });
+
+      const result = await listSchools();
+
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('Alpha School');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/schools',
+        expect.objectContaining({ credentials: 'include' })
+      );
+    });
+  });
+
   describe('dashboardPathForRole', () => {
     it('returns /organiser for organiser role', () => {
       expect(dashboardPathForRole('organiser')).toBe('/organiser');
@@ -481,6 +504,10 @@ describe('api client', () => {
 
     it('returns /educator for educator role', () => {
       expect(dashboardPathForRole('educator')).toBe('/educator');
+    });
+
+    it('returns /student for student role', () => {
+      expect(dashboardPathForRole('student')).toBe('/student');
     });
 
     it('returns /login for unknown role', () => {

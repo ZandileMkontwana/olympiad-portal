@@ -38,6 +38,7 @@ describe('Auth routes', () => {
     vi.spyOn(prisma.user, 'delete');
     vi.spyOn(prisma.school, 'findFirst');
     vi.spyOn(prisma.school, 'create');
+    vi.spyOn(prisma.entrant, 'findFirst');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetUser.mockReset();
     mockDeleteUser.mockReset();
@@ -132,6 +133,131 @@ describe('Auth routes', () => {
     });
   });
 
+  describe('POST /api/students/complete-profile', () => {
+    it('returns 400 when name is missing', async () => {
+      const res = await request(app)
+        .post('/api/students/complete-profile')
+        .send({ schoolName: 'Test School' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/required/);
+    });
+
+    it('returns 400 when schoolName is missing', async () => {
+      const res = await request(app).post('/api/students/complete-profile').send({ name: 'Test' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/required/);
+    });
+
+    it('returns 409 when profile already completed', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: '1', clerkUserId: 'clerk-user-1' });
+      const res = await request(app)
+        .post('/api/students/complete-profile')
+        .send({ name: 'Test', schoolName: 'Test School' });
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/already completed/);
+    });
+
+    it('returns 404 when no school found', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.school.findFirst.mockResolvedValue(null);
+      const res = await request(app)
+        .post('/api/students/complete-profile')
+        .send({ name: 'Test', schoolName: 'Unknown School' });
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/No school/);
+    });
+
+    it('returns 404 when no unclaimed entrant matches name and school', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
+      prisma.entrant.findFirst.mockResolvedValue(null);
+      const res = await request(app)
+        .post('/api/students/complete-profile')
+        .send({ name: 'Nobody', schoolName: 'Test School' });
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/No unclaimed entrant/);
+      expect(prisma.entrant.findFirst).toHaveBeenCalledWith({
+        where: {
+          name: { equals: 'Nobody', mode: 'insensitive' },
+          schoolId: 'school-1',
+          userId: null,
+        },
+      });
+    });
+
+    it('matches school and entrant names case-insensitively', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
+      prisma.entrant.findFirst.mockResolvedValue({ id: 'entrant-1', name: 'Test', userId: null });
+      mockGetUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'student@b.com' }],
+      });
+      prisma.user.create.mockResolvedValue({
+        id: 'user-1',
+        email: 'student@b.com',
+        role: 'student',
+        name: 'Test',
+        entrant: { school: { name: 'Test School' } },
+      });
+
+      const res = await request(app)
+        .post('/api/students/complete-profile')
+        .send({ name: 'test', schoolName: 'test school' });
+
+      expect(res.status).toBe(201);
+      expect(prisma.school.findFirst).toHaveBeenCalledWith({
+        where: { name: { equals: 'test school', mode: 'insensitive' } },
+      });
+    });
+
+    it('returns 400 when Clerk has no email', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
+      prisma.entrant.findFirst.mockResolvedValue({ id: 'entrant-1', name: 'Test' });
+      mockGetUser.mockResolvedValue({ emailAddresses: [] });
+      const res = await request(app)
+        .post('/api/students/complete-profile')
+        .send({ name: 'Test', schoolName: 'Test School' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/No email/);
+    });
+
+    it('links user to the claimed entrant and returns 201', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
+      prisma.entrant.findFirst.mockResolvedValue({ id: 'entrant-1', name: 'Test', userId: null });
+      mockGetUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'student@b.com' }],
+      });
+      prisma.user.create.mockResolvedValue({
+        id: 'user-1',
+        email: 'student@b.com',
+        role: 'student',
+        name: 'Test',
+        entrant: { school: { name: 'Test School' } },
+      });
+
+      const res = await request(app)
+        .post('/api/students/complete-profile')
+        .send({ name: 'Test', schoolName: 'Test School' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.user.role).toBe('student');
+      expect(res.body.user.school).toBe('Test School');
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: {
+          clerkUserId: 'clerk-user-1',
+          email: 'student@b.com',
+          role: 'student',
+          name: 'Test',
+          entrant: { connect: { id: 'entrant-1' } },
+        },
+        include: { entrant: { include: { school: true } } },
+      });
+      expect(prisma.school.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('GET /api/auth/me', () => {
     it('returns 404 when user not found', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
@@ -151,6 +277,21 @@ describe('Auth routes', () => {
       const res = await request(app).get('/api/auth/me');
       expect(res.status).toBe(200);
       expect(res.body.user.email).toBe('a@b.com');
+      expect(res.body.user.school).toBe('Test School');
+    });
+
+    it('returns school from entrant for student users', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: '2',
+        email: 'student@b.com',
+        role: 'student',
+        name: 'Test',
+        educator: null,
+        entrant: { school: { name: 'Test School' } },
+      });
+      const res = await request(app).get('/api/auth/me');
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe('student');
       expect(res.body.user.school).toBe('Test School');
     });
   });

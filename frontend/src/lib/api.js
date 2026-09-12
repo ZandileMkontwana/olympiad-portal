@@ -90,6 +90,18 @@ export function fetchArchivedPapers() {
 }
 
 /**
+ * Lists every school registered on the platform (id + name only).
+ * Wired to GET /api/schools (backend/src/routes/schools.js).
+ * Used by the student registration form so students pick their school
+ * from a list instead of guessing the exact spelling their educator used.
+ *
+ * @returns {Promise<Array<{id: string, name: string}>>}
+ */
+export function listSchools() {
+  return requestJson('/api/schools');
+}
+
+/**
  * Fetches the entrants registered for a round.
  * Wired to GET /api/rounds/:id/entrants (backend/src/routes/rounds.js).
  *
@@ -271,5 +283,6 @@ export async function fetchCurrentUser(token) {
 export function dashboardPathForRole(role) {
   if (role === 'organiser') return '/organiser'; // TODO: confirm real path
   if (role === 'educator') return '/educator';
+  if (role === 'student') return '/student';
   return '/login';
 }
