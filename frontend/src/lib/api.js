@@ -280,6 +280,71 @@ export async function fetchCurrentUser(token) {
   }
 }
 
+/**
+ * Lists the signed-in student's own sittings, newest first.
+ * Wired to GET /api/students/me/sittings (backend/src/routes/students.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   entrantId: string,
+ *   roundId: string,
+ *   answers: object|null,
+ *   startedAt: string,
+ *   expiresAt: string,
+ *   completedAt: string|null,
+ *   round: { id: string, name: string, state: string, closeTime: string },
+ * }>>}
+ */
+export function fetchMySittings(token) {
+  return requestJson('/api/students/me/sittings', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Lists the signed-in student's released results, newest first.
+ * Wired to GET /api/students/me/results (backend/src/routes/students.js).
+ * Unreleased marks are never included.
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   score: number,
+ *   releasedAt: string,
+ *   submittedAt: string,
+ *   round: { id: string, name: string },
+ * }>>}
+ */
+export function fetchMyResults(token) {
+  return requestJson('/api/students/me/results', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Fetches one released result with a question-by-question review —
+ * the student's answer next to the correct answer for every question.
+ * Wired to GET /api/students/me/results/:resultId (backend/src/routes/students.js).
+ *
+ * @param {string} resultId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   id: string,
+ *   score: number,
+ *   submittedAt: string,
+ *   releasedAt: string,
+ *   round: { id: string, name: string },
+ *   paperFileUrl: string|null,
+ *   questions: Array<{questionId: string, correctAnswer: string, studentAnswer: string|null, isCorrect: boolean}>,
+ * }>}
+ */
+export function fetchMyResult(resultId, token) {
+  return requestJson(`/api/students/me/results/${resultId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export function dashboardPathForRole(role) {
   if (role === 'organiser') return '/organiser'; // TODO: confirm real path
   if (role === 'educator') return '/educator';

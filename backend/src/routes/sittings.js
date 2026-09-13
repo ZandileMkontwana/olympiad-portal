@@ -27,7 +27,7 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 
     if (round.state !== 'open') {
       return res.status(403).json({
-        error: `Sitting cannot be started - round is currently '${round.state}'`,
+        error: `Test cannot be started - round is currently '${round.state}'`,
       });
     }
 
@@ -48,13 +48,13 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
     });
 
     if (existing && existing.completedAt) {
-      return res.status(403).json({ error: 'Sitting already completed for this round' });
+      return res.status(403).json({ error: 'Test already completed for this round' });
     }
 
     // The sitting expires when the round closes (the round's time limit).
     // An in-progress sitting past expiresAt can no longer be resumed.
     if (existing && new Date(existing.expiresAt) < new Date()) {
-      return res.status(403).json({ error: 'Sitting expired - it can no longer be resumed' });
+      return res.status(403).json({ error: 'Test expired - it can no longer be resumed' });
     }
 
     const sitting =
@@ -89,7 +89,7 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Could not start sitting' });
+    res.status(500).json({ error: 'Could not start the test' });
   }
 });
 
@@ -110,15 +110,15 @@ router.patch('/sittings/:id/answers', requireAuth, async (req, res) => {
     });
 
     if (!sitting) {
-      return res.status(404).json({ error: 'Sitting not found' });
+      return res.status(404).json({ error: 'Test not found' });
     }
 
     if (sitting.completedAt) {
-      return res.status(403).json({ error: 'Sitting already completed' });
+      return res.status(403).json({ error: 'Test already completed' });
     }
 
     if (new Date(sitting.expiresAt) < new Date()) {
-      return res.status(403).json({ error: 'Sitting expired - answers can no longer be saved' });
+      return res.status(403).json({ error: 'Test expired - answers can no longer be saved' });
     }
 
     const updated = await prisma.sitting.update({
@@ -159,7 +159,7 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
     });
 
     if (!sitting) {
-      return res.status(404).json({ error: 'Sitting not found' });
+      return res.status(404).json({ error: 'Test not found' });
     }
 
     if (sitting.completedAt) {
@@ -170,11 +170,11 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
       if (existing) {
         return res.status(200).json({ submission: existing, result: existing.result });
       }
-      return res.status(403).json({ error: 'Sitting already completed' });
+      return res.status(403).json({ error: 'Test already completed' });
     }
 
     if (new Date(sitting.expiresAt) < new Date()) {
-      return res.status(403).json({ error: 'Sitting expired - it can no longer be submitted' });
+      return res.status(403).json({ error: 'Test expired - it can no longer be submitted' });
     }
 
     const answers = sitting.answers || {};
@@ -216,7 +216,7 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
     res.status(201).json({ submission, result: submission.result });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Could not submit sitting' });
+    res.status(500).json({ error: 'Could not submit the test' });
   }
 });
 

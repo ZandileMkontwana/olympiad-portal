@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Base font size: bump the root so rem-based sizes across the app
+   (Tailwind classes and inherited text) render slightly larger. */
+html {
+  font-size: 17px;
+}
+
 :root {
   --background: #faf7fd;
   --foreground: #3f3151;
@@ -28,7 +34,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
   margin: 0;
 }
 
@@ -110,19 +116,21 @@ body {
 }
 
 .description {
-  color: #777;
+  color: #666;
+  font-size: 1.05rem;
+  line-height: 1.6;
 }
 
 .button {
   display: inline-block;
-  padding: 12px 20px;
+  padding: 12px 22px;
   background: var(--lavender);
   color: white;
   border: none;
   border-radius: 8px;
   text-decoration: none;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 
