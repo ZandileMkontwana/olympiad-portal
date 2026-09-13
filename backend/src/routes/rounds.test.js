@@ -372,4 +372,135 @@ describe('Rounds routes', () => {
       expect(res.status).toBe(500);
     });
   });
+
+  describe('GET /api/rounds/:id/standings', () => {
+    it('returns 404 when the round does not exist', async () => {
+      prisma.round.findUnique.mockResolvedValue(null);
+
+      const res = await request(app).get('/api/rounds/missing-round/standings');
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/not found/i);
+    });
+
+    it('returns an empty array when no submissions have a result yet', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+      prisma.submission.findMany.mockResolvedValue([]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('excludes submissions with no result', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+      // The route filters at the query level (result: { isNot: null }), so a
+      // correctly-implemented query never returns this row — this test just
+      // confirms the response only reflects what came back from Prisma.
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: { id: 'entrant-1', name: 'Thabo', school: { name: 'Wits High School' } },
+          result: { score: 80 },
+          submittedAt: '2026-09-12T20:56:55.855Z',
+        },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(prisma.submission.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { roundId: 'round-1', result: { isNot: null } },
+        })
+      );
+    });
+
+    it('ranks entrants by score, highest first', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: { id: 'entrant-1', name: 'Thabo', school: { name: 'Wits High School' } },
+          result: { score: 50 },
+          submittedAt: '2026-09-12T20:00:00.000Z',
+        },
+        {
+          entrant: { id: 'entrant-2', name: 'Naledi', school: { name: "St Mary's" } },
+          result: { score: 90 },
+          submittedAt: '2026-09-12T20:10:00.000Z',
+        },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0]).toMatchObject({ rank: 1, entrantName: 'Naledi', score: 90 });
+      expect(res.body[1]).toMatchObject({ rank: 2, entrantName: 'Thabo', score: 50 });
+    });
+
+    it('gives tied scores the same rank, and skips the next rank accordingly', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: { id: 'entrant-1', name: 'A', school: { name: 'School A' } },
+          result: { score: 70 },
+          submittedAt: '2026-09-12T20:00:00.000Z',
+        },
+        {
+          entrant: { id: 'entrant-2', name: 'B', school: { name: 'School B' } },
+          result: { score: 70 },
+          submittedAt: '2026-09-12T20:10:00.000Z',
+        },
+        {
+          entrant: { id: 'entrant-3', name: 'C', school: { name: 'School C' } },
+          result: { score: 60 },
+          submittedAt: '2026-09-12T20:20:00.000Z',
+        },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.body[0].rank).toBe(1);
+      expect(res.body[1].rank).toBe(1);
+      expect(res.body[2].rank).toBe(3); // skips rank 2, matching standard competition ranking
+    });
+
+    it('includes both paper-based and online-sitting-based submissions without distinction', async () => {
+      // Both submission types converge on the same Submission -> Result shape
+      // (see sittings.js `POST /sittings/:id/submit` and submissions.js
+      // `POST /rounds/:id/submissions`), so the standings query needs no
+      // special-casing between them (#125).
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: { id: 'entrant-1', name: 'Paper Entrant', school: { name: 'School A' } },
+          result: { score: 40 },
+          submittedAt: '2026-09-12T20:00:00.000Z',
+        },
+        {
+          entrant: { id: 'entrant-2', name: 'Online Entrant', school: { name: 'School B' } },
+          result: { score: 20 },
+          submittedAt: '2026-09-12T20:56:55.855Z',
+        },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.body).toHaveLength(2);
+      expect(res.body.map((r) => r.entrantName)).toEqual(
+        expect.arrayContaining(['Paper Entrant', 'Online Entrant'])
+      );
+    });
+
+    it('returns 500 on prisma error', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+      prisma.submission.findMany.mockRejectedValue(new Error('DB error'));
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Failed/);
+    });
+  });
 });

@@ -173,4 +173,54 @@ router.get('/rounds/:id/submissions', async (req, res) => {
   }
 });
 
+// GET /rounds/:id/standings
+// Ranks entrants who have a scored Result for this round, highest score first.
+// Entrants with a Submission but no Result yet (not marked / no memo answers
+// on the paper) are excluded — there's nothing to rank them on.
+router.get('/rounds/:id/standings', async (req, res) => {
+  try {
+    const roundId = req.params.id;
+
+    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const submissions = await prisma.submission.findMany({
+      where: { roundId, result: { isNot: null } },
+      include: {
+        result: true,
+        entrant: { include: { school: true } },
+      },
+    });
+
+    const ranked = submissions
+      .map((s) => ({
+        entrantId: s.entrant.id,
+        entrantName: s.entrant.name,
+        schoolName: s.entrant.school.name,
+        score: s.result.score,
+        submittedAt: s.submittedAt,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    // Standard competition ranking (1224): ties share a rank, next rank
+    // skips ahead by the number of tied entries.
+    let rank = 0;
+    let lastScore = null;
+    const standings = ranked.map((entry, index) => {
+      if (entry.score !== lastScore) {
+        rank = index + 1;
+        lastScore = entry.score;
+      }
+      return { rank, ...entry };
+    });
+
+    res.json(standings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch standings' });
+  }
+});
+
 module.exports = router;
