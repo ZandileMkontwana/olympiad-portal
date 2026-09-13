@@ -223,4 +223,65 @@ router.get('/rounds/:id/standings', async (req, res) => {
   }
 });
 
+// GET /rounds/:id/standings/schools
+// Ranks schools by the sum of their entrants' scores for this round.
+// Reuses the same underlying data as GET /rounds/:id/standings (Submission
+// -> Result), so it automatically covers both paper and online results too,
+// same as the individual standings route.
+router.get('/rounds/:id/standings/schools', async (req, res) => {
+  try {
+    const roundId = req.params.id;
+
+    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const submissions = await prisma.submission.findMany({
+      where: { roundId, result: { isNot: null } },
+      include: {
+        result: true,
+        entrant: { include: { school: true } },
+      },
+    });
+
+    const bySchool = new Map();
+
+    for (const s of submissions) {
+      const schoolId = s.entrant.school.id;
+      if (!bySchool.has(schoolId)) {
+        bySchool.set(schoolId, {
+          schoolId,
+          schoolName: s.entrant.school.name,
+          totalScore: 0,
+          entrantCount: 0,
+        });
+      }
+      const entry = bySchool.get(schoolId);
+      entry.totalScore += s.result.score;
+      entry.entrantCount += 1;
+    }
+
+    const ranked = Array.from(bySchool.values()).sort((a, b) => b.totalScore - a.totalScore);
+
+    // Standard competition ranking (1224), same convention as the
+    // individual standings route.
+    let rank = 0;
+    let lastScore = null;
+    const standings = ranked.map((entry, index) => {
+      if (entry.totalScore !== lastScore) {
+        rank = index + 1;
+        lastScore = entry.totalScore;
+      }
+      return { rank, ...entry };
+    });
+
+    res.json(standings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch school standings' });
+  }
+});
+
+
 module.exports = router;

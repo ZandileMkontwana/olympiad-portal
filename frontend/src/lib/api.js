@@ -273,3 +273,24 @@ export function dashboardPathForRole(role) {
   if (role === 'educator') return '/educator';
   return '/login';
 }
+
+export function fetchStandings(roundId) {
+  return requestJson(`/api/rounds/${roundId}/standings`);
+}
+
+/**
+ * Fetches ranked standings grouped by school for a round.
+ * Wired to GET /api/rounds/:id/standings/schools (backend/src/routes/rounds.js).
+ *
+ * @param {string} roundId
+ * @returns {Promise<Array<{
+ *   rank: number,
+ *   schoolId: string,
+ *   schoolName: string,
+ *   totalScore: number,
+ *   entrantCount: number,
+ * }>>}
+ */
+export function getSchoolStandings(roundId) {
+  return requestJson(`/api/rounds/${roundId}/standings/schools`);
+}
