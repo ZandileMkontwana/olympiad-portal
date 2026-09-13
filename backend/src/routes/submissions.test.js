@@ -35,6 +35,10 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.entrant, 'findUnique');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     sgMail.send.mockResolvedValue({});
+    prisma.markingTask.create.mockResolvedValue({
+      id: 'default-task-id',
+      status: 'unassigned',
+    });
     // Default: the Clerk user maps to an educator in our database
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
