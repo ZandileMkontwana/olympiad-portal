@@ -364,6 +364,11 @@ describe('Rounds routes', () => {
       const res = await request(app).get('/api/rounds/1/submissions');
       expect(res.status).toBe(200);
       expect(res.body[0].result.score).toBe(80);
+      expect(prisma.submission.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: { result: true, entrant: true, remarkRequests: true },
+        })
+      );
     });
 
     it('returns 500 on error', async () => {

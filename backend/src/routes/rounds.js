@@ -164,7 +164,7 @@ router.get('/rounds/:id/submissions', async (req, res) => {
   try {
     const submissions = await prisma.submission.findMany({
       where: { roundId: req.params.id },
-      include: { result: true },
+      include: { result: true, entrant: true, remarkRequests: true },
     });
     res.json(submissions);
   } catch (err) {

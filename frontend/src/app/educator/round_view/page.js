@@ -1,8 +1,10 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@clerk/nextjs';
+import { listRoundSubmissions, requestRemark, ApiError } from '@/lib/api';
 
 function formatRemaining(ms) {
   if (ms <= 0) return 'closing any moment';
@@ -19,12 +21,31 @@ function formatRemaining(ms) {
 function RoundViewContent() {
   const searchParams = useSearchParams();
   const roundId = searchParams.get('id');
+  const { getToken } = useAuth();
 
   const [round, setRound] = useState(null);
   const [loading, setLoading] = useState(!!roundId);
   const [error, setError] = useState('');
   const [downloadError, setDownloadError] = useState('');
   const [timeRemaining, setTimeRemaining] = useState('');
+
+  const [submissions, setSubmissions] = useState([]);
+  const [submissionsStatus, setSubmissionsStatus] = useState('loading'); // loading | ready | error
+  const [remarkTargetId, setRemarkTargetId] = useState(null);
+  const [remarkReason, setRemarkReason] = useState('');
+  const [remarkStatus, setRemarkStatus] = useState('idle'); // idle | submitting | error
+  const [remarkError, setRemarkError] = useState('');
+
+  const loadSubmissions = useCallback(async () => {
+    if (!roundId) return;
+    try {
+      const data = await listRoundSubmissions(roundId);
+      setSubmissions(data);
+      setSubmissionsStatus('ready');
+    } catch {
+      setSubmissionsStatus('error');
+    }
+  }, [roundId]);
 
   useEffect(() => {
     if (!roundId) return;
@@ -58,6 +79,7 @@ function RoundViewContent() {
   }, [roundId]);
 
   // Live countdown to closeTime, ticking every second independent of the 15s poll
+  // Live countdown to closeTime, ticking every second independent of the 15s poll
   useEffect(() => {
     if (!round?.closeTime) return;
 
@@ -70,6 +92,37 @@ function RoundViewContent() {
     const countdownInterval = setInterval(tick, 1000);
     return () => clearInterval(countdownInterval);
   }, [round?.closeTime]);
+
+  useEffect(() => {
+    // Deferring via .then() so loadSubmissions' setState calls don't run
+    // synchronously within the effect body itself (react-hooks/set-state-in-effect).
+    Promise.resolve().then(loadSubmissions);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId]);
+
+  function openRemarkForm(submissionId) {
+    setRemarkTargetId(submissionId);
+    setRemarkReason('');
+    setRemarkStatus('idle');
+    setRemarkError('');
+  }
+
+  async function handleSubmitRemark(e) {
+    e.preventDefault();
+    if (!remarkTargetId || !remarkReason.trim()) return;
+
+    setRemarkStatus('submitting');
+    setRemarkError('');
+    try {
+      const token = await getToken();
+      await requestRemark(remarkTargetId, remarkReason.trim(), token);
+      setRemarkTargetId(null);
+      await loadSubmissions();
+    } catch (err) {
+      setRemarkStatus('error');
+      setRemarkError(err instanceof ApiError ? err.message : 'Could not submit remark request.');
+    }
+  }
 
   async function handleDownload() {
     setDownloadError('');
@@ -155,6 +208,88 @@ function RoundViewContent() {
               Submit Results
             </Link>
           </>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Submissions &amp; Remarks</h2>
+
+        {submissionsStatus === 'loading' && <p className="description">Loading submissions...</p>}
+        {submissionsStatus === 'error' && (
+          <p className="message">Couldn&apos;t load submissions for this round.</p>
+        )}
+        {submissionsStatus === 'ready' && submissions.length === 0 && (
+          <p className="description">No submissions yet for this round.</p>
+        )}
+
+        {submissionsStatus === 'ready' && submissions.length > 0 && (
+          <ul style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {submissions.map((submission) => {
+              const hasPendingRemark = (submission.remarkRequests || []).some(
+                (r) => r.status === 'pending'
+              );
+              return (
+                <li
+                  key={submission.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid var(--lavender, #e5e5e5)',
+                    paddingBottom: '8px',
+                  }}
+                >
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 600 }}>
+                      {submission.entrant?.name || 'Unknown entrant'}
+                    </p>
+                    <p className="description" style={{ margin: '2px 0 0 0', fontSize: '0.85em' }}>
+                      {submission.result ? `Score: ${submission.result.score}` : 'Not yet marked'}
+                      {hasPendingRemark && ' · Remark pending'}
+                    </p>
+                  </div>
+                  {submission.result && !hasPendingRemark && (
+                    <button className="button" onClick={() => openRemarkForm(submission.id)}>
+                      Request Remark
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {remarkTargetId && (
+          <form
+            onSubmit={handleSubmitRemark}
+            style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+          >
+            <label htmlFor="remark-reason">Why are you requesting a remark?</label>
+            <textarea
+              id="remark-reason"
+              value={remarkReason}
+              onChange={(e) => setRemarkReason(e.target.value)}
+              rows={3}
+              required
+              className="block rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+            />
+            {remarkStatus === 'error' && (
+              <p style={{ color: 'red', fontSize: '0.9em' }}>{remarkError}</p>
+            )}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="submit" disabled={remarkStatus === 'submitting'} className="button">
+                {remarkStatus === 'submitting' ? 'Submitting...' : 'Submit Remark Request'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRemarkTargetId(null)}
+                className="button"
+                style={{ background: 'transparent', color: 'inherit' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </main>

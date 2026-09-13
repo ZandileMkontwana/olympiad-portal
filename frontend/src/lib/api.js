@@ -335,3 +335,27 @@ export function moderateMarkingTask(taskId, moderatedScore, token) {
     body: JSON.stringify({ moderatedScore }),
   });
 }
+
+/**
+ * Lists submissions for a round, with result and remark request info.
+ * Wired to GET /api/rounds/:id/submissions (backend/src/routes/rounds.js).
+ */
+export function listRoundSubmissions(roundId) {
+  return requestJson(`/api/rounds/${roundId}/submissions`);
+}
+
+/**
+ * Requests a remark on a submission, explaining why in `reason`.
+ * Wired to POST /api/submissions/:id/remark (backend/src/routes/submissions.js).
+ *
+ * @param {string} submissionId
+ * @param {string} reason
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function requestRemark(submissionId, reason, token) {
+  return requestJson(`/api/submissions/${submissionId}/remark`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason }),
+  });
+}

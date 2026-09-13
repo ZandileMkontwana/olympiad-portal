@@ -9,6 +9,7 @@ const submissionsRouter = require('./routes/submissions');
 const sittingsRouter = require('./routes/sittings');
 const entrantsRouter = require('./routes/entrants');
 const markingRouter = require('./routes/marking');
+const remarkRouter = require('./routes/remark');
 const authRouter = require('./routes/auth');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
@@ -33,6 +34,7 @@ app.use('/api', submissionsRouter);
 app.use('/api', sittingsRouter);
 app.use('/api', entrantsRouter);
 app.use('/api', markingRouter);
+app.use('/api', remarkRouter);
 app.use('/api', authRouter);
 
 // 404 handler — anything that didn't match a route above
