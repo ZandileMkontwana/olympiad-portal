@@ -30,6 +30,7 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.submission, 'create');
     vi.spyOn(prisma.submission, 'findUnique');
     vi.spyOn(prisma.result, 'create');
+    vi.spyOn(prisma.markingTask, 'create');
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -114,7 +115,7 @@ describe('Submissions routes', () => {
       expect(prisma.submission.create).not.toHaveBeenCalled();
     });
 
-    it('creates submission without result when no memoAnswers', async () => {
+    it('creates submission without result when no memoAnswers, and queues a MarkingTask', async () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         state: 'open',
@@ -126,6 +127,11 @@ describe('Submissions routes', () => {
         roundId: 'round-1',
         submittedAt: new Date('2026-01-01'),
       });
+      prisma.markingTask.create.mockResolvedValue({
+        id: 'task-1',
+        submissionId: 'sub-1',
+        status: 'unassigned',
+      });
       prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice' });
 
       const res = await request(app)
@@ -135,7 +141,11 @@ describe('Submissions routes', () => {
       expect(res.status).toBe(201);
       expect(res.body.submission.id).toBe('sub-1');
       expect(res.body.result).toBeNull();
+      expect(res.body.markingTask.id).toBe('task-1');
       expect(prisma.result.create).not.toHaveBeenCalled();
+      expect(prisma.markingTask.create).toHaveBeenCalledWith({
+        data: { submissionId: 'sub-1' },
+      });
       expect(sgMail.send).toHaveBeenCalled();
     });
 
@@ -162,6 +172,7 @@ describe('Submissions routes', () => {
       expect(prisma.result.create).toHaveBeenCalledWith({
         data: { submissionId: 'sub-1', score: 50 },
       });
+      expect(prisma.markingTask.create).not.toHaveBeenCalled();
     });
 
     it('handles 0% score when all answers wrong', async () => {
@@ -200,6 +211,7 @@ describe('Submissions routes', () => {
       prisma.submission.findUnique.mockResolvedValue({
         id: 'existing-sub',
         result: { score: 80 },
+        markingTask: null,
       });
 
       const res = await request(app)
@@ -210,7 +222,7 @@ describe('Submissions routes', () => {
       expect(res.body.submission.id).toBe('existing-sub');
       expect(prisma.submission.findUnique).toHaveBeenCalledWith({
         where: { idempotencyKey: 'dup-key' },
-        include: { result: true },
+        include: { result: true, markingTask: true },
       });
     });
 

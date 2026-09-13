@@ -12,6 +12,9 @@ export default defineConfig([
     languageOptions: {
       globals: globals.node,
     },
+    rules: {
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    },
   },
   { files: ["**/*.js"], languageOptions: { sourceType: "commonjs" } },
   { files: ["**/*.test.js"], languageOptions: { sourceType: "module" } },

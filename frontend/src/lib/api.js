@@ -273,3 +273,65 @@ export function dashboardPathForRole(role) {
   if (role === 'educator') return '/educator';
   return '/login';
 }
+
+/**
+ * Lists marking tasks for organisers to work through.
+ * Wired to GET /api/marking/queue (backend/src/routes/marking.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @param {string} [status] - 'unassigned' (default), 'assigned', 'marked', 'moderated', or 'all'
+ */
+export function listMarkingQueue(token, status) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return requestJson(`/api/marking/queue${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Assigns a marking task to an organiser (defaults to the requester).
+ * Wired to PATCH /api/marking/:id/assign (backend/src/routes/marking.js).
+ *
+ * @param {string} taskId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @param {string} [assignedToId] - defaults to the requester on the backend
+ */
+export function assignMarkingTask(taskId, token, assignedToId) {
+  return requestJson(`/api/marking/${taskId}/assign`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(assignedToId ? { assignedToId } : {}),
+  });
+}
+
+/**
+ * Records a marker's score (with optional per-question breakdown) for a task.
+ * Wired to PATCH /api/marking/:id (backend/src/routes/marking.js).
+ *
+ * @param {string} taskId
+ * @param {{score: number, breakdown?: Record<string, number>}} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function submitMarking(taskId, { score, breakdown }, token) {
+  return requestJson(`/api/marking/${taskId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ score, breakdown }),
+  });
+}
+
+/**
+ * Records a moderator's reviewed score for an already-marked task.
+ * Wired to PATCH /api/marking/:id/moderate (backend/src/routes/marking.js).
+ *
+ * @param {string} taskId
+ * @param {number} moderatedScore
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function moderateMarkingTask(taskId, moderatedScore, token) {
+  return requestJson(`/api/marking/${taskId}/moderate`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ moderatedScore }),
+  });
+}

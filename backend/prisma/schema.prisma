@@ -38,6 +38,8 @@ model User {
   createdAt   DateTime  @default(now())
   name        String
   educator    Educator?
+  assignedMarkingTasks   MarkingTask[] @relation("AssignedMarkingTasks")
+  moderatedMarkingTasks  MarkingTask[] @relation("ModeratedMarkingTasks")
 }
 
 model School {
@@ -87,8 +89,25 @@ model Submission {
   idempotencyKey String   @unique
   submittedAt    DateTime @default(now())
   result         Result?
+  markingTask    MarkingTask?
   entrant        Entrant  @relation(fields: [entrantId], references: [id])
   round          Round    @relation(fields: [roundId], references: [id])
+}
+model MarkingTask {
+  id             String     @id @default(uuid())
+  submissionId   String     @unique
+  status         String     @default("unassigned") // 'unassigned' | 'assigned' | 'marked' | 'moderated'
+  assignedToId   String?
+  score          Float?
+  breakdown      Json?      // per-question partial credit, e.g. { "q1": 3, "q2": 5 }
+  markedAt       DateTime?
+  moderatedById  String?
+  moderatedScore Float?
+  moderatedAt    DateTime?
+  createdAt      DateTime   @default(now())
+  submission     Submission @relation(fields: [submissionId], references: [id])
+  assignedTo     User?      @relation("AssignedMarkingTasks", fields: [assignedToId], references: [id])
+  moderatedBy    User?      @relation("ModeratedMarkingTasks", fields: [moderatedById], references: [id])
 }
 
 model Result {
