@@ -58,18 +58,80 @@ router.post('/educators/complete-profile', requireAuth(), async (req, res) => {
   });
 });
 
+// POST /students/complete-profile
+// Links a Clerk student account to an existing Entrant record,
+// matched by name + school (the entrant should already have been
+// created by an educator registering them for a round).
+router.post('/students/complete-profile', requireAuth(), async (req, res) => {
+  const { userId: clerkUserId } = req.auth();
+  const { name, schoolName } = req.body;
+
+  if (!name || !schoolName) {
+    return res.status(400).json({ error: 'name and schoolName are required' });
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (existingUser) {
+    return res.status(409).json({ error: 'Profile already completed for this account' });
+  }
+
+  const school = await prisma.school.findFirst({ where: { name: schoolName } });
+  if (!school) {
+    return res.status(404).json({ error: 'No school found with that name' });
+  }
+
+  const entrant = await prisma.entrant.findFirst({
+    where: { name, schoolId: school.id, userId: null },
+  });
+  if (!entrant) {
+    return res.status(404).json({ error: 'No unclaimed entrant record found matching that name and school' });
+  }
+
+  const clerkUser = await clerkClient.users.getUser(clerkUserId);
+  const email = clerkUser.emailAddresses[0] && clerkUser.emailAddresses[0].emailAddress;
+  if (!email) {
+    return res.status(400).json({ error: 'No email found on Clerk account' });
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      clerkUserId,
+      email,
+      role: 'student',
+      name,
+      entrant: { connect: { id: entrant.id } },
+    },
+    include: { entrant: { include: { school: true } } },
+  });
+
+  res.status(201).json({
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      school: user.entrant.school.name,
+    },
+  });
+});
+
 // GET /auth/me
 router.get('/auth/me', requireAuth(), async (req, res) => {
   const { userId: clerkUserId } = req.auth();
 
   const user = await prisma.user.findUnique({
     where: { clerkUserId },
-    include: { educator: { include: { school: true } } },
+    include: {
+      educator: { include: { school: true } },
+      entrant:  { include: { school: true } },
+    },
   });
 
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
+
+  const school = user.educator?.school?.name ?? user.entrant?.school?.name ?? null;
 
   res.json({
     user: {
@@ -77,7 +139,7 @@ router.get('/auth/me', requireAuth(), async (req, res) => {
       email: user.email,
       role: user.role,
       name: user.name,
-      school: user.educator ? user.educator.school.name : null,
+      school,
     },
   });
 });
