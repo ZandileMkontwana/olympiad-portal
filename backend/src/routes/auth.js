@@ -27,7 +27,9 @@ router.post('/educators/complete-profile', requireAuth(), async (req, res) => {
     return res.status(400).json({ error: 'No email found on Clerk account' });
   }
 
-  let school = await prisma.school.findFirst({ where: { name: schoolName } });
+  let school = await prisma.school.findFirst({
+    where: { name: { equals: schoolName, mode: 'insensitive' } },
+  });
   if (!school) {
     school = await prisma.school.create({
       data: { name: schoolName, timezone: 'Africa/Johannesburg' },
@@ -75,13 +77,19 @@ router.post('/students/complete-profile', requireAuth(), async (req, res) => {
     return res.status(409).json({ error: 'Profile already completed for this account' });
   }
 
-  const school = await prisma.school.findFirst({ where: { name: schoolName } });
+  const school = await prisma.school.findFirst({
+    where: { name: { equals: schoolName, mode: 'insensitive' } },
+  });
   if (!school) {
     return res.status(404).json({ error: 'No school found with that name' });
   }
 
   const entrant = await prisma.entrant.findFirst({
-    where: { name, schoolId: school.id, userId: null },
+    where: {
+      name: { equals: name, mode: 'insensitive' },
+      schoolId: school.id,
+      userId: null,
+    },
   });
   if (!entrant) {
     return res.status(404).json({ error: 'No unclaimed entrant record found matching that name and school' });
