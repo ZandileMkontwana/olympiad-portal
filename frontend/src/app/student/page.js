@@ -59,7 +59,7 @@ function Sidebar({ user, onLogout, activeSection, setActiveSection }) {
     { id: 'results', icon: '🏆', label: 'Results' },
   ];
   return (
-    <aside className="sticky top-0 flex h-screen w-60 flex-shrink-0 flex-col border-r border-lavender/15 bg-surface px-4 py-6">
+    <aside className="fixed left-0 top-0 flex h-screen w-60 flex-shrink-0 flex-col border-r border-lavender/15 bg-surface px-4 py-6">
       <div className="flex items-center gap-2.5 px-2 pb-6">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-lavender to-lavender-deep font-display text-lg font-bold text-white">
           O
@@ -452,10 +452,10 @@ export default function StudentDashboard() {
   const avgScore = results.length > 0 ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length) : null;
 
   return (
-    <div className="flex min-h-screen bg-canvas">
+    <div className="min-h-screen bg-canvas">
       <Sidebar user={user} onLogout={handleLogout} activeSection={activeSection} setActiveSection={setActiveSection} />
 
-      <main className="relative mx-auto w-full max-w-6xl overflow-hidden px-8 py-10">
+      <main className="relative ml-60 w-[calc(100%-15rem)] max-w-6xl overflow-hidden px-8 py-10">
         <HeroBanner
           name={user.name}
           school={user.school}
