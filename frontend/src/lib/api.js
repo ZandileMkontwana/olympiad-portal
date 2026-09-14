@@ -102,6 +102,23 @@ export function listSchools() {
 }
 
 /**
+ * Completes a student's profile by linking their Clerk account to an
+ * existing Entrant record matched by name + school.
+ * Wired to POST /api/students/complete-profile (backend/src/routes/auth.js).
+ *
+ * @param {{name: string, schoolName: string}} profile
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{id: string, email: string, role: string, name: string, school: string}>}
+ */
+export function completeStudentProfile({ name, schoolName }, token) {
+  return requestJson('/api/students/complete-profile', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, schoolName }),
+  });
+}
+
+/**
  * Fetches the entrants registered for a round.
  * Wired to GET /api/rounds/:id/entrants (backend/src/routes/rounds.js).
  *
@@ -341,6 +358,25 @@ export function fetchMyResults(token) {
  */
 export function fetchMyResult(resultId, token) {
   return requestJson(`/api/students/me/results/${resultId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Fetches the school dashboard (entrant stats, scores) for a given school.
+ * Wired to GET /api/schools/:id/dashboard (backend/src/routes/schools.js).
+ *
+ * @param {string} schoolId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   school: { id: string, name: string },
+ *   entrantCount: number,
+ *   totalSubmissions: number,
+ *   entrants: Array<{ id: string, name: string, grade: string, submissionCount: number, averageScore: number|null }>,
+ * }>}
+ */
+export function fetchSchoolDashboard(schoolId, token) {
+  return requestJson(`/api/schools/${schoolId}/dashboard`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
