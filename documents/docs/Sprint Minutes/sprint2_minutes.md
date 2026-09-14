@@ -3,7 +3,7 @@
 ## Meeting 1 — 26 August 2026
 
 **Sprint:** Sprint 2
-**Date:** 26 August 2026
+**Date:** 25 August 2026
 **Participants:** Zandile, Kutloano, Ronie, Mlungisi
 **Meeting Type:** Sprint Planning
 
