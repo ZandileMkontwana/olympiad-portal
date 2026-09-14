@@ -2,7 +2,7 @@
 sidebar_position: 7
 ---
 
-# Sprint 2 Planning
+# Sprint 2 Planning (25 August)
 
 ## Sprint Goal
 
@@ -10,7 +10,7 @@ Finish the basic tier and start the intermediate tier: past papers become downlo
 
 ## Dates
 
-25 August – 15 September 2026. Sprint board and stories live on Taiga.
+26 August – 15 September 2026. Sprint board and stories live on Taiga.
 
 ## Scope
 
