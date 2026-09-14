@@ -2,8 +2,8 @@ const prisma = require('../src/lib/prisma');
 const { clerkClient } = require('@clerk/express');
 
 async function main() {
-  const email = 'shaunmlungisi4@gmail.com';
-  const password = 'FirstOrganiser1234!!';
+  const email = 'zsikelelwa7@gmail.com';
+  const password = 'Codecrafters@2026';
   const name = 'Portal Organiser';
 
   // Check if this email already has a Clerk account
