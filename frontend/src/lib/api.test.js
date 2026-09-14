@@ -18,6 +18,13 @@ import {
   fetchMyResults,
   fetchMyResult,
   dashboardPathForRole,
+  fetchMyRounds,
+  fetchSchoolDashboard,
+  fetchStandings,
+  getSchoolStandings,
+  fetchNotificationRules,
+  updateNotificationRule,
+  testNotificationTrigger,
 } from './api';
 
 describe('api client', () => {
@@ -483,10 +490,11 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve([
-          { id: 'school-1', name: 'Alpha School' },
-          { id: 'school-2', name: 'Beta School' },
-        ]),
+        json: () =>
+          Promise.resolve([
+            { id: 'school-1', name: 'Alpha School' },
+            { id: 'school-2', name: 'Beta School' },
+          ]),
       });
 
       const result = await listSchools();
@@ -547,12 +555,15 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({
-          id: 'result-1',
-          score: 80,
-          round: { id: 'round-1', name: 'Round 1' },
-          questions: [{ questionId: 'q1', correctAnswer: 'A', studentAnswer: 'A', isCorrect: true }],
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 'result-1',
+            score: 80,
+            round: { id: 'round-1', name: 'Round 1' },
+            questions: [
+              { questionId: 'q1', correctAnswer: 'A', studentAnswer: 'A', isCorrect: true },
+            ],
+          }),
       });
 
       const result = await fetchMyResult('result-1', 'test-token');
@@ -588,6 +599,161 @@ describe('api client', () => {
 
     it('returns /login for undefined role', () => {
       expect(dashboardPathForRole(undefined)).toBe('/login');
+    });
+  });
+  describe('fetchMyRounds', () => {
+    it('sends GET to /api/students/me/rounds with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ round: { id: 'round-1' }, sitting: null }]),
+      });
+
+      const result = await fetchMyRounds('test-token');
+
+      expect(result[0].round.id).toBe('round-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/students/me/rounds',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('fetchSchoolDashboard', () => {
+    it('sends GET to /api/schools/:id/dashboard with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ school: { id: 'school-1' }, entrantCount: 3 }),
+      });
+
+      const result = await fetchSchoolDashboard('school-1', 'test-token');
+
+      expect(result.entrantCount).toBe(3);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/schools/school-1/dashboard',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('fetchStandings', () => {
+    it('sends GET to /api/rounds/:id/standings without a token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ rank: 1, entrantName: 'Alice', totalScore: 90 }]),
+      });
+
+      const result = await fetchStandings('round-1');
+
+      expect(result[0].entrantName).toBe('Alice');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/standings',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+    });
+  });
+
+  describe('getSchoolStandings', () => {
+    it('sends GET to /api/rounds/:id/standings/schools without a token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ rank: 1, schoolName: 'Testville High', totalScore: 250 }]),
+      });
+
+      const result = await getSchoolStandings('round-1');
+
+      expect(result[0].schoolName).toBe('Testville High');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/standings/schools',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+    });
+  });
+
+  describe('fetchNotificationRules', () => {
+    it('sends GET to /api/rounds/:id/notifications without a token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ triggerType: 'before-open', enabled: true }]),
+      });
+
+      const result = await fetchNotificationRules('round-1');
+
+      expect(result[0].triggerType).toBe('before-open');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/notifications',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+    });
+  });
+
+  describe('updateNotificationRule', () => {
+    it('sends PUT to /api/rounds/:id/notifications/:triggerType with Bearer token and JSON body', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'rule-1', triggerType: 'before-close', enabled: false }),
+      });
+
+      const result = await updateNotificationRule(
+        'round-1',
+        'before-close',
+        { enabled: false },
+        'test-token'
+      );
+
+      expect(result.enabled).toBe(false);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/notifications/before-close',
+        expect.objectContaining({
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ enabled: false }),
+        })
+      );
+    });
+  });
+
+  describe('testNotificationTrigger', () => {
+    it('sends POST to /api/rounds/:id/notifications/test with Bearer token and triggerType body', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ dryRun: true, recipients: [{ email: 'a@b.co' }] }),
+      });
+
+      const result = await testNotificationTrigger('round-1', 'results-released', 'test-token');
+
+      expect(result.dryRun).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/notifications/test',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ triggerType: 'results-released' }),
+        })
+      );
     });
   });
 });

@@ -15,25 +15,25 @@ This runs the full backend and frontend suites with coverage enabled, from the r
 
 ## Current coverage (as of Sprint 2 close)
 
-**Backend** — 12 test files, 211 tests, all passing
+**Backend** — 13 test files, 283 tests, all passing
 | Metric | Coverage |
 |---|---|
-| Statements | 98.22% |
-| Branches | 96.51% |
-| Functions | 96.92% |
-| Lines | 98.18% |
+| Statements | 97.96% |
+| Branches | 93.10% |
+| Functions | 97.97% |
+| Lines | 98.47% |
 
-Nearly every backend module — the scheduler (including all four notification jobs), auth middleware, the email library, and all route files — sits at or near 100% statement coverage. `index.js` (the app entry point) and parts of `auth.js`'s branch logic are the main gaps, largely around startup/edge-case branches that are harder to exercise in isolation.
+Nearly every backend module — the scheduler (including all four notification jobs), auth middleware, the email library, certificates generation, and all route files — sits at or near 100% statement coverage. `index.js` (the app entry point) and parts of `auth.js`'s branch logic are the main gaps, largely around startup/edge-case branches that are harder to exercise in isolation.
 
-**Frontend** — 8 test files, 108 tests, all passing
+**Frontend** — 9 test files, 129 tests, all passing
 | Metric | Coverage |
 |---|---|
-| Statements | 90.51% |
+| Statements | 90.32% |
 | Branches | 87.23% |
-| Functions | 81.81% |
-| Lines | 91.66% |
+| Functions | 82.92% |
+| Lines | 91.37% |
 
-Covers the API client library, the auth-related React hooks (`useAuthRedirect`, `useRequireRole`), and component tests for the student sitting page, student dashboard and results review, the student registration page, and the educator school dashboard.
+Covers the API client library (including the standings, school standings, and notification-rule endpoints), the auth-related React hooks (`useAuthRedirect`, `useRequireRole`), and component tests for the student sitting page, student dashboard and results review, the student registration page, and the educator school dashboard.
 
 Both suites enforce coverage thresholds in their `vitest.config.mjs` (80% lines/functions/statements, 75% branches) — a build fails if coverage drops below them.
 
@@ -46,7 +46,8 @@ Both suites enforce coverage thresholds in their `vitest.config.mjs` (80% lines/
 - Submission creation, including automarking against `memoAnswers`, idempotency, and receipt email sending
 - Online sittings end-to-end: start, resume, autosave, expiry enforcement, and submission with automarking
 - School dashboard aggregation and student self-service endpoints
-- Frontend auth redirect hooks, the API client, and page components (sitting, student dashboard/results, registration, school dashboard)
+- Standings (entrant- and school-ranked), notification rules CRUD, and PDF certificate generation
+- Frontend auth redirect hooks, the API client, and page components (sitting, student dashboard/results, registration, school dashboard, standings)
 
 ## Test policy
 
