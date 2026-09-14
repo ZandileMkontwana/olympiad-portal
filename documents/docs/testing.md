@@ -52,6 +52,6 @@ Both suites enforce coverage thresholds in their `vitest.config.mjs` (80% lines/
 ## Test policy
 
 - Every backend endpoint ships with tests in a matching `*.test.js` file next to the route — new endpoints are expected to add tests in the same PR.
-- Tests run automatically on every push and PR via the Gitea Actions lint workflow; `npm test` at the repo root runs both suites locally.
+- Both suites run automatically on every push and PR via the Gitea Actions "Lint and Test" workflow (`.gitea/workflows/lint.yml`), alongside the lint jobs; `npm test` at the repo root runs both suites locally.
 - After pulling schema changes, run `npx prisma generate` in `backend/` before testing — a stale generated client is the most common cause of local test failures.
 - File parallelism is disabled in the frontend `vitest.config.mjs` (`fileParallelism: false`) — parallel jsdom workers fail to start reliably on slow, OneDrive-synced filesystems, and the suite is small enough that sequential runs cost nothing.
