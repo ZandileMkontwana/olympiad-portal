@@ -83,11 +83,12 @@ function SitContent() {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(
+          console.error('Sit page error:', err);
+          const message =
             err instanceof ApiError
               ? err.message
-              : 'Could not start the test. Please contact your educator.'
-          );
+              : err?.message || 'Could not start the test. Please contact your educator.';
+          setError(message);
           setPhase('error');
         }
       }
