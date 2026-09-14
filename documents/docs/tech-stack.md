@@ -42,9 +42,9 @@ Used for storing paper and memo PDF files, kept separate from the primary databa
 Access goes through our own Express upload/download endpoints, which call Supabase's SDK internally — the frontend never talks to Supabase directly. This keeps file storage compliant with the course's Hand-Written API requirement, the same principle applied to how the frontend accesses the database.
 
 ## External API integration
-**[Not yet confirmed]**
+**SendGrid (email)**
 
-Used for round reminders and submission receipts, satisfying the course's requirement to integrate with a relevant external API service.
+Sends round reminders (opening-soon, closing-soon, results-released) and submission receipt emails, triggered from the round scheduler and submission endpoints. Chosen for its generous free tier (100 emails/day) and simple Node SDK. Alongside Clerk (authentication) and Supabase Storage (file storage), it satisfies the course's requirement to integrate with relevant external API services — see the [API Reference](./api-reference.md#external-api-integrations) for the full list.
 
 ## Version control
 **Gitea**, with **Conventional Commits** and a **feature-branch + pull request** workflow, enforced via branch protection requiring review and (once configured) passing CI checks.
@@ -57,6 +57,6 @@ Please check [code_quality_tool](./code_quality_tool.md) document for details ab
 **Docusaurus**, deployed via **Netlify**, publicly accessible with no login required.
 
 ## Deployment
-- **Backend:** Railway
-- **Frontend:** Vercel 
-- **Docs:** Netlify
+- **Backend:** Render — <https://olympiad-portal.onrender.com> (moved from Railway when its trial ended; Render was chosen because the round-lifecycle scheduler needs a long-running process, which serverless platforms don't provide)
+- **Frontend:** Vercel — <https://frontend-two-ruby-25.vercel.app>
+- **Docs:** Netlify — <https://olympiad-portal-docs.netlify.app>

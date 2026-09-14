@@ -4,13 +4,15 @@ sidebar_position: 1
 
 # Getting Started — Backend
 
+The backend is deployed at <https://olympiad-portal.onrender.com> — everything below is only needed for local development.
+
 ## Prerequisites
 - **Node.js 20 (LTS)** — newer versions (22+) have caused compatibility issues with our dependencies. Use [nvm-windows](https://github.com/coreybutler/nvm-windows) to manage versions if needed:
 ```
   nvm install 20
   nvm use 20
 ```
-- Access to the shared Railway Postgres database (ask a teammate for the connection string)
+- Access to the shared Supabase Postgres database (ask a teammate for the connection string — use the **Connection Pooler** string, as the direct connection is IPv6-only)
 
 ## Setup
 
@@ -28,7 +30,7 @@ npm i
 **3. Set up your environment variables**
 Create a `.env` file in `backend/` (never commit this — it's gitignored):
 ```
-DATABASE_URL="<ask a teammate for the shared Railway connection string>"
+DATABASE_URL="<ask a teammate for the shared Supabase connection string>"
 ```
 
 **4. Generate the Prisma client**
