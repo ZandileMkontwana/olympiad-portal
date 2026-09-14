@@ -18,6 +18,7 @@ describe('startScheduler', () => {
     vi.spyOn(prisma.roundEntrant, 'createMany').mockResolvedValue({ count: 0 });
     vi.spyOn(prisma.notificationLog, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.notificationLog, 'create').mockResolvedValue({ id: 'log-1' });
+    vi.spyOn(prisma.notificationRule, 'findUnique').mockResolvedValue(null);
     vi.spyOn(sgMail, 'send').mockResolvedValue({});
     vi.spyOn(console, 'log').mockImplementation(() => {});
   });
@@ -125,8 +126,6 @@ describe('startScheduler', () => {
   });
 
   describe('before-open reminder emails', () => {
-    // Two entrants from the same school — their shared educator should only
-    // get one reminder email.
     const upcomingRound = () => ({
       id: 'round-1',
       name: 'Round One',
@@ -339,7 +338,7 @@ describe('startScheduler', () => {
       startScheduler();
       prisma.round.updateMany.mockResolvedValue({ count: 0 });
       prisma.round.findMany
-        .mockResolvedValueOnce([])  // before_open
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{
           id: 'round-1',
           name: 'Round One',
@@ -348,8 +347,8 @@ describe('startScheduler', () => {
             { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
           ],
         }])
-        .mockResolvedValueOnce([])  // results_released
-        .mockResolvedValueOnce([]);  // missing_submission
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
 
       await scheduledCallback();
 
@@ -409,8 +408,8 @@ describe('startScheduler', () => {
       startScheduler();
       prisma.round.updateMany.mockResolvedValue({ count: 0 });
       prisma.round.findMany
-        .mockResolvedValueOnce([])  // before_open
-        .mockResolvedValueOnce([])  // before_close
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{
           id: 'round-1',
           name: 'Round One',
@@ -418,7 +417,7 @@ describe('startScheduler', () => {
             { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
           ],
         }])
-        .mockResolvedValueOnce([]);  // missing_submission
+        .mockResolvedValueOnce([]);
 
       await scheduledCallback();
 
@@ -457,9 +456,9 @@ describe('startScheduler', () => {
       startScheduler();
       prisma.round.updateMany.mockResolvedValue({ count: 0 });
       prisma.round.findMany
-        .mockResolvedValueOnce([])  // before_open
-        .mockResolvedValueOnce([])  // before_close
-        .mockResolvedValueOnce([])  // results_released
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{
           id: 'round-1',
           name: 'Round One',

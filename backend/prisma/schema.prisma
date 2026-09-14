@@ -28,6 +28,7 @@ model Round {
   submissions      Submission[]
   sittings         Sitting[]
   notificationLogs NotificationLog[]
+  notificationRules NotificationRule[]
 }
 
 model User {
@@ -143,4 +144,17 @@ model NotificationLog {
   entrant        Entrant? @relation(fields: [entrantId], references: [id])
 
   @@unique([roundId, triggerType, recipientEmail])
+}
+
+model NotificationRule {
+  id            String   @id @default(uuid())
+  roundId       String
+  triggerType   String // 'before_open' | 'before_close' | 'missing_submission' | 'results_released'
+  enabled       Boolean  @default(true)
+  recipientRole String   @default("educator") // 'educator' | 'organiser' | 'all'
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  round         Round    @relation(fields: [roundId], references: [id])
+
+  @@unique([roundId, triggerType])
 }

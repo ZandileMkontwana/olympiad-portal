@@ -1,8 +1,28 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
+const {
+  getRecipientsForRound,
+  isTriggerEnabled,
+  roundIncludeForNotifications,
+  roundIncludeForMissingSubmissions,
+} = require('../scheduler');
+const {
+  buildRoundOpeningMessage,
+  buildRoundClosingMessage,
+  buildResultsReleasedMessage,
+  buildMissingSubmissionMessage,
+} = require('../lib/email');
 
 const router = express.Router();
+
+const NOTIFICATION_TRIGGER_TYPES = [
+  'before_open',
+  'before_close',
+  'missing_submission',
+  'results_released',
+];
+const NOTIFICATION_RECIPIENT_ROLES = ['educator', 'organiser', 'all'];
 
 router.post('/olympiads', async (req, res) => {
   try {
@@ -73,16 +93,7 @@ router.get('/rounds/:id', async (req, res) => {
   try {
     const round = await prisma.round.findUnique({ where: { id: req.params.id } });
     if (!round) return res.status(404).json({ error: 'Round not found' });
-
-    // Check if any results have been released for this round
-    const releasedCount = await prisma.result.count({
-      where: {
-        releasedAt: { not: null },
-        submission: { roundId: round.id },
-      },
-    });
-
-    res.json({ ...round, hasReleasedResults: releasedCount > 0 });
+    res.json(round);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch round' });
@@ -182,6 +193,116 @@ router.get('/rounds/:id/submissions', async (req, res) => {
   }
 });
 
+// GET /rounds/:id/standings
+// Ranks entrants who have a scored Result for this round, highest score first.
+// Entrants with a Submission but no Result yet (not marked / no memo answers
+// on the paper) are excluded — there's nothing to rank them on.
+router.get('/rounds/:id/standings', async (req, res) => {
+  try {
+    const roundId = req.params.id;
+
+    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const submissions = await prisma.submission.findMany({
+      where: { roundId, result: { isNot: null } },
+      include: {
+        result: true,
+        entrant: { include: { school: true } },
+      },
+    });
+
+    const ranked = submissions
+      .map((s) => ({
+        entrantId: s.entrant.id,
+        entrantName: s.entrant.name,
+        schoolName: s.entrant.school.name,
+        score: s.result.score,
+        submittedAt: s.submittedAt,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    // Standard competition ranking (1224): ties share a rank, next rank
+    // skips ahead by the number of tied entries.
+    let rank = 0;
+    let lastScore = null;
+    const standings = ranked.map((entry, index) => {
+      if (entry.score !== lastScore) {
+        rank = index + 1;
+        lastScore = entry.score;
+      }
+      return { rank, ...entry };
+    });
+
+    res.json(standings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch standings' });
+  }
+});
+
+// GET /rounds/:id/standings/schools
+// Ranks schools by the sum of their entrants' scores for this round.
+// Reuses the same underlying data as GET /rounds/:id/standings (Submission
+// -> Result), so it automatically covers both paper and online results too,
+// same as the individual standings route.
+router.get('/rounds/:id/standings/schools', async (req, res) => {
+  try {
+    const roundId = req.params.id;
+
+    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const submissions = await prisma.submission.findMany({
+      where: { roundId, result: { isNot: null } },
+      include: {
+        result: true,
+        entrant: { include: { school: true } },
+      },
+    });
+
+    const bySchool = new Map();
+
+    for (const s of submissions) {
+      const schoolId = s.entrant.school.id;
+      if (!bySchool.has(schoolId)) {
+        bySchool.set(schoolId, {
+          schoolId,
+          schoolName: s.entrant.school.name,
+          totalScore: 0,
+          entrantCount: 0,
+        });
+      }
+      const entry = bySchool.get(schoolId);
+      entry.totalScore += s.result.score;
+      entry.entrantCount += 1;
+    }
+
+    const ranked = Array.from(bySchool.values()).sort((a, b) => b.totalScore - a.totalScore);
+
+    // Standard competition ranking (1224), same convention as the
+    // individual standings route.
+    let rank = 0;
+    let lastScore = null;
+    const standings = ranked.map((entry, index) => {
+      if (entry.totalScore !== lastScore) {
+        rank = index + 1;
+        lastScore = entry.totalScore;
+      }
+      return { rank, ...entry };
+    });
+
+    res.json(standings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch school standings' });
+  }
+});
+
 // POST /rounds/:id/release-results
 // Releases all automarked results for a closed round so students can view them.
 // Sets releasedAt on every Result that doesn't already have one.
@@ -237,5 +358,228 @@ router.post('/rounds/:id/unrelease-results', ...requireRole('educator'), async (
     res.status(500).json({ error: 'Could not unrelease results' });
   }
 });
+
+
+// GET /rounds/:id/notifications
+// Returns all 4 trigger types for this round, whether or not a rule has
+// been explicitly configured — unconfigured types show as enabled by
+// default (matching the scheduler's fallback behavior), with no id.
+router.get('/rounds/:id/notifications', ...requireRole('organiser'), async (req, res) => {
+  try {
+    const roundId = req.params.id;
+
+    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const existingRules = await prisma.notificationRule.findMany({
+      where: { roundId },
+    });
+    const byTriggerType = new Map(existingRules.map((r) => [r.triggerType, r]));
+
+    const rules = NOTIFICATION_TRIGGER_TYPES.map((triggerType) => {
+      const existing = byTriggerType.get(triggerType);
+      return (
+        existing || {
+          id: null,
+          roundId,
+          triggerType,
+          enabled: true,
+          recipientRole: 'educator',
+        }
+      );
+    });
+
+    res.json(rules);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch notification rules' });
+  }
+});
+
+// PUT /rounds/:id/notifications/:triggerType
+// Upserts the rule for this round + trigger type — creates it if this is
+// the first time it's been configured, otherwise updates it. This is the
+// route the config page (#138) calls when an organiser toggles a switch
+// or changes a recipient role.
+router.put(
+  '/rounds/:id/notifications/:triggerType',
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const roundId = req.params.id;
+      const { triggerType } = req.params;
+      const { enabled, recipientRole } = req.body;
+
+      if (!NOTIFICATION_TRIGGER_TYPES.includes(triggerType)) {
+        return res.status(400).json({ error: 'Invalid trigger type' });
+      }
+      if (recipientRole !== undefined && !NOTIFICATION_RECIPIENT_ROLES.includes(recipientRole)) {
+        return res.status(400).json({ error: 'Invalid recipient role' });
+      }
+
+      const round = await prisma.round.findUnique({ where: { id: roundId } });
+      if (!round) {
+        return res.status(404).json({ error: 'Round not found' });
+      }
+
+      const rule = await prisma.notificationRule.upsert({
+        where: { roundId_triggerType: { roundId, triggerType } },
+        create: {
+          roundId,
+          triggerType,
+          enabled: enabled ?? true,
+          recipientRole: recipientRole ?? 'educator',
+        },
+        update: {
+          ...(enabled !== undefined && { enabled }),
+          ...(recipientRole !== undefined && { recipientRole }),
+        },
+      });
+
+      res.json(rule);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to update notification rule' });
+    }
+  }
+);
+
+// DELETE /rounds/:id/notifications/:triggerType
+// Removes any explicit configuration for this trigger type, reverting it
+// to the default (enabled, educator) behavior.
+router.delete(
+  '/rounds/:id/notifications/:triggerType',
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const roundId = req.params.id;
+      const { triggerType } = req.params;
+
+      await prisma.notificationRule.deleteMany({
+        where: { roundId, triggerType },
+      });
+
+      res.status(204).send();
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to delete notification rule' });
+    }
+  }
+);
+
+// POST /rounds/:id/notifications/test
+// Dry-run of a single trigger type: reports exactly who the scheduler would
+// email for this round (and, for missing_submission, which entrant each
+// educator would be alerted about) WITHOUT sending anything or writing to
+// notificationLog. The scheduler's timing windows are not simulated — the
+// preview shows recipients and email content regardless of when the trigger
+// would actually fire. Recipients already covered by a past send are flagged,
+// since the scheduler dedups per (round, trigger, email) — which also means
+// each educator only ever gets ONE missing-submission email per round (for
+// the first missing entrant found).
+router.post(
+  '/rounds/:id/notifications/test',
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const roundId = req.params.id;
+      const { triggerType } = req.body;
+
+      if (!NOTIFICATION_TRIGGER_TYPES.includes(triggerType)) {
+        return res.status(400).json({ error: 'A valid triggerType is required' });
+      }
+
+      const round = await prisma.round.findUnique({
+        where: { id: roundId },
+        include:
+          triggerType === 'missing_submission'
+            ? roundIncludeForMissingSubmissions
+            : roundIncludeForNotifications,
+      });
+      if (!round) {
+        return res.status(404).json({ error: 'Round not found' });
+      }
+
+      const enabled = await isTriggerEnabled(roundId, triggerType);
+
+      const sentLogs = await prisma.notificationLog.findMany({
+        where: { roundId, triggerType },
+        select: { recipientEmail: true },
+      });
+      const alreadyEmailed = new Set(sentLogs.map((log) => log.recipientEmail));
+
+      const recipients = [];
+      if (triggerType === 'missing_submission') {
+        // Same per-entrant loop (and dedup) as the scheduler: educators are
+        // emailed about the first missing entrant only — later entrants at
+        // the same school are flagged as already notified.
+        const coveredEmails = new Set();
+        for (const roundEntrant of round.roundEntrants) {
+          const entrant = roundEntrant.entrant;
+          const hasSubmitted = entrant.submissions.some((s) => s.roundId === round.id);
+          if (hasSubmitted) continue;
+
+          for (const educator of entrant.school.educators) {
+            const email = educator.user.email;
+            recipients.push({
+              email,
+              entrantId: entrant.id,
+              entrantName: entrant.name,
+              alreadyNotified: alreadyEmailed.has(email) || coveredEmails.has(email),
+            });
+            coveredEmails.add(email);
+          }
+        }
+      } else {
+        for (const email of await getRecipientsForRound(round)) {
+          recipients.push({ email, alreadyNotified: alreadyEmailed.has(email) });
+        }
+      }
+
+      // Preview rendered from the same templates the real sends use.
+      let emailPreview = null;
+      if (triggerType === 'before_open') {
+        emailPreview = buildRoundOpeningMessage({
+          roundName: round.name,
+          opensAt: new Date(round.openTime).toISOString(),
+        });
+      } else if (triggerType === 'before_close') {
+        emailPreview = buildRoundClosingMessage({
+          roundName: round.name,
+          closesAt: new Date(round.closeTime).toISOString(),
+        });
+      } else if (triggerType === 'results_released') {
+        emailPreview = buildResultsReleasedMessage({ roundName: round.name });
+      } else if (recipients.length > 0) {
+        // One email per missing entrant — preview the first that would go out.
+        emailPreview = buildMissingSubmissionMessage({
+          roundName: round.name,
+          entrantName: recipients[0].entrantName,
+        });
+      }
+
+      res.json({
+        dryRun: true,
+        round: {
+          id: round.id,
+          name: round.name,
+          state: round.state,
+          openTime: round.openTime,
+          closeTime: round.closeTime,
+        },
+        triggerType,
+        enabled,
+        recipients,
+        emailPreview,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to run notification dry-run' });
+    }
+  }
+);
+
 
 module.exports = router;
