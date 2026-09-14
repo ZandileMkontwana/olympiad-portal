@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SignIn, useAuth, useClerk } from '@clerk/nextjs';
 import { dashboardPathForRole } from '@/lib/api';
-import Link from 'next/link';
 
 function Watermark() {
   return (
@@ -66,15 +65,18 @@ export default function LoginPage() {
               className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 mb-4"
             >
               <p className="font-semibold mb-1">Account not set up yet</p>
-              <p>You&apos;re signed in, but your profile hasn&apos;t been completed. Choose an option below to finish setting up your account.</p>
+              <p>You&apos;re signed in, but your profile hasn&apos;t been completed yet.</p>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <Link href="/register" className="button" style={{ textDecoration: 'none', textAlign: 'center' }}>
-                Complete Your Profile
-              </Link>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => router.push('/register')}
+                className="w-full rounded-md bg-lavender-deep px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              >
+                Complete your profile
+              </button>
               <button
                 onClick={() => signOut({ redirectUrl: '/login' })}
-                style={{ padding: '10px', borderRadius: '8px', border: '1px solid rgba(224,97,95,0.3)', background: 'transparent', color: '#e0615f', fontWeight: 600, cursor: 'pointer', fontSize: '0.9em' }}
+                className="text-sm text-lavender hover:text-lavender-deep"
               >
                 Sign out and use a different account
               </button>
@@ -90,7 +92,7 @@ export default function LoginPage() {
             </div>
             <button
               onClick={() => signOut({ redirectUrl: '/login' })}
-              style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid rgba(224,97,95,0.3)', background: 'transparent', color: '#e0615f', fontWeight: 600, cursor: 'pointer', fontSize: '0.9em' }}
+              className="text-sm text-lavender hover:text-lavender-deep"
             >
               Sign out and try again
             </button>

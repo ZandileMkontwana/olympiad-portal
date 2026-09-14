@@ -8,12 +8,15 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('id=round-1'),
 }));
 
-// Mock @clerk/nextjs
+// Stable references for Clerk auth — getToken MUST be stable across renders,
+// otherwise the auto-save useEffect (which depends on getToken) clears and
+// restarts its debounce timer on every render, causing timeouts.
+const mockGetToken = vi.fn().mockResolvedValue('mock-token');
 vi.mock('@clerk/nextjs', () => ({
   useAuth: () => ({
     isLoaded: true,
     isSignedIn: true,
-    getToken: vi.fn().mockResolvedValue('mock-token'),
+    getToken: mockGetToken,
   }),
 }));
 
@@ -22,12 +25,12 @@ vi.mock('@/lib/api', () => ({
   createSitting: vi.fn(),
   saveSittingAnswers: vi.fn(),
   submitSitting: vi.fn(),
-  fetchRoundEntrants: vi.fn(),
+  fetchCurrentUser: vi.fn(),
   ApiError: class ApiError extends Error {},
 }));
 
 import SitPage from './page';
-import { createSitting, saveSittingAnswers, submitSitting, fetchRoundEntrants, ApiError } from '@/lib/api';
+import { createSitting, saveSittingAnswers, submitSitting, fetchCurrentUser, ApiError } from '@/lib/api';
 
 const sittingResponse = (answers) => ({
   sitting: {
@@ -46,23 +49,68 @@ const sittingResponse = (answers) => ({
   },
 });
 
-async function startSitting(answers) {
+async function renderAndStart(answers) {
+  fetchCurrentUser.mockResolvedValue({ role: 'student', entrantId: 'entrant-1' });
   createSitting.mockResolvedValue(sittingResponse(answers));
   const view = render(<SitPage />);
-
-  const select = await screen.findByLabelText(/who are you/i);
-  fireEvent.change(select, { target: { value: 'entrant-1' } });
-  fireEvent.click(screen.getByRole('button', { name: /start test/i }));
   await screen.findByLabelText(/answer for question q1/i);
   return view;
 }
 
+describe('SitPage auto-detect and start', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    saveSittingAnswers.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('auto-detects the student and starts the sitting without a dropdown', async () => {
+    await renderAndStart(null);
+
+    expect(fetchCurrentUser).toHaveBeenCalledWith('mock-token');
+    expect(createSitting).toHaveBeenCalledWith('round-1', 'entrant-1', 'mock-token');
+    // No dropdown should exist
+    expect(screen.queryByLabelText(/who are you/i)).toBeNull();
+  });
+
+  it('shows an error when the user is not a student', async () => {
+    fetchCurrentUser.mockResolvedValue({ role: 'educator', entrantId: null });
+    render(<SitPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/only students/i);
+    expect(createSitting).not.toHaveBeenCalled();
+  });
+
+  it('shows an error when the user has no entrantId', async () => {
+    fetchCurrentUser.mockResolvedValue({ role: 'student', entrantId: null });
+    render(<SitPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/only students/i);
+    expect(createSitting).not.toHaveBeenCalled();
+  });
+
+  it('shows an error when fetchCurrentUser returns null', async () => {
+    fetchCurrentUser.mockResolvedValue(null);
+    render(<SitPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not load your account/i);
+  });
+
+  it('shows the backend error when createSitting fails', async () => {
+    fetchCurrentUser.mockResolvedValue({ role: 'student', entrantId: 'entrant-1' });
+    createSitting.mockRejectedValue(new ApiError('Not registered for this round', 403));
+    render(<SitPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not registered/i);
+  });
+});
+
 describe('SitPage auto-save (Story A3)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Native confirm dialogs default to "OK" so guarded actions run.
-    vi.stubGlobal('confirm', vi.fn(() => true));
-    fetchRoundEntrants.mockResolvedValue([{ id: 'entrant-1', name: 'Alice', grade: '11' }]);
     saveSittingAnswers.mockResolvedValue({});
   });
 
@@ -71,60 +119,47 @@ describe('SitPage auto-save (Story A3)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('asks for confirmation before starting the test and stays when cancelled', async () => {
-    createSitting.mockResolvedValue(sittingResponse(null));
-    confirm.mockReturnValue(false);
-    render(<SitPage />);
+  it(
+    'saves answers after typing and restores them after a refresh',
+    async () => {
+      // First visit: no saved answers yet
+      const { unmount } = await renderAndStart(null);
 
-    const select = await screen.findByLabelText(/who are you/i);
-    fireEvent.change(select, { target: { value: 'entrant-1' } });
-    fireEvent.click(screen.getByRole('button', { name: /start test/i }));
-
-    expect(confirm).toHaveBeenCalledWith(
-      expect.stringMatching(/start this test now/i)
-    );
-    expect(createSitting).not.toHaveBeenCalled();
-    // Still on the name-picking phase
-    expect(screen.getByLabelText(/who are you/i)).toBeInTheDocument();
-  });
-
-  it('saves answers after typing and restores them after a refresh', async () => {
-    // First visit: no saved answers yet
-    const { unmount } = await startSitting(null);
-
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText(/answer for question q1/i), {
-        target: { value: 'a' },
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/answer for question q1/i), {
+          target: { value: 'a' },
+        });
       });
-    });
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText(/answer for question q2/i), {
-        target: { value: 'b' },
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/answer for question q2/i), {
+          target: { value: 'b' },
+        });
       });
-    });
 
-    // The debounce (1s) sends the auto-save
-    await vi.waitFor(
-      () => {
-        expect(saveSittingAnswers).toHaveBeenCalledWith(
-          'sitting-1',
-          { q1: 'A', q2: 'B' },
-          'mock-token'
-        );
-      },
-      { timeout: 4000 }
-    );
+      // The debounce (1s) sends the auto-save
+      await vi.waitFor(
+        () => {
+          expect(saveSittingAnswers).toHaveBeenCalledWith(
+            'sitting-1',
+            { q1: 'A', q2: 'B' },
+            'mock-token'
+          );
+        },
+        { timeout: 4000 }
+      );
 
-    // Refresh = unmount + re-render. The server now returns the saved answers.
-    unmount();
-    await startSitting({ q1: 'A', q2: 'B' });
+      // Refresh = unmount + re-render. The server now returns the saved answers.
+      unmount();
+      await renderAndStart({ q1: 'A', q2: 'B' });
 
-    expect(screen.getByLabelText(/answer for question q1/i).value).toBe('A');
-    expect(screen.getByLabelText(/answer for question q2/i).value).toBe('B');
+      expect(screen.getByLabelText(/answer for question q1/i).value).toBe('A');
+      expect(screen.getByLabelText(/answer for question q2/i).value).toBe('B');
 
-    // Restored answers are not dirty - no save fires until something changes.
-    expect(saveSittingAnswers).toHaveBeenCalledTimes(1);
-  });
+      // Restored answers are not dirty - no save fires until something changes.
+      expect(saveSittingAnswers).toHaveBeenCalledTimes(1);
+    },
+    15000
+  );
 });
 
 describe('SitPage submit (Story A5)', () => {
@@ -132,7 +167,6 @@ describe('SitPage submit (Story A5)', () => {
     vi.clearAllMocks();
     // Native confirm dialogs default to "OK" so guarded actions run.
     vi.stubGlobal('confirm', vi.fn(() => true));
-    fetchRoundEntrants.mockResolvedValue([{ id: 'entrant-1', name: 'Alice', grade: '11' }]);
     saveSittingAnswers.mockResolvedValue({});
     submitSitting.mockResolvedValue({ submission: { id: 'sub-1' }, result: null });
   });
@@ -143,7 +177,7 @@ describe('SitPage submit (Story A5)', () => {
   });
 
   it('submits the test and shows a confirmation', async () => {
-    await startSitting({ q1: 'A', q2: 'B' });
+    await renderAndStart({ q1: 'A', q2: 'B' });
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /submit test/i }));
@@ -157,7 +191,7 @@ describe('SitPage submit (Story A5)', () => {
   });
 
   it('asks for confirmation before submitting and stays when cancelled', async () => {
-    await startSitting({ q1: 'A', q2: 'B' });
+    await renderAndStart({ q1: 'A', q2: 'B' });
     confirm.mockReturnValue(false);
 
     await act(async () => {
@@ -172,29 +206,33 @@ describe('SitPage submit (Story A5)', () => {
     expect(screen.getByLabelText(/answer for question q1/i)).toBeTruthy();
   });
 
-  it('flushes unsaved answers before submitting', async () => {
-    await startSitting(null);
+  it(
+    'flushes unsaved answers before submitting',
+    async () => {
+      await renderAndStart(null);
 
-    await act(async () => {
-      fireEvent.change(screen.getByLabelText(/answer for question q1/i), {
-        target: { value: 'a' },
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/answer for question q1/i), {
+          target: { value: 'a' },
+        });
       });
-    });
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /submit test/i }));
-    });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /submit test/i }));
+      });
 
-    expect(submitSitting).toHaveBeenCalledWith('sitting-1', 'mock-token');
-    // The typed answer was flushed to the server before the submit
-    expect(saveSittingAnswers).toHaveBeenCalledWith('sitting-1', { q1: 'A' }, 'mock-token');
-    expect(saveSittingAnswers).toHaveBeenCalledTimes(1);
-  });
+      expect(submitSitting).toHaveBeenCalledWith('sitting-1', 'mock-token');
+      // The typed answer was flushed to the server before the submit
+      expect(saveSittingAnswers).toHaveBeenCalledWith('sitting-1', { q1: 'A' }, 'mock-token');
+      expect(saveSittingAnswers).toHaveBeenCalledTimes(1);
+    },
+    15000
+  );
 
   it('shows the backend error and keeps the form when submission fails', async () => {
     submitSitting.mockRejectedValue(new ApiError('Test already completed', 403));
 
-    await startSitting({ q1: 'A' });
+    await renderAndStart({ q1: 'A' });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /submit test/i }));
     });

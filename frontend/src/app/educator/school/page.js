@@ -277,10 +277,11 @@ export default function SchoolDashboardPage() {
   const [addMessage, setAddMessage] = useState(null);
   const [adding, setAdding] = useState(false);
 
+  const noSchool = !checking && user && !(user.school && user.school.id);
+
   useEffect(() => {
-    if (checking || !user) return;
-    const schoolId = user.school && user.school.id;
-    if (!schoolId) { setStatus('no-school'); return; }
+    if (checking || !user || noSchool) return;
+    const schoolId = user.school.id;
 
     async function load() {
       try {
@@ -361,7 +362,7 @@ export default function SchoolDashboardPage() {
     }
   }
 
-  if (checking || status === 'loading') {
+  if (checking || (!noSchool && status === 'loading')) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: '#faf9fc' }}>
         <div style={{ width: '40px', height: '40px', border: '3px solid rgba(139,92,246,0.2)', borderTopColor: '#8b5cf6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -374,15 +375,15 @@ export default function SchoolDashboardPage() {
     if (window.confirm('Are you sure you want to log out?')) await signOut({ redirectUrl: '/login' });
   }
 
-  if (status === 'no-school' || status === 'error') {
+  if (noSchool || status === 'error') {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: '#faf9fc' }}>
         <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
           <div style={{ textAlign: 'center', maxWidth: '420px' }}>
-            <p style={{ fontSize: '3em', margin: '0 0 12px' }}>{status === 'no-school' ? '🏫' : '⚠️'}</p>
-            <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>{status === 'no-school' ? 'No School Linked' : 'Something went wrong'}</h2>
+            <p style={{ fontSize: '3em', margin: '0 0 12px' }}>{noSchool ? '🏫' : '⚠️'}</p>
+            <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>{noSchool ? 'No School Linked' : 'Something went wrong'}</h2>
             <p style={{ color: '#8b7fa8' }}>
-              {status === 'no-school' ? 'Complete your educator profile to link a school.' : "Couldn't load the dashboard. Try refreshing."}
+              {noSchool ? 'Complete your educator profile to link a school.' : "Couldn't load the dashboard. Try refreshing."}
             </p>
           </div>
         </main>
