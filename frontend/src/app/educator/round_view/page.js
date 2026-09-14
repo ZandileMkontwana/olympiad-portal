@@ -83,6 +83,9 @@ function RoundViewContent() {
         throw new Error(data.error || 'Failed to fetch paper');
       }
 
+      // External API URL (paper file download), not an internal Next.js route,
+      // so window.location is intentional here.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = `${process.env.NEXT_PUBLIC_API_BASE_URL}${data.fileUrl}`;
     } catch (error) {
       setDownloadError(error.message);
