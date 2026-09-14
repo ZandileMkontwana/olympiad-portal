@@ -269,7 +269,7 @@ function TestsSection({ tests }) {
       {tests.length === 0 ? (
         <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
           <span className="text-3xl">📝</span>
-          <p className="mt-2 text-base text-ink-soft">No tests yet. They'll appear here once a round opens.</p>
+          <p className="mt-2 text-base text-ink-soft">No tests yet. They&apos;ll appear here once a round opens.</p>
         </div>
       ) : (
         <ul className="mt-4 space-y-3">

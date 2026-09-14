@@ -31,14 +31,6 @@ function RoundViewContent() {
   const [releaseStatus, setReleaseStatus] = useState('idle'); // idle | releasing | released | unreleasing | error
   const [releaseMessage, setReleaseMessage] = useState('');
 
-  // Detect release state from the round data
-  useEffect(() => {
-    if (round?.hasReleasedResults && releaseStatus === 'idle') {
-      setReleaseStatus('released');
-      setReleaseMessage('Results have been released to students.');
-    }
-  }, [round?.hasReleasedResults, releaseStatus]);
-
   useEffect(() => {
     if (!roundId) return;
 
@@ -56,6 +48,11 @@ function RoundViewContent() {
 
         setRound(data);
         setError('');
+        // Detect release state from fresh round data
+        if (data.hasReleasedResults) {
+          setReleaseStatus('released');
+          setReleaseMessage('Results have been released to students.');
+        }
       } catch (error) {
         setError(error.message);
       } finally {
