@@ -215,7 +215,7 @@ function CompleteProfileForm({ onBack }) {
 export default function RegisterPage() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const router = useRouter();
-  const [role, setRole] = useState(null); // null | 'educator'
+  const [role, setRole] = useState(null); // null | 'educator' | 'student'
   const [checking, setChecking] = useState(true);
 
   // Check if the signed-in user already has a completed profile.
@@ -241,25 +241,84 @@ export default function RegisterPage() {
 
   function handleRoleSelect(selected) {
     if (selected === 'student') {
-      router.push('/register/student');
+      if (isSignedIn) {
+        // Already authenticated — go straight to the student form
+        router.push('/register/student');
+      } else {
+        // Show student Clerk SignUp inline on this page
+        setRole('student');
+      }
     } else {
       setRole('educator');
     }
   }
 
+  // Not signed in + educator chosen → Clerk SignUp with educator redirect
+  if (!isSignedIn && role === 'educator') {
+    return (
+      <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
+        <Watermark />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setRole(null)}
+            className="mb-4 text-sm text-lavender hover:text-lavender-deep"
+          >
+            &larr; Back
+          </button>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
+            Educator sign up
+          </h1>
+          <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+          <p className="mt-4 text-center text-sm text-ink-soft">
+            Create your account to manage students and rounds for your school.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <SignUp routing="hash" signInUrl="/login" fallbackRedirectUrl="/register" />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Not signed in + student chosen → Clerk SignUp with student redirect
+  if (!isSignedIn && role === 'student') {
+    return (
+      <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
+        <Watermark />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setRole(null)}
+            className="mb-4 text-sm text-lavender hover:text-lavender-deep"
+          >
+            &larr; Back
+          </button>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
+            Student sign up
+          </h1>
+          <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+          <p className="mt-4 text-center text-sm text-ink-soft">
+            Create your account to take tests and view your results.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <SignUp routing="hash" signInUrl="/login" fallbackRedirectUrl="/register/student" />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Signed in + educator → show the educator profile form
+  // Signed in + no role (or role === null) → show the role selector
+  // Not signed in + no role → show the role selector
   return (
     <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
       <Watermark />
-      {isSignedIn ? (
-        role === 'educator' ? (
-          <CompleteProfileForm onBack={() => setRole(null)} />
-        ) : (
-          <RoleSelector onSelect={handleRoleSelect} />
-        )
+      {isSignedIn && role === 'educator' ? (
+        <CompleteProfileForm onBack={() => setRole(null)} />
       ) : (
-        <div className="relative flex justify-center">
-          <SignUp routing="hash" signInUrl="/login" fallbackRedirectUrl="/register" />
-        </div>
+        <RoleSelector onSelect={handleRoleSelect} />
       )}
     </main>
   );
