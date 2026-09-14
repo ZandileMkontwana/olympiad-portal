@@ -4,11 +4,11 @@ sidebar_position: 2
 
 # Bug Tracking
 
-We track bugs where the rest of the sprint work already lives: in our **Taiga** project's Issues section. A bug in a shared tracker beats a bug in a chat message — it can't be lost, it can be assigned, and its history (who found it, who fixed it, what verified the fix) stays attached to it.
+Bugs are tracked in the repository's **Issues** on Gitea. A bug in a shared tracker beats a bug in a chat message — it can't be lost, it can be assigned, and its history (who found it, who fixed it, what verified the fix) stays attached to it.
 
 ## Filing a bug
 
-Anyone on the team files an issue in Taiga as soon as a defect is confirmed reproducible. A useful bug report contains:
+Anyone on the team files an issue as soon as a defect is confirmed reproducible, labelled `bug`. A useful bug report contains:
 
 - **Steps to reproduce** — the shortest sequence that triggers it
 - **Expected vs actual** — what should happen, what happens
@@ -17,7 +17,7 @@ Anyone on the team files an issue in Taiga as soon as a defect is confirmed repr
 
 ## Severity
 
-Severity describes impact; triage sets it alongside priority.
+Severity describes impact; it is agreed at triage and recorded on the issue with a Critical/Major/Minor label.
 
 | Severity | Meaning |
 | --- | --- |
@@ -29,21 +29,18 @@ A Critical bug interrupts whatever story it was found in — it gets fixed befor
 
 ## Triage and status
 
-New issues are triaged at standup. The status flow is Taiga's default issue workflow:
+New issues are triaged at standup. An issue's life in Gitea:
 
-- **New** — filed, not yet triaged
-- **In progress** — someone is actively fixing it
-- **Ready for test** — the fix is on a PR branch and needs review
+- **Open, unassigned** — filed, not yet triaged
+- **Open, assigned** — someone owns the fix; the fix branch references the issue where practical (`fix/short-description`, per our [branch naming](./code_quality_tool.md))
 - **Closed** — the fix is merged to `main`
 
-**Needs info**, **Rejected** (not a bug, or by design) and **Postponed** (real, but not this sprint) are the side exits.
-
-Anything that blocks the current sprint's demo becomes a task on the active sprint board; everything else waits in the backlog for sprint planning.
+An issue is not closed when the fix is written — it's closed when the fix is merged.
 
 ## Bugs and code changes
 
-The issue is the record; the PR is the fix. Every bug-fix PR references its issue in the description or commit message so Taiga links the two, and an issue isn't closed when the fix is written — it's closed when the fix is merged.
+The issue is the record; the PR is the fix. Mentioning `#<issue>` in a commit message or PR description links the change on the issue's timeline — our history already does this habitually — and a closing keyword (`fixes #N`, `closes #N`, `resolves #N`) closes the issue automatically once the PR lands on `main`. Because direct pushes to `main` are branch-protected, every bug fix passes review and the CI lint-and-test jobs before its issue can close.
 
-## Why one tool
+## Why the repo tracker
 
-Bugs could live next to the code in Gitea's issue tracker, but the sprint board, backlog and bug list are used together during planning — splitting them across two tools means the planning conversation happens without the bugs in view. One tool, one place to look.
+Bugs live next to the code they describe. The issue page collects every referencing commit, the fixing PR and its CI run, all one click from each other — and nothing needs synchronising between tools, because there is only one.
