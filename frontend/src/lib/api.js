@@ -233,6 +233,17 @@ export function submitSitting(sittingId, token) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * Releases all automarked results for a closed round so students can view them.
+ * Wired to POST /api/rounds/:id/release-results (backend/src/routes/rounds.js).
+ */
+export function releaseResults(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/release-results`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
 /**
  * Fetches a single round by id.
  * Wired to GET /api/rounds/:id (backend/src/routes/rounds.js).

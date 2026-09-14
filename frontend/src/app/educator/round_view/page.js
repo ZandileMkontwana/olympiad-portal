@@ -2,7 +2,9 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
+import { releaseResults } from '@/lib/api';
 
 function formatRemaining(ms) {
   if (ms <= 0) return 'closing any moment';
@@ -19,12 +21,15 @@ function formatRemaining(ms) {
 function RoundViewContent() {
   const searchParams = useSearchParams();
   const roundId = searchParams.get('id');
+  const { getToken } = useAuth();
 
   const [round, setRound] = useState(null);
   const [loading, setLoading] = useState(!!roundId);
   const [error, setError] = useState('');
   const [downloadError, setDownloadError] = useState('');
   const [timeRemaining, setTimeRemaining] = useState('');
+  const [releaseStatus, setReleaseStatus] = useState('idle'); // idle | releasing | released | error
+  const [releaseMessage, setReleaseMessage] = useState('');
 
   useEffect(() => {
     if (!roundId) return;
@@ -151,6 +156,45 @@ function RoundViewContent() {
               Submit Results
             </Link>
           </>
+        )}
+
+        {round.state === 'closed' && (
+          <div style={{ marginTop: '12px' }}>
+            {releaseStatus === 'released' ? (
+              <div className="message" style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }}>
+                {releaseMessage}
+              </div>
+            ) : (
+              <>
+                <button
+                  className="button"
+                  disabled={releaseStatus === 'releasing'}
+                  onClick={async () => {
+                    setReleaseStatus('releasing');
+                    setReleaseMessage('');
+                    try {
+                      const token = await getToken();
+                      const data = await releaseResults(roundId, token);
+                      setReleaseStatus('released');
+                      setReleaseMessage(
+                        data.releasedCount > 0
+                          ? `Released ${data.releasedCount} result${data.releasedCount !== 1 ? 's' : ''}. Students can now view their marks.`
+                          : 'No unreleased results found for this round.'
+                      );
+                    } catch (err) {
+                      setReleaseStatus('error');
+                      setReleaseMessage(err.message || 'Could not release results.');
+                    }
+                  }}
+                >
+                  {releaseStatus === 'releasing' ? 'Releasing…' : 'Release Results to Students'}
+                </button>
+                {releaseStatus === 'error' && (
+                  <p className="message" style={{ marginTop: '8px' }}>{releaseMessage}</p>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
     </main>

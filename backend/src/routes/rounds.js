@@ -173,4 +173,36 @@ router.get('/rounds/:id/submissions', async (req, res) => {
   }
 });
 
+// POST /rounds/:id/release-results
+// Releases all automarked results for a closed round so students can view them.
+// Sets releasedAt on every Result that doesn't already have one.
+router.post('/rounds/:id/release-results', ...requireRole('educator'), async (req, res) => {
+  try {
+    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    if (round.state !== 'closed') {
+      return res.status(403).json({
+        error: `Results can only be released for closed rounds (currently '${round.state}')`,
+      });
+    }
+
+    const now = new Date();
+    const updated = await prisma.result.updateMany({
+      where: {
+        releasedAt: null,
+        submission: { roundId: round.id },
+      },
+      data: { releasedAt: now },
+    });
+
+    res.json({ releasedCount: updated.count, releasedAt: now });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not release results' });
+  }
+});
+
 module.exports = router;

@@ -33,6 +33,7 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.roundEntrant, 'findUnique');
     vi.spyOn(prisma.roundEntrant, 'create');
     vi.spyOn(prisma.submission, 'findMany');
+    vi.spyOn(prisma.result, 'updateMany');
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
@@ -370,6 +371,45 @@ describe('Rounds routes', () => {
       prisma.submission.findMany.mockRejectedValue(new Error('DB error'));
       const res = await request(app).get('/api/rounds/1/submissions');
       expect(res.status).toBe(500);
+    });
+  });
+
+  describe('POST /api/rounds/:id/release-results', () => {
+    it('releases all unreleased results for a closed round', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'closed' });
+      prisma.result.updateMany.mockResolvedValue({ count: 5 });
+
+      const res = await request(app).post('/api/rounds/r1/release-results');
+      expect(res.status).toBe(200);
+      expect(res.body.releasedCount).toBe(5);
+      expect(res.body.releasedAt).toBeTruthy();
+      expect(prisma.result.updateMany).toHaveBeenCalledWith({
+        where: { releasedAt: null, submission: { roundId: 'r1' } },
+        data: expect.objectContaining({ releasedAt: expect.any(Date) }),
+      });
+    });
+
+    it('returns 404 when round does not exist', async () => {
+      prisma.round.findUnique.mockResolvedValue(null);
+      const res = await request(app).post('/api/rounds/nope/release-results');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/Round not found/);
+    });
+
+    it('returns 403 when round is not closed', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'open' });
+      const res = await request(app).post('/api/rounds/r1/release-results');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/closed/);
+      expect(prisma.result.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 on database error', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'closed' });
+      prisma.result.updateMany.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).post('/api/rounds/r1/release-results');
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Could not release/);
     });
   });
 });
