@@ -41,6 +41,7 @@ describe('Sittings routes', () => {
   beforeEach(() => {
     vi.spyOn(prisma.round, 'findUnique');
     vi.spyOn(prisma.roundEntrant, 'findUnique');
+    vi.spyOn(prisma.roundEntrant, 'upsert');
     vi.spyOn(prisma.sitting, 'findUnique');
     vi.spyOn(prisma.sitting, 'create');
     vi.spyOn(prisma.sitting, 'update');
@@ -52,6 +53,7 @@ describe('Sittings routes', () => {
     // no existing sitting.
     prisma.round.findUnique.mockResolvedValue(openRound);
     prisma.roundEntrant.findUnique.mockResolvedValue({ id: 're-1' });
+    prisma.roundEntrant.upsert.mockResolvedValue({ id: 're-1' });
     prisma.sitting.findUnique.mockResolvedValue(null);
     prisma.submission.findUnique.mockResolvedValue(null);
     prisma.submission.create.mockResolvedValue(null);
@@ -134,13 +136,17 @@ describe('Sittings routes', () => {
       expect(res.body.error).toMatch(/No paper uploaded/);
     });
 
-    it('returns 403 when entrant is not registered for the round', async () => {
-      prisma.roundEntrant.findUnique.mockResolvedValue(null);
+    it('auto-registers the entrant when not already registered for the round', async () => {
+      prisma.roundEntrant.upsert.mockResolvedValue({ id: 're-new' });
       const res = await request(app)
         .post('/api/rounds/round-1/sittings')
         .send({ entrantId: 'entrant-1' });
-      expect(res.status).toBe(403);
-      expect(res.body.error).toMatch(/not registered/);
+      expect(res.status).toBe(201);
+      expect(prisma.roundEntrant.upsert).toHaveBeenCalledWith({
+        where: { roundId_entrantId: { roundId: 'round-1', entrantId: 'entrant-1' } },
+        create: { roundId: 'round-1', entrantId: 'entrant-1' },
+        update: {},
+      });
     });
 
     it('returns 403 when the entrant already completed a sitting', async () => {

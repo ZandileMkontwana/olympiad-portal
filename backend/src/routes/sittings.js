@@ -35,13 +35,14 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'No paper uploaded for this round yet' });
     }
 
-    const registration = await prisma.roundEntrant.findUnique({
+    // Ensure the entrant is registered for this round. If not already
+    // registered (e.g. the entrant was created before the round opened),
+    // create the RoundEntrant record on the fly so the student can start.
+    await prisma.roundEntrant.upsert({
       where: { roundId_entrantId: { roundId, entrantId } },
+      create: { roundId, entrantId },
+      update: {},
     });
-
-    if (!registration) {
-      return res.status(403).json({ error: 'Entrant is not registered for this round' });
-    }
 
     const existing = await prisma.sitting.findUnique({
       where: { roundId_entrantId: { roundId, entrantId } },
