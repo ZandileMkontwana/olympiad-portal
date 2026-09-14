@@ -1,7 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
-const { generateCertificate } = require('../lib/certificate');
+const { generateCertificatePdf } = require('../lib/certificate');
 
 const router = express.Router();
 
@@ -64,17 +64,12 @@ router.get(
       }
 
       // Generate the PDF
-      const pdfBuffer = await generateCertificate({
+      const pdfBuffer = await generateCertificatePdf({
         entrantName: entrant.name,
         roundName: round.name,
         olympiadName: round.olympiad.name,
         schoolName: entrant.school.name,
         score: submission.result.score,
-        issuedDate: new Date().toLocaleDateString('en-ZA', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }),
       });
 
       const filename = `${entrant.name.replace(/[^a-zA-Z0-9 ]/g, '')}-${round.name}-certificate.pdf`;

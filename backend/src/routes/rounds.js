@@ -114,8 +114,6 @@ router.get('/olympiads/:id/rounds', async (req, res) => {
 });
 
 // POST /rounds/:id/entrants
-// Registers one of the educator's own entrants to sit a round. Registration
-// is only accepted while the round is scheduled or open.
 router.post('/rounds/:id/entrants', ...requireRole('educator'), async (req, res) => {
   try {
     const { entrantId } = req.body;
@@ -194,9 +192,6 @@ router.get('/rounds/:id/submissions', async (req, res) => {
 });
 
 // GET /rounds/:id/standings
-// Ranks entrants who have a scored Result for this round, highest score first.
-// Entrants with a Submission but no Result yet (not marked / no memo answers
-// on the paper) are excluded — there's nothing to rank them on.
 router.get('/rounds/:id/standings', async (req, res) => {
   try {
     const roundId = req.params.id;
@@ -224,8 +219,6 @@ router.get('/rounds/:id/standings', async (req, res) => {
       }))
       .sort((a, b) => b.score - a.score);
 
-    // Standard competition ranking (1224): ties share a rank, next rank
-    // skips ahead by the number of tied entries.
     let rank = 0;
     let lastScore = null;
     const standings = ranked.map((entry, index) => {
@@ -244,10 +237,6 @@ router.get('/rounds/:id/standings', async (req, res) => {
 });
 
 // GET /rounds/:id/standings/schools
-// Ranks schools by the sum of their entrants' scores for this round.
-// Reuses the same underlying data as GET /rounds/:id/standings (Submission
-// -> Result), so it automatically covers both paper and online results too,
-// same as the individual standings route.
 router.get('/rounds/:id/standings/schools', async (req, res) => {
   try {
     const roundId = req.params.id;
@@ -284,8 +273,6 @@ router.get('/rounds/:id/standings/schools', async (req, res) => {
 
     const ranked = Array.from(bySchool.values()).sort((a, b) => b.totalScore - a.totalScore);
 
-    // Standard competition ranking (1224), same convention as the
-    // individual standings route.
     let rank = 0;
     let lastScore = null;
     const standings = ranked.map((entry, index) => {
@@ -304,8 +291,6 @@ router.get('/rounds/:id/standings/schools', async (req, res) => {
 });
 
 // POST /rounds/:id/release-results
-// Releases all automarked results for a closed round so students can view them.
-// Sets releasedAt on every Result that doesn't already have one.
 router.post('/rounds/:id/release-results', ...requireRole('educator'), async (req, res) => {
   try {
     const round = await prisma.round.findUnique({ where: { id: req.params.id } });
@@ -336,7 +321,6 @@ router.post('/rounds/:id/release-results', ...requireRole('educator'), async (re
 });
 
 // POST /rounds/:id/unrelease-results
-// Hides all released results for a round so students can no longer view them.
 router.post('/rounds/:id/unrelease-results', ...requireRole('educator'), async (req, res) => {
   try {
     const round = await prisma.round.findUnique({ where: { id: req.params.id } });
@@ -359,11 +343,7 @@ router.post('/rounds/:id/unrelease-results', ...requireRole('educator'), async (
   }
 });
 
-
 // GET /rounds/:id/notifications
-// Returns all 4 trigger types for this round, whether or not a rule has
-// been explicitly configured — unconfigured types show as enabled by
-// default (matching the scheduler's fallback behavior), with no id.
 router.get('/rounds/:id/notifications', ...requireRole('organiser'), async (req, res) => {
   try {
     const roundId = req.params.id;
@@ -399,10 +379,6 @@ router.get('/rounds/:id/notifications', ...requireRole('organiser'), async (req,
 });
 
 // PUT /rounds/:id/notifications/:triggerType
-// Upserts the rule for this round + trigger type — creates it if this is
-// the first time it's been configured, otherwise updates it. This is the
-// route the config page (#138) calls when an organiser toggles a switch
-// or changes a recipient role.
 router.put(
   '/rounds/:id/notifications/:triggerType',
   ...requireRole('organiser'),
@@ -447,8 +423,6 @@ router.put(
 );
 
 // DELETE /rounds/:id/notifications/:triggerType
-// Removes any explicit configuration for this trigger type, reverting it
-// to the default (enabled, educator) behavior.
 router.delete(
   '/rounds/:id/notifications/:triggerType',
   ...requireRole('organiser'),
@@ -470,15 +444,6 @@ router.delete(
 );
 
 // POST /rounds/:id/notifications/test
-// Dry-run of a single trigger type: reports exactly who the scheduler would
-// email for this round (and, for missing_submission, which entrant each
-// educator would be alerted about) WITHOUT sending anything or writing to
-// notificationLog. The scheduler's timing windows are not simulated — the
-// preview shows recipients and email content regardless of when the trigger
-// would actually fire. Recipients already covered by a past send are flagged,
-// since the scheduler dedups per (round, trigger, email) — which also means
-// each educator only ever gets ONE missing-submission email per round (for
-// the first missing entrant found).
 router.post(
   '/rounds/:id/notifications/test',
   ...requireRole('organiser'),
@@ -512,9 +477,6 @@ router.post(
 
       const recipients = [];
       if (triggerType === 'missing_submission') {
-        // Same per-entrant loop (and dedup) as the scheduler: educators are
-        // emailed about the first missing entrant only — later entrants at
-        // the same school are flagged as already notified.
         const coveredEmails = new Set();
         for (const roundEntrant of round.roundEntrants) {
           const entrant = roundEntrant.entrant;
@@ -538,7 +500,6 @@ router.post(
         }
       }
 
-      // Preview rendered from the same templates the real sends use.
       let emailPreview = null;
       if (triggerType === 'before_open') {
         emailPreview = buildRoundOpeningMessage({
@@ -553,7 +514,6 @@ router.post(
       } else if (triggerType === 'results_released') {
         emailPreview = buildResultsReleasedMessage({ roundName: round.name });
       } else if (recipients.length > 0) {
-        // One email per missing entrant — preview the first that would go out.
         emailPreview = buildMissingSubmissionMessage({
           roundName: round.name,
           entrantName: recipients[0].entrantName,
@@ -580,6 +540,5 @@ router.post(
     }
   }
 );
-
 
 module.exports = router;
