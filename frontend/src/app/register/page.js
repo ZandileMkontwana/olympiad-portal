@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SignUp, useAuth } from '@clerk/nextjs';
+import { fetchCurrentUser, dashboardPathForRole } from '@/lib/api';
 
 function Watermark() {
   return (
@@ -14,7 +16,55 @@ function Watermark() {
   );
 }
 
-function CompleteProfileForm() {
+function RoleSelector({ onSelect }) {
+  return (
+    <div className="relative">
+      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
+        Set up your account
+      </h1>
+      <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+      <p className="mt-4 text-center text-sm text-ink-soft">
+        Choose how you&apos;ll use the Olympiad Portal.
+      </p>
+
+      <div className="mt-8 flex flex-col gap-4">
+        <button
+          type="button"
+          onClick={() => onSelect('educator')}
+          className="flex items-center gap-4 rounded-lg border border-lavender/30 bg-surface p-5 text-left transition-colors hover:border-lavender/60 hover:bg-lavender/5"
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-lavender/10 text-2xl">
+            🎓
+          </span>
+          <div>
+            <p className="font-display text-lg font-semibold text-ink">I&apos;m an Educator</p>
+            <p className="mt-1 text-sm text-ink-soft">
+              Register students, manage rounds, and view results for your school.
+            </p>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onSelect('student')}
+          className="flex items-center gap-4 rounded-lg border border-lavender/30 bg-surface p-5 text-left transition-colors hover:border-lavender/60 hover:bg-lavender/5"
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-lavender/10 text-2xl">
+            📝
+          </span>
+          <div>
+            <p className="font-display text-lg font-semibold text-ink">I&apos;m a Student</p>
+            <p className="mt-1 text-sm text-ink-soft">
+              Take tests and view your results. Your educator must register you first.
+            </p>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CompleteProfileForm({ onBack }) {
   const { getToken } = useAuth();
   const [name, setName] = useState('');
   const [schoolName, setSchoolName] = useState('');
@@ -85,12 +135,19 @@ function CompleteProfileForm() {
 
   return (
     <div className="relative">
+      <button
+        type="button"
+        onClick={onBack}
+        className="mb-4 text-sm text-lavender hover:text-lavender-deep"
+      >
+        &larr; Back
+      </button>
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
-        Finish setting up your account
+        Educator setup
       </h1>
       <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-4 text-center text-sm text-ink-soft">
-        You&apos;re signed in — just need your name and school to finish.
+        Enter your name and school to finish setting up your educator account.
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
@@ -156,21 +213,112 @@ function CompleteProfileForm() {
 }
 
 export default function RegisterPage() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
+  const router = useRouter();
+  const [role, setRole] = useState(null); // null | 'educator' | 'student'
+  const [checking, setChecking] = useState(true);
 
-  if (!isLoaded) {
+  // Check if the signed-in user already has a completed profile.
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    async function check() {
+      const token = await getToken();
+      const user = await fetchCurrentUser(token);
+      if (user) {
+        // Profile already completed — go to their dashboard
+        router.replace(dashboardPathForRole(user.role));
+      } else {
+        setChecking(false);
+      }
+    }
+    check();
+  }, [isLoaded, isSignedIn, getToken, router]);
+
+  if (!isLoaded || (isSignedIn && checking)) {
     return <main className="mx-auto max-w-md px-8 py-24 text-center">Loading…</main>;
   }
 
+  function handleRoleSelect(selected) {
+    if (selected === 'student') {
+      if (isSignedIn) {
+        // Already authenticated — go straight to the student form
+        router.push('/register/student');
+      } else {
+        // Show student Clerk SignUp inline on this page
+        setRole('student');
+      }
+    } else {
+      setRole('educator');
+    }
+  }
+
+  // Not signed in + educator chosen → Clerk SignUp with educator redirect
+  if (!isSignedIn && role === 'educator') {
+    return (
+      <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
+        <Watermark />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setRole(null)}
+            className="mb-4 text-sm text-lavender hover:text-lavender-deep"
+          >
+            &larr; Back
+          </button>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
+            Educator sign up
+          </h1>
+          <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+          <p className="mt-4 text-center text-sm text-ink-soft">
+            Create your account to manage students and rounds for your school.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <SignUp routing="hash" signInUrl="/login" fallbackRedirectUrl="/register" />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Not signed in + student chosen → Clerk SignUp with student redirect
+  if (!isSignedIn && role === 'student') {
+    return (
+      <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
+        <Watermark />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setRole(null)}
+            className="mb-4 text-sm text-lavender hover:text-lavender-deep"
+          >
+            &larr; Back
+          </button>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
+            Student sign up
+          </h1>
+          <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+          <p className="mt-4 text-center text-sm text-ink-soft">
+            Create your account to take tests and view your results.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <SignUp routing="hash" signInUrl="/login" fallbackRedirectUrl="/register/student" />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Signed in + educator → show the educator profile form
+  // Signed in + no role (or role === null) → show the role selector
+  // Not signed in + no role → show the role selector
   return (
     <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
       <Watermark />
-      {isSignedIn ? (
-        <CompleteProfileForm />
+      {isSignedIn && role === 'educator' ? (
+        <CompleteProfileForm onBack={() => setRole(null)} />
       ) : (
-        <div className="relative flex justify-center">
-          <SignUp routing="hash" signInUrl="/login" fallbackRedirectUrl="/register" />
-        </div>
+        <RoleSelector onSelect={handleRoleSelect} />
       )}
     </main>
   );

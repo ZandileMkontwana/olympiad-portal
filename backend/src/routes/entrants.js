@@ -39,6 +39,20 @@ router.post('/entrants', ...requireRole('educator'), async (req, res) => {
         schoolId: educator.schoolId,
       },
     });
+
+    // Auto-register the new entrant for all currently open rounds,
+    // so they can immediately take any active test.
+    const openRounds = await prisma.round.findMany({
+      where: { state: 'open' },
+      select: { id: true },
+    });
+    if (openRounds.length > 0) {
+      await prisma.roundEntrant.createMany({
+        data: openRounds.map((r) => ({ roundId: r.id, entrantId: entrant.id })),
+        skipDuplicates: true,
+      });
+    }
+
     res.status(201).json(entrant);
   } catch (err) {
     console.error(err);

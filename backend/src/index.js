@@ -45,7 +45,8 @@ app.use('/api', (req, res) => {
 });
 
 // Global error handler — always returns JSON
-app.use((err, req, res, _next) => {
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: err.message || 'Internal server error' });
 });

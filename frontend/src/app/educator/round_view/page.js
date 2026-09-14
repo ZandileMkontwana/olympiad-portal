@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
+import { releaseResults, unreleaseResults } from '@/lib/api';
 
 function formatRemaining(ms) {
   if (ms <= 0) return 'closing any moment';
@@ -30,6 +31,8 @@ function RoundViewContent() {
   const [certificateEntrants, setCertificateEntrants] = useState([]);
   const [certificateError, setCertificateError] = useState('');
   const [certificateLoading, setCertificateLoading] = useState(false);
+  const [releaseStatus, setReleaseStatus] = useState('idle'); // idle | releasing | released | unreleasing | error
+  const [releaseMessage, setReleaseMessage] = useState('');
 
   useEffect(() => {
     if (!roundId) return;
@@ -48,6 +51,11 @@ function RoundViewContent() {
 
         setRound(data);
         setError('');
+        // Detect release state from fresh round data
+        if (data.hasReleasedResults) {
+          setReleaseStatus('released');
+          setReleaseMessage('Results have been released to students.');
+        }
       } catch (error) {
         setError(error.message);
       } finally {
@@ -228,10 +236,6 @@ function RoundViewContent() {
             </button>
             {downloadError && <p className="message">{downloadError}</p>}
 
-            <Link href={`/student/sit?id=${roundId}`} className="button">
-              Sit Paper Online
-            </Link>
-
             <p className="description">Submissions are open. Closes in {timeRemaining}.</p>
 
             <Link href={`/educator/submit?id=${roundId}`} className="button">
@@ -288,6 +292,84 @@ function RoundViewContent() {
               </ul>
             )}
           </>
+        )}
+
+        {round.state === 'closed' && (
+          <div style={{ marginTop: '12px' }}>
+            {releaseStatus === 'released' ? (
+              <div>
+                <div className="message" style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }}>
+                  {releaseMessage}
+                </div>
+                <button
+                  className="button"
+                  style={{ marginTop: '8px', background: 'transparent', color: '#e0615f', border: '1px solid rgba(224,97,95,0.3)' }}
+                  disabled={releaseStatus === 'unreleasing'}
+                  onClick={async () => {
+                    if (!window.confirm(
+                      'Are you sure you want to hide results? Students will no longer be able to see their marks.'
+                    )) return;
+                    setReleaseStatus('unreleasing');
+                    try {
+                      const token = await getToken();
+                      const data = await unreleaseResults(roundId, token);
+                      setReleaseStatus('idle');
+                      setReleaseMessage('');
+                      // Force re-fetch to update hasReleasedResults
+                      const response = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`
+                      );
+                      const freshRound = await response.json();
+                      if (response.ok) setRound(freshRound);
+                    } catch (err) {
+                      setReleaseStatus('error');
+                      setReleaseMessage(err.message || 'Could not unrelease results.');
+                    }
+                  }}
+                >
+                  {releaseStatus === 'unreleasing' ? 'Hiding\u2026' : 'Hide Results from Students'}
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  className="button"
+                  disabled={releaseStatus === 'releasing'}
+                  onClick={async () => {
+                    if (!window.confirm(
+                      'Are you sure you want to release results? Students will immediately be able to see their marks.'
+                    )) return;
+                    setReleaseStatus('releasing');
+                    setReleaseMessage('');
+                    try {
+                      const token = await getToken();
+                      const data = await releaseResults(roundId, token);
+                      setReleaseStatus('released');
+                      setReleaseMessage(
+                        data.releasedCount > 0
+                          ? `Released ${data.releasedCount} result${data.releasedCount !== 1 ? 's' : ''}. Students can now view their marks.`
+                          : 'No unreleased results found for this round.'
+                      );
+                      // Force re-fetch to update hasReleasedResults
+                      const response = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`
+                      );
+                      const freshRound = await response.json();
+                      if (response.ok) setRound(freshRound);
+                    } catch (err) {
+                      setReleaseStatus('error');
+                      setReleaseMessage(err.message || 'Could not release results.');
+                    }
+                  }}
+                >
+                  {releaseStatus === 'releasing' ? 'Releasing\u2026' : 'Release Results to Students'}
+                </button>
+                {releaseStatus === 'error' && (
+                  <p className="message" style={{ marginTop: '8px' }}>{releaseMessage}</p>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
     </main>

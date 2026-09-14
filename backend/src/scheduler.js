@@ -10,6 +10,41 @@ const {
 const NOTIFY_BEFORE_OPEN_MS = 60 * 60 * 1000; // 1 hour
 const NOTIFY_BEFORE_CLOSE_MS = 60 * 60 * 1000; // 1 hour
 
+/**
+ * When a round transitions from 'scheduled' to 'open', register all existing
+ * entrants for it. This handles entrants that were created before the round
+ * opened (the per-entrant auto-registration in entrants.js only fires at
+ * creation time, so previously created entrants would be missed).
+ */
+async function registerEntrantsForNewlyOpenRounds() {
+  const openRounds = await prisma.round.findMany({
+    where: { state: 'open' },
+    select: { id: true },
+  });
+  if (openRounds.length === 0) return;
+
+  const entrants = await prisma.entrant.findMany({ select: { id: true } });
+  if (entrants.length === 0) return;
+
+  for (const round of openRounds) {
+    const existing = await prisma.roundEntrant.findMany({
+      where: { roundId: round.id },
+      select: { entrantId: true },
+    });
+    const existingIds = new Set(existing.map((re) => re.entrantId));
+    const toCreate = entrants
+      .filter((e) => !existingIds.has(e.id))
+      .map((e) => ({ roundId: round.id, entrantId: e.id }));
+
+    if (toCreate.length > 0) {
+      await prisma.roundEntrant.createMany({
+        data: toCreate,
+        skipDuplicates: true,
+      });
+    }
+  }
+}
+
 function startScheduler() {
   cron.schedule('*/30 * * * * *', async () => {
     const now = new Date();
@@ -20,6 +55,8 @@ function startScheduler() {
     });
     if (opened.count > 0) {
       console.log(`Opened ${opened.count} round(s) at ${now.toISOString()}`);
+      // Register all existing entrants for newly opened rounds
+      await registerEntrantsForNewlyOpenRounds();
     }
 
     const closed = await prisma.round.updateMany({

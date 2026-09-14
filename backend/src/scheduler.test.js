@@ -13,6 +13,9 @@ describe('startScheduler', () => {
     });
     vi.spyOn(prisma.round, 'updateMany');
     vi.spyOn(prisma.round, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.entrant, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.roundEntrant, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.roundEntrant, 'createMany').mockResolvedValue({ count: 0 });
     vi.spyOn(prisma.notificationLog, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.notificationLog, 'create').mockResolvedValue({ id: 'log-1' });
     vi.spyOn(prisma.notificationRule, 'findUnique').mockResolvedValue(null);
@@ -92,6 +95,34 @@ describe('startScheduler', () => {
     const closedLogs = console.log.mock.calls.filter((c) => c[0]?.includes?.('Closed'));
     expect(openedLogs).toHaveLength(0);
     expect(closedLogs).toHaveLength(0);
+  });
+
+  it('registers all existing entrants for newly opened rounds', async () => {
+    startScheduler();
+    prisma.round.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    // 1st call: registerEntrantsForNewlyOpenRounds (open rounds)
+    // 2nd call: sendBeforeOpenNotifications (upcoming scheduled rounds)
+    prisma.round.findMany
+      .mockResolvedValueOnce([{ id: 'round-1' }])
+      .mockResolvedValueOnce([]);
+    prisma.entrant.findMany.mockResolvedValue([
+      { id: 'entrant-1' },
+      { id: 'entrant-2' },
+    ]);
+    // entrant-1 is already registered, entrant-2 is not
+    prisma.roundEntrant.findMany.mockResolvedValue([{ entrantId: 'entrant-1' }]);
+    prisma.roundEntrant.createMany.mockResolvedValue({ count: 1 });
+
+    await scheduledCallback();
+
+    expect(prisma.roundEntrant.findMany).toHaveBeenCalledWith({
+      where: { roundId: 'round-1' },
+      select: { entrantId: true },
+    });
+    expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+      data: [{ roundId: 'round-1', entrantId: 'entrant-2' }],
+      skipDuplicates: true,
+    });
   });
 
   describe('before-open reminder emails', () => {

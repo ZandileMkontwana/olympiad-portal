@@ -233,6 +233,28 @@ export function submitSitting(sittingId, token) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * Releases all automarked results for a closed round so students can view them.
+ * Wired to POST /api/rounds/:id/release-results (backend/src/routes/rounds.js).
+ */
+export function releaseResults(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/release-results`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Hides all released results for a round so students can no longer view them.
+ * Wired to POST /api/rounds/:id/unrelease-results (backend/src/routes/rounds.js).
+ */
+export function unreleaseResults(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/unrelease-results`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
 /**
  * Fetches a single round by id.
  * Wired to GET /api/rounds/:id (backend/src/routes/rounds.js).
@@ -335,6 +357,23 @@ export function fetchMySittings(token) {
  */
 export function fetchMyResults(token) {
   return requestJson('/api/students/me/results', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Lists open rounds the student is registered for via RoundEntrant,
+ * with an optional sitting if they've already started the test.
+ * Wired to GET /api/students/me/rounds (backend/src/routes/students.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   round: { id: string, name: string, state: string, closeTime: string },
+ *   sitting: { id: string, completedAt: string|null, startedAt: string, expiresAt: string } | null,
+ * }>>}
+ */
+export function fetchMyRounds(token) {
+  return requestJson('/api/students/me/rounds', {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
