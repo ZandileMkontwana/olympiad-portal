@@ -55,7 +55,7 @@ router.post('/educators/complete-profile', requireAuth(), async (req, res) => {
       email: user.email,
       role: user.role,
       name: user.name,
-      school: user.educator.school.name,
+      school: { id: user.educator.school.id, name: user.educator.school.name },
     },
   });
 });
@@ -119,7 +119,7 @@ router.post('/students/complete-profile', requireAuth(), async (req, res) => {
         email: user.email,
         role: user.role,
         name: user.name,
-        school: user.entrant.school.name,
+        school: { id: user.entrant.school.id, name: user.entrant.school.name },
       },
     });
   } catch (err) {
@@ -144,7 +144,7 @@ router.get('/auth/me', requireAuth(), async (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  const school = user.educator?.school?.name ?? user.entrant?.school?.name ?? null;
+  const schoolRecord = user.educator?.school ?? user.entrant?.school ?? null;
 
   res.json({
     user: {
@@ -152,7 +152,7 @@ router.get('/auth/me', requireAuth(), async (req, res) => {
       email: user.email,
       role: user.role,
       name: user.name,
-      school,
+      school: schoolRecord ? { id: schoolRecord.id, name: schoolRecord.name } : null,
     },
   });
 });

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 // Mutable hook state — individual tests override before rendering.
 const roleState = vi.hoisted(() => ({
-  user: { id: 'user-1', email: 'student@school.com', role: 'student', name: 'Thabo', school: 'Test School' },
+  user: { id: 'user-1', email: 'student@school.com', role: 'student', name: 'Thabo', school: { id: 'school-1', name: 'Test School' } },
   checking: true,
 }));
 
@@ -67,7 +67,7 @@ describe('StudentDashboard', () => {
       email: 'student@school.com',
       role: 'student',
       name: 'Thabo',
-      school: 'Test School',
+      school: { id: 'school-1', name: 'Test School' },
     };
   });
 

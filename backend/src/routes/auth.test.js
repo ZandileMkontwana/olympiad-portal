@@ -235,7 +235,7 @@ describe('Auth routes', () => {
         email: 'student@b.com',
         role: 'student',
         name: 'Test',
-        entrant: { school: { name: 'Test School' } },
+        entrant: { school: { id: 'school-1', name: 'Test School' } },
       });
 
       const res = await request(app)
@@ -244,7 +244,7 @@ describe('Auth routes', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.user.role).toBe('student');
-      expect(res.body.user.school).toBe('Test School');
+      expect(res.body.user.school).toEqual({ id: 'school-1', name: 'Test School' });
       expect(prisma.user.create).toHaveBeenCalledWith({
         data: {
           clerkUserId: 'clerk-user-1',
@@ -278,7 +278,7 @@ describe('Auth routes', () => {
       const res = await request(app).get('/api/auth/me');
       expect(res.status).toBe(200);
       expect(res.body.user.email).toBe('a@b.com');
-      expect(res.body.user.school).toBe('Test School');
+      expect(res.body.user.school).toEqual({ id: 'school-1', name: 'Test School' });
     });
 
     it('returns school from entrant for student users', async () => {
@@ -288,12 +288,12 @@ describe('Auth routes', () => {
         role: 'student',
         name: 'Test',
         educator: null,
-        entrant: { school: { name: 'Test School' } },
+        entrant: { school: { id: 'school-1', name: 'Test School' } },
       });
       const res = await request(app).get('/api/auth/me');
       expect(res.status).toBe(200);
       expect(res.body.user.role).toBe('student');
-      expect(res.body.user.school).toBe('Test School');
+      expect(res.body.user.school).toEqual({ id: 'school-1', name: 'Test School' });
     });
   });
 

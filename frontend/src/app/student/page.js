@@ -82,7 +82,7 @@ function HeroBanner({ name, school, inProgressCount, resumeHref }) {
       <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
         Welcome back, {name}
       </h1>
-      {school && <p className="mt-2 text-lg font-medium text-white/85">{school}</p>}
+      {school && <p className="mt-2 text-lg font-medium text-white/85">{school.name ?? school}</p>}
 
       <div className="mt-6 flex flex-wrap items-center gap-4">
         {inProgressCount > 0 ? (
