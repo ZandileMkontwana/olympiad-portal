@@ -100,7 +100,7 @@ describe('RegisterStudentPage', () => {
   });
 
   it('submits trimmed name and school with the bearer token and shows success', async () => {
-    mockFetchOk({ name: 'Thabo', role: 'student', school: 'Test School' });
+    mockFetchOk({ name: 'Thabo', role: 'student', school: { id: 's1', name: 'Test School' } });
     render(<RegisterStudentPage />);
 
     const select = await screen.findByLabelText(/school/i);

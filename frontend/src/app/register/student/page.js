@@ -96,7 +96,8 @@ function CompleteProfileForm() {
           <h1 className="font-display text-2xl font-semibold text-ink">Account created</h1>
         </div>
         <p className="mt-3 text-base text-ink-soft">
-          Welcome, {profile.name}. You&apos;re registered as a student at {profile.school}.
+          Welcome, {profile.name}. You&apos;re registered as a student at{' '}
+          {profile.school?.name ?? profile.school}.
         </p>
       </div>
     );
