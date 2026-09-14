@@ -98,7 +98,8 @@ describe('StudentDashboard', () => {
     fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
-    expect(await screen.findByRole('heading', { name: /welcome back, thabo/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^thabo$/i })).toBeInTheDocument();
+    expect(screen.getByText('Welcome back')).toBeInTheDocument();
     expect(screen.getByText('Test School')).toBeInTheDocument();
   });
 
@@ -110,7 +111,7 @@ describe('StudentDashboard', () => {
 
     expect(await screen.findByText(/no tests yet/i)).toBeInTheDocument();
     expect(screen.getByText(/no results released yet/i)).toBeInTheDocument();
-    expect(screen.getByText('—')).toBeInTheDocument(); // best score placeholder
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1); // average and best score placeholders
   });
 
   it('shows stat cards with counts and best score', async () => {
@@ -145,7 +146,7 @@ describe('StudentDashboard', () => {
     fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
-    expect(await screen.findByText(/1 test to finish/i)).toBeInTheDocument();
+    expect(await screen.findByText(/1 test.* in progress/i)).toBeInTheDocument();
   });
 
   it('shows a completed test without a resume link', async () => {
