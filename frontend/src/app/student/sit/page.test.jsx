@@ -52,7 +52,7 @@ async function startSitting(answers) {
 
   const select = await screen.findByLabelText(/who are you/i);
   fireEvent.change(select, { target: { value: 'entrant-1' } });
-  fireEvent.click(screen.getByRole('button', { name: /start sitting/i }));
+  fireEvent.click(screen.getByRole('button', { name: /start test/i }));
   await screen.findByLabelText(/answer for question q1/i);
   return view;
 }
@@ -60,12 +60,32 @@ async function startSitting(answers) {
 describe('SitPage auto-save (Story A3)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Native confirm dialogs default to "OK" so guarded actions run.
+    vi.stubGlobal('confirm', vi.fn(() => true));
     fetchRoundEntrants.mockResolvedValue([{ id: 'entrant-1', name: 'Alice', grade: '11' }]);
     saveSittingAnswers.mockResolvedValue({});
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('asks for confirmation before starting the test and stays when cancelled', async () => {
+    createSitting.mockResolvedValue(sittingResponse(null));
+    confirm.mockReturnValue(false);
+    render(<SitPage />);
+
+    const select = await screen.findByLabelText(/who are you/i);
+    fireEvent.change(select, { target: { value: 'entrant-1' } });
+    fireEvent.click(screen.getByRole('button', { name: /start test/i }));
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringMatching(/start this test now/i)
+    );
+    expect(createSitting).not.toHaveBeenCalled();
+    // Still on the name-picking phase
+    expect(screen.getByLabelText(/who are you/i)).toBeInTheDocument();
   });
 
   it('saves answers after typing and restores them after a refresh', async () => {
@@ -110,6 +130,8 @@ describe('SitPage auto-save (Story A3)', () => {
 describe('SitPage submit (Story A5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Native confirm dialogs default to "OK" so guarded actions run.
+    vi.stubGlobal('confirm', vi.fn(() => true));
     fetchRoundEntrants.mockResolvedValue([{ id: 'entrant-1', name: 'Alice', grade: '11' }]);
     saveSittingAnswers.mockResolvedValue({});
     submitSitting.mockResolvedValue({ submission: { id: 'sub-1' }, result: null });
@@ -117,20 +139,37 @@ describe('SitPage submit (Story A5)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it('submits the sitting and shows a confirmation', async () => {
+  it('submits the test and shows a confirmation', async () => {
     await startSitting({ q1: 'A', q2: 'B' });
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /submit sitting/i }));
+      fireEvent.click(screen.getByRole('button', { name: /submit test/i }));
     });
 
     expect(submitSitting).toHaveBeenCalledWith('sitting-1', 'mock-token');
     expect(screen.getByText(/submission received/i)).toBeTruthy();
     // The answer form is gone once submitted
     expect(screen.queryByLabelText(/answer for question q1/i)).toBeNull();
-    expect(screen.queryByRole('button', { name: /submit sitting/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /submit test/i })).toBeNull();
+  });
+
+  it('asks for confirmation before submitting and stays when cancelled', async () => {
+    await startSitting({ q1: 'A', q2: 'B' });
+    confirm.mockReturnValue(false);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /submit test/i }));
+    });
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringMatching(/you answered 2 of 2 questions/i)
+    );
+    expect(submitSitting).not.toHaveBeenCalled();
+    // The form is still there so the student can keep going
+    expect(screen.getByLabelText(/answer for question q1/i)).toBeTruthy();
   });
 
   it('flushes unsaved answers before submitting', async () => {
@@ -143,7 +182,7 @@ describe('SitPage submit (Story A5)', () => {
     });
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /submit sitting/i }));
+      fireEvent.click(screen.getByRole('button', { name: /submit test/i }));
     });
 
     expect(submitSitting).toHaveBeenCalledWith('sitting-1', 'mock-token');
@@ -153,14 +192,14 @@ describe('SitPage submit (Story A5)', () => {
   });
 
   it('shows the backend error and keeps the form when submission fails', async () => {
-    submitSitting.mockRejectedValue(new ApiError('Sitting already completed', 403));
+    submitSitting.mockRejectedValue(new ApiError('Test already completed', 403));
 
     await startSitting({ q1: 'A' });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /submit sitting/i }));
+      fireEvent.click(screen.getByRole('button', { name: /submit test/i }));
     });
 
-    expect(screen.getByText(/sitting already completed/i)).toBeTruthy();
+    expect(screen.getByText(/test already completed/i)).toBeTruthy();
     expect(screen.queryByText(/submission received/i)).toBeNull();
     // The form is still there so the student can retry
     expect(screen.getByLabelText(/answer for question q1/i)).toBeTruthy();

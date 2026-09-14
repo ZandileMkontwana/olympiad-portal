@@ -2,16 +2,34 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useClerk } from '@clerk/nextjs';
+import { useAuth, useClerk } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { listOlympiads } from '@/lib/api';
+import { listOlympiads, listSchoolEntrants, createEntrant } from '@/lib/api';
 
 export default function EducatorDashboard() {
   const { user, checking } = useRequireRole('educator');
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
 
   const [olympiads, setOlympiads] = useState([]);
   const [roundsStatus, setRoundsStatus] = useState('loading');
+
+  const [students, setStudents] = useState([]);
+  const [studentsStatus, setStudentsStatus] = useState('loading');
+  const [name, setName] = useState('');
+  const [grade, setGrade] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [studentsError, setStudentsError] = useState('');
+
+  async function fetchStudents(token) {
+    try {
+      const list = await listSchoolEntrants(token);
+      setStudents(list);
+      setStudentsStatus('ready');
+    } catch (err) {
+      setStudentsStatus('error');
+    }
+  }
 
   useEffect(() => {
     if (checking) return;
@@ -26,8 +44,14 @@ export default function EducatorDashboard() {
       }
     }
 
+    async function loadStudents() {
+      const token = await getToken();
+      await fetchStudents(token);
+    }
+
     fetchOlympiads();
-  }, [checking]);
+    loadStudents();
+  }, [checking, getToken]);
 
   if (checking) {
     return (
@@ -41,6 +65,29 @@ export default function EducatorDashboard() {
     await signOut({ redirectUrl: '/login' });
   }
 
+  async function handleAddStudent(event) {
+    event.preventDefault();
+    setStudentsError('');
+
+    if (!name.trim() || !grade.trim()) {
+      setStudentsError('Name and grade are required.');
+      return;
+    }
+
+    setAdding(true);
+    try {
+      const token = await getToken();
+      await createEntrant({ name: name.trim(), grade: grade.trim() }, token);
+      setName('');
+      setGrade('');
+      await fetchStudents(token);
+    } catch (err) {
+      setStudentsError(err.message || 'Could not add student.');
+    } finally {
+      setAdding(false);
+    }
+  }
+
   // Educators work with rounds - only show olympiads that have at least one.
   const olympiadsWithRounds = olympiads.filter((olympiad) => olympiad.rounds.length > 0);
 
@@ -52,10 +99,77 @@ export default function EducatorDashboard() {
       </p>
 
       <div className="card" style={{ display: 'flex', gap: '12px' }}>
+        <Link href="/educator/school" className="button" style={{ textDecoration: 'none' }}>
+          School Dashboard
+        </Link>
         <button onClick={handleLogout} className="button">
           Log out
         </button>
       </div>
+
+      <h2 style={{ marginTop: '24px' }}>My Students</h2>
+
+      {studentsStatus === 'loading' && <p className="description">Loading students...</p>}
+
+      {studentsStatus === 'error' && (
+        <p className="message">Couldn&apos;t load students. Try refreshing the page.</p>
+      )}
+
+      {studentsStatus === 'ready' && (
+        <div className="card" style={{ marginTop: '12px' }}>
+          {students.length === 0 ? (
+            <p className="description" style={{ margin: 0 }}>
+              No students yet. Add a student below so they can register and sit rounds.
+            </p>
+          ) : (
+            <ul style={{ margin: 0, paddingLeft: '20px' }}>
+              {students.map((student) => (
+                <li key={student.id} className="description" style={{ marginBottom: '4px' }}>
+                  {student.name} — Grade {student.grade}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form onSubmit={handleAddStudent} style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Student name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{
+                flex: '1 1 160px',
+                padding: '10px 12px',
+                border: '1px solid var(--border-lavender)',
+                borderRadius: '8px',
+                fontSize: '15px',
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Grade"
+              value={grade}
+              onChange={(e) => setGrade(e.target.value)}
+              style={{
+                flex: '0 1 90px',
+                padding: '10px 12px',
+                border: '1px solid var(--border-lavender)',
+                borderRadius: '8px',
+                fontSize: '15px',
+              }}
+            />
+            <button type="submit" disabled={adding} className="button">
+              {adding ? 'Adding...' : 'Add student'}
+            </button>
+          </form>
+
+          {studentsError && (
+            <p className="message" style={{ marginTop: '8px', marginBottom: 0 }}>
+              {studentsError}
+            </p>
+          )}
+        </div>
+      )}
 
       <h2 style={{ marginTop: '24px' }}>Rounds</h2>
 

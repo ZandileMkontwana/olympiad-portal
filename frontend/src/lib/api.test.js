@@ -13,6 +13,10 @@ import {
   createEntrant,
   registerRoundEntrant,
   submitSitting,
+  listSchools,
+  fetchMySittings,
+  fetchMyResults,
+  fetchMyResult,
   dashboardPathForRole,
 } from './api';
 
@@ -474,6 +478,97 @@ describe('api client', () => {
     });
   });
 
+  describe('listSchools', () => {
+    it('fetches the school list from /api/schools', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([
+          { id: 'school-1', name: 'Alpha School' },
+          { id: 'school-2', name: 'Beta School' },
+        ]),
+      });
+
+      const result = await listSchools();
+
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('Alpha School');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/schools',
+        expect.objectContaining({ credentials: 'include' })
+      );
+    });
+  });
+
+  describe('fetchMySittings', () => {
+    it('sends GET to /api/students/me/sittings with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 'sitting-1', round: { name: 'Round 1' } }]),
+      });
+
+      const result = await fetchMySittings('test-token');
+
+      expect(result[0].id).toBe('sitting-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/students/me/sittings',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('fetchMyResults', () => {
+    it('sends GET to /api/students/me/results with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 'result-1', score: 85 }]),
+      });
+
+      const result = await fetchMyResults('test-token');
+
+      expect(result[0].score).toBe(85);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/students/me/results',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('fetchMyResult', () => {
+    it('sends GET to /api/students/me/results/:id with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          id: 'result-1',
+          score: 80,
+          round: { id: 'round-1', name: 'Round 1' },
+          questions: [{ questionId: 'q1', correctAnswer: 'A', studentAnswer: 'A', isCorrect: true }],
+        }),
+      });
+
+      const result = await fetchMyResult('result-1', 'test-token');
+
+      expect(result.score).toBe(80);
+      expect(result.questions[0].isCorrect).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/students/me/results/result-1',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
   describe('dashboardPathForRole', () => {
     it('returns /organiser for organiser role', () => {
       expect(dashboardPathForRole('organiser')).toBe('/organiser');
@@ -481,6 +576,10 @@ describe('api client', () => {
 
     it('returns /educator for educator role', () => {
       expect(dashboardPathForRole('educator')).toBe('/educator');
+    });
+
+    it('returns /student for student role', () => {
+      expect(dashboardPathForRole('student')).toBe('/student');
     });
 
     it('returns /login for unknown role', () => {

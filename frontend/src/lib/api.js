@@ -90,6 +90,35 @@ export function fetchArchivedPapers() {
 }
 
 /**
+ * Lists every school registered on the platform (id + name only).
+ * Wired to GET /api/schools (backend/src/routes/schools.js).
+ * Used by the student registration form so students pick their school
+ * from a list instead of guessing the exact spelling their educator used.
+ *
+ * @returns {Promise<Array<{id: string, name: string}>>}
+ */
+export function listSchools() {
+  return requestJson('/api/schools');
+}
+
+/**
+ * Completes a student's profile by linking their Clerk account to an
+ * existing Entrant record matched by name + school.
+ * Wired to POST /api/students/complete-profile (backend/src/routes/auth.js).
+ *
+ * @param {{name: string, schoolName: string}} profile
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{id: string, email: string, role: string, name: string, school: string}>}
+ */
+export function completeStudentProfile({ name, schoolName }, token) {
+  return requestJson('/api/students/complete-profile', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, schoolName }),
+  });
+}
+
+/**
  * Fetches the entrants registered for a round.
  * Wired to GET /api/rounds/:id/entrants (backend/src/routes/rounds.js).
  *
@@ -268,9 +297,94 @@ export async function fetchCurrentUser(token) {
   }
 }
 
+/**
+ * Lists the signed-in student's own sittings, newest first.
+ * Wired to GET /api/students/me/sittings (backend/src/routes/students.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   entrantId: string,
+ *   roundId: string,
+ *   answers: object|null,
+ *   startedAt: string,
+ *   expiresAt: string,
+ *   completedAt: string|null,
+ *   round: { id: string, name: string, state: string, closeTime: string },
+ * }>>}
+ */
+export function fetchMySittings(token) {
+  return requestJson('/api/students/me/sittings', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Lists the signed-in student's released results, newest first.
+ * Wired to GET /api/students/me/results (backend/src/routes/students.js).
+ * Unreleased marks are never included.
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   score: number,
+ *   releasedAt: string,
+ *   submittedAt: string,
+ *   round: { id: string, name: string },
+ * }>>}
+ */
+export function fetchMyResults(token) {
+  return requestJson('/api/students/me/results', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Fetches one released result with a question-by-question review —
+ * the student's answer next to the correct answer for every question.
+ * Wired to GET /api/students/me/results/:resultId (backend/src/routes/students.js).
+ *
+ * @param {string} resultId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   id: string,
+ *   score: number,
+ *   submittedAt: string,
+ *   releasedAt: string,
+ *   round: { id: string, name: string },
+ *   paperFileUrl: string|null,
+ *   questions: Array<{questionId: string, correctAnswer: string, studentAnswer: string|null, isCorrect: boolean}>,
+ * }>}
+ */
+export function fetchMyResult(resultId, token) {
+  return requestJson(`/api/students/me/results/${resultId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Fetches the school dashboard (entrant stats, scores) for a given school.
+ * Wired to GET /api/schools/:id/dashboard (backend/src/routes/schools.js).
+ *
+ * @param {string} schoolId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   school: { id: string, name: string },
+ *   entrantCount: number,
+ *   totalSubmissions: number,
+ *   entrants: Array<{ id: string, name: string, grade: string, submissionCount: number, averageScore: number|null }>,
+ * }>}
+ */
+export function fetchSchoolDashboard(schoolId, token) {
+  return requestJson(`/api/schools/${schoolId}/dashboard`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export function dashboardPathForRole(role) {
   if (role === 'organiser') return '/organiser'; // TODO: confirm real path
   if (role === 'educator') return '/educator';
+  if (role === 'student') return '/student';
   return '/login';
 }
 

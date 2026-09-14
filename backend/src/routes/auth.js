@@ -27,7 +27,9 @@ router.post('/educators/complete-profile', requireAuth(), async (req, res) => {
     return res.status(400).json({ error: 'No email found on Clerk account' });
   }
 
-  let school = await prisma.school.findFirst({ where: { name: schoolName } });
+  let school = await prisma.school.findFirst({
+    where: { name: { equals: schoolName, mode: 'insensitive' } },
+  });
   if (!school) {
     school = await prisma.school.create({
       data: { name: schoolName, timezone: 'Africa/Johannesburg' },
@@ -53,9 +55,77 @@ router.post('/educators/complete-profile', requireAuth(), async (req, res) => {
       email: user.email,
       role: user.role,
       name: user.name,
-      school: user.educator.school.name,
+      school: { id: user.educator.school.id, name: user.educator.school.name },
     },
   });
+});
+
+// POST /students/complete-profile
+// Links a Clerk student account to an existing Entrant record,
+// matched by name + school (the entrant should already have been
+// created by an educator registering them for a round).
+router.post('/students/complete-profile', requireAuth(), async (req, res) => {
+  try {
+    const { userId: clerkUserId } = req.auth();
+    const { name, schoolName } = req.body;
+
+    if (!name || !schoolName) {
+      return res.status(400).json({ error: 'name and schoolName are required' });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { clerkUserId } });
+    if (existingUser) {
+      return res.status(409).json({ error: 'Profile already completed for this account' });
+    }
+
+    const school = await prisma.school.findFirst({
+      where: { name: { equals: schoolName, mode: 'insensitive' } },
+    });
+    if (!school) {
+      return res.status(404).json({ error: 'No school found with that name' });
+    }
+
+    const entrant = await prisma.entrant.findFirst({
+      where: {
+        name: { equals: name, mode: 'insensitive' },
+        schoolId: school.id,
+        userId: null,
+      },
+    });
+    if (!entrant) {
+      return res.status(404).json({ error: 'No unclaimed entrant record found matching that name and school' });
+    }
+
+    const clerkUser = await clerkClient.users.getUser(clerkUserId);
+    const email = clerkUser.emailAddresses[0] && clerkUser.emailAddresses[0].emailAddress;
+    if (!email) {
+      return res.status(400).json({ error: 'No email found on Clerk account' });
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        clerkUserId,
+        email,
+        role: 'student',
+        name,
+        entrant: { connect: { id: entrant.id } },
+      },
+      include: { entrant: { include: { school: true } } },
+    });
+
+    res.status(201).json({
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        school: { id: user.entrant.school.id, name: user.entrant.school.name },
+      },
+    });
+  } catch (err) {
+    console.error('Student complete-profile failed:', err);
+    res.status(500).json({ error: 'Could not complete profile. Please try again.' });
+  }
 });
 
 // GET /auth/me
@@ -64,12 +134,17 @@ router.get('/auth/me', requireAuth(), async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { clerkUserId },
-    include: { educator: { include: { school: true } } },
+    include: {
+      educator: { include: { school: true } },
+      entrant:  { include: { school: true } },
+    },
   });
 
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
+
+  const schoolRecord = user.educator?.school ?? user.entrant?.school ?? null;
 
   res.json({
     user: {
@@ -77,7 +152,7 @@ router.get('/auth/me', requireAuth(), async (req, res) => {
       email: user.email,
       role: user.role,
       name: user.name,
-      school: user.educator ? user.educator.school.name : null,
+      school: schoolRecord ? { id: schoolRecord.id, name: schoolRecord.name } : null,
     },
   });
 });

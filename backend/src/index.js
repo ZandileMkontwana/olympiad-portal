@@ -8,6 +8,8 @@ const roundsRouter = require('./routes/rounds');
 const submissionsRouter = require('./routes/submissions');
 const sittingsRouter = require('./routes/sittings');
 const entrantsRouter = require('./routes/entrants');
+const schoolsRouter = require('./routes/schools');
+const studentsRouter = require('./routes/students');
 const authRouter = require('./routes/auth');
 const certificatesRouter = require('./routes/certificates');
 const { startScheduler } = require('./scheduler');
@@ -32,8 +34,21 @@ app.use('/api', roundsRouter);
 app.use('/api', submissionsRouter);
 app.use('/api', sittingsRouter);
 app.use('/api', entrantsRouter);
+app.use('/api', schoolsRouter);
+app.use('/api', studentsRouter);
 app.use('/api', authRouter);
 app.use('/api', certificatesRouter);
+
+// JSON 404 for unmatched /api routes (prevents Express's default HTML response)
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });
+});
+
+// Global error handler — always returns JSON
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
+});
 
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
