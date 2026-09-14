@@ -120,8 +120,8 @@ describe('RegisterStudentPage', () => {
     );
   });
 
-  it('shows the backend error when no unclaimed entrant matches', async () => {
-    mockFetchError(404, 'No unclaimed entrant record found matching that name and school');
+  it('shows a helpful error when no student record matches (404)', async () => {
+    mockFetchError(404, 'No student record found matching your name and school. Ask your educator to add you to the school first.');
     render(<RegisterStudentPage />);
 
     const select = await screen.findByLabelText(/school/i);
@@ -132,6 +132,6 @@ describe('RegisterStudentPage', () => {
     fireEvent.change(select, { target: { value: 'Test School' } });
     fireEvent.click(screen.getByRole('button', { name: /finish setup/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no unclaimed entrant/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/educator must add you to the school/i);
   });
 });

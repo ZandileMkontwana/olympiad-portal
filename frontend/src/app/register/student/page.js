@@ -69,7 +69,14 @@ function CompleteProfileForm() {
       setStatus('success');
     } catch (err) {
       setStatus('error');
-      setErrorMessage(err.message || 'Something went wrong.');
+      if (err.status === 404) {
+        setErrorMessage(
+          'No student record found matching your name and school. ' +
+          'Your educator must add you to the school before you can create an account.'
+        );
+      } else {
+        setErrorMessage(err.message || 'Something went wrong.');
+      }
     }
   }
 

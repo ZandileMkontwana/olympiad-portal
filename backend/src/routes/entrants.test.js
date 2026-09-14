@@ -28,6 +28,8 @@ describe('Entrants routes', () => {
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.entrant, 'create');
     vi.spyOn(prisma.entrant, 'findMany');
+    vi.spyOn(prisma.round, 'findMany');
+    vi.spyOn(prisma.roundEntrant, 'createMany');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: the Clerk user maps to an educator linked to school-1
     prisma.user.findUnique.mockResolvedValue({
@@ -99,12 +101,42 @@ describe('Entrants routes', () => {
         name: 'Alice',
         grade: '10',
       });
+      prisma.round.findMany.mockResolvedValue([]);
       const res = await request(app).post('/api/entrants').send({ name: ' Alice ', grade: '10' });
 
       expect(res.status).toBe(201);
       expect(res.body.name).toBe('Alice');
       expect(prisma.entrant.create).toHaveBeenCalledWith({
         data: { name: 'Alice', grade: '10', schoolId: 'school-1' },
+      });
+    });
+
+    it('auto-registers the new entrant for all open rounds', async () => {
+      prisma.entrant.create.mockResolvedValue({
+        id: 'entrant-1',
+        schoolId: 'school-1',
+        name: 'Alice',
+        grade: '10',
+      });
+      prisma.round.findMany.mockResolvedValue([
+        { id: 'round-1' },
+        { id: 'round-2' },
+      ]);
+      prisma.roundEntrant.createMany.mockResolvedValue({ count: 2 });
+
+      const res = await request(app).post('/api/entrants').send({ name: 'Alice', grade: '10' });
+
+      expect(res.status).toBe(201);
+      expect(prisma.round.findMany).toHaveBeenCalledWith({
+        where: { state: 'open' },
+        select: { id: true },
+      });
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [
+          { roundId: 'round-1', entrantId: 'entrant-1' },
+          { roundId: 'round-2', entrantId: 'entrant-1' },
+        ],
+        skipDuplicates: true,
       });
     });
 

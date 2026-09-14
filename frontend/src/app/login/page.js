@@ -70,7 +70,10 @@ export default function LoginPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <Link href="/register" className="button" style={{ textDecoration: 'none', textAlign: 'center' }}>
-                Complete Your Profile
+                Complete Educator Profile
+              </Link>
+              <Link href="/register/student" className="button" style={{ textDecoration: 'none', textAlign: 'center' }}>
+                Complete Student Profile
               </Link>
               <button
                 onClick={() => signOut({ redirectUrl: '/login' })}
