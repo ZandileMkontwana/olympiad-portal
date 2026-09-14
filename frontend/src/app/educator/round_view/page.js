@@ -170,6 +170,9 @@ function RoundViewContent() {
                   className="button"
                   disabled={releaseStatus === 'releasing'}
                   onClick={async () => {
+                    if (!window.confirm(
+                      'Are you sure you want to release results? Students will immediately be able to see their marks.'
+                    )) return;
                     setReleaseStatus('releasing');
                     setReleaseMessage('');
                     try {
