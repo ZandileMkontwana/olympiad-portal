@@ -185,30 +185,30 @@ function RoundViewContent() {
 
   if (!roundId) {
     return (
-      <main className="round-page">
+      <div className="round-page">
         <div className="message">No round ID was provided.</div>
-      </main>
+      </div>
     );
   }
 
   if (loading) {
     return (
-      <main className="round-page">
+      <div className="round-page">
         <p>Loading round...</p>
-      </main>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <main className="round-page">
+      <div className="round-page">
         <div className="message">{error}</div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="round-page">
+    <div className="round-page">
       <div className="round-header">
         <h1>{round.name}</h1>
 
@@ -398,12 +398,12 @@ function RoundViewContent() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }
 export default function RoundViewPage() {
   return (
-    <Suspense fallback={<main className="round-page">Loading round...</main>}>
+    <Suspense fallback={<div className="round-page">Loading round...</div>}>
       <RoundViewContent />
     </Suspense>
   );

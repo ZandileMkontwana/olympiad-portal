@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 // Mutable hook state — individual tests override before rendering.
 const authState = vi.hoisted(() => ({
-  user: { id: 'user-1', email: 'student@school.com', role: 'student', name: 'Thabo', school: { id: 'school-1', name: 'Test School' }, entrantId: 'entrant-1' },
+  user: {
+    id: 'user-1',
+    email: 'student@school.com',
+    role: 'student',
+    name: 'Thabo',
+    school: { id: 'school-1', name: 'Test School' },
+    entrantId: 'entrant-1',
+  },
   checking: true,
 }));
 
 const mocks = vi.hoisted(() => ({
-  signOut: vi.fn().mockResolvedValue(undefined),
   // Stable reference — the data-loading effect depends on getToken.
   getToken: vi.fn().mockResolvedValue('mock-token'),
 }));
@@ -18,7 +24,6 @@ vi.mock('@/hooks/useStudentAuth', () => ({
     user: authState.user,
     checking: authState.checking,
     getToken: mocks.getToken,
-    signOut: mocks.signOut,
   }),
 }));
 
@@ -63,7 +68,10 @@ describe('StudentDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Native confirm dialogs default to "OK" so guarded actions run.
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true)
+    );
     authState.checking = false;
     authState.user = {
       id: 'user-1',
@@ -127,7 +135,10 @@ describe('StudentDashboard', () => {
 
   it('shows stat cards with counts and best score', async () => {
     fetchMySittings.mockResolvedValue([sitting(), sitting({ id: 'sitting-2', completedAt: PAST })]);
-    fetchMyResults.mockResolvedValue([result({ score: 85 }), result({ id: 'result-2', score: 60 })]);
+    fetchMyResults.mockResolvedValue([
+      result({ score: 85 }),
+      result({ id: 'result-2', score: 60 }),
+    ]);
     fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
@@ -197,29 +208,54 @@ describe('StudentDashboard', () => {
     expect(viewTest).toHaveAttribute('href', '/student/result?id=result-1');
   });
 
-  it('shows available rounds with a start-test link', async () => {
+  it('shows rounds not yet started with a Not started chip and a start-test link', async () => {
     fetchMySittings.mockResolvedValue([]);
     fetchMyResults.mockResolvedValue([]);
     fetchMyRounds.mockResolvedValue([
-      { round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: FUTURE }, sitting: null },
+      {
+        round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: FUTURE },
+        sitting: null,
+      },
     ]);
     render(<StudentDashboard />);
 
-    expect(await screen.findByText(/available tests/i)).toBeInTheDocument();
-    expect(screen.getByText('Round 1')).toBeInTheDocument();
+    // One unified "My tests" list — started and not-started tests together.
+    expect(await screen.findByText('Round 1')).toBeInTheDocument();
+    expect(screen.getByText('Not started')).toBeInTheDocument();
     const startLink = screen.getByRole('link', { name: /start test/i });
     expect(startLink).toHaveAttribute('href', '/student/sit?id=round-1');
   });
 
-  it('hides available rounds that already have a sitting', async () => {
+  it('shows started and not-started tests in one list, urgent first', async () => {
     fetchMySittings.mockResolvedValue([sitting()]);
     fetchMyResults.mockResolvedValue([]);
     fetchMyRounds.mockResolvedValue([
-      { round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: FUTURE }, sitting: { id: 'sitting-1' } },
+      {
+        round: { id: 'round-2', name: 'Round 2', state: 'open', closeTime: FUTURE },
+        sitting: null,
+      },
     ]);
     render(<StudentDashboard />);
 
-    // The round appears in "My tests" but not in "Available tests"
+    const listItems = await screen.findAllByRole('listitem');
+    expect(listItems).toHaveLength(2);
+    // In-progress test sorts above the not-started one.
+    expect(listItems[0]).toHaveTextContent('In progress');
+    expect(listItems[1]).toHaveTextContent('Not started');
+  });
+
+  it('hides the start link when a round already has a sitting', async () => {
+    fetchMySittings.mockResolvedValue([sitting()]);
+    fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([
+      {
+        round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: FUTURE },
+        sitting: { id: 'sitting-1' },
+      },
+    ]);
+    render(<StudentDashboard />);
+
+    // The round appears once in "My tests" with a Resume link, never a Start link
     expect(await screen.findByText('Round 1')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /start test/i })).not.toBeInTheDocument();
   });
@@ -231,29 +267,5 @@ describe('StudentDashboard', () => {
     render(<StudentDashboard />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't load your tests/i);
-  });
-
-  it('signs the student out when clicking log out and confirming', async () => {
-    fetchMySittings.mockResolvedValue([]);
-    fetchMyResults.mockResolvedValue([]);
-    fetchMyRounds.mockResolvedValue([]);
-    render(<StudentDashboard />);
-
-    fireEvent.click(await screen.findByRole('button', { name: /log out/i }));
-    await vi.waitFor(() => {
-      expect(mocks.signOut).toHaveBeenCalledWith({ redirectUrl: '/login' });
-    });
-  });
-
-  it('asks for confirmation before logging out and stays when cancelled', async () => {
-    confirm.mockReturnValue(false);
-    fetchMySittings.mockResolvedValue([]);
-    fetchMyResults.mockResolvedValue([]);
-    fetchMyRounds.mockResolvedValue([]);
-    render(<StudentDashboard />);
-
-    fireEvent.click(await screen.findByRole('button', { name: /log out/i }));
-    expect(confirm).toHaveBeenCalledWith('Log out of the Olympiad Portal?');
-    expect(mocks.signOut).not.toHaveBeenCalled();
   });
 });

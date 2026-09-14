@@ -28,7 +28,7 @@ vi.mock('@clerk/nextjs', () => ({
 vi.mock('@/lib/api', () => ({
   studentLogin: vi.fn(),
   dashboardPathForRole: (role) =>
-    ({ organiser: '/organiser', educator: '/educator', student: '/student' }[role] || '/login'),
+    ({ organiser: '/organiser', educator: '/educator', student: '/student' })[role] || '/login',
 }));
 
 // Mutable stored-session state — the page redirects on a live session.
@@ -60,7 +60,8 @@ describe('Login page', () => {
   it('shows the Student tab by default with email and password fields', () => {
     render(<LoginPage />);
 
-    expect(screen.getByRole('tab', { name: 'Student' })).toHaveAttribute('aria-selected', 'true');
+    // The tab labels carry emoji ("🎓 Student") — match on the word.
+    expect(screen.getByRole('tab', { name: /student/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText(/student email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
@@ -156,6 +157,8 @@ describe('Login page', () => {
   it('tells students without a password to check their invitation email', () => {
     render(<LoginPage />);
 
-    expect(screen.getByText(/educator registers you and emails an invitation link/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/educator registers you and emails an invitation link/i)
+    ).toBeInTheDocument();
   });
 });

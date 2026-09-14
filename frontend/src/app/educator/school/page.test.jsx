@@ -16,9 +16,33 @@ const mockDashboard = {
   entrantCount: 3,
   totalSubmissions: 5,
   entrants: [
-    { id: 'e1', name: 'Alice Alpha', grade: '10', submissionCount: 2, averageScore: 85, email: 'alice@school.com', accountStatus: 'active' },
-    { id: 'e2', name: 'Bob Beta', grade: '11', submissionCount: 2, averageScore: 60, email: 'bob@school.com', accountStatus: 'invite_pending' },
-    { id: 'e3', name: 'Carol Gamma', grade: '10', submissionCount: 1, averageScore: null, email: null, accountStatus: null },
+    {
+      id: 'e1',
+      name: 'Alice Alpha',
+      grade: '10',
+      submissionCount: 2,
+      averageScore: 85,
+      email: 'alice@school.com',
+      accountStatus: 'active',
+    },
+    {
+      id: 'e2',
+      name: 'Bob Beta',
+      grade: '11',
+      submissionCount: 2,
+      averageScore: 60,
+      email: 'bob@school.com',
+      accountStatus: 'invite_pending',
+    },
+    {
+      id: 'e3',
+      name: 'Carol Gamma',
+      grade: '10',
+      submissionCount: 1,
+      averageScore: null,
+      email: null,
+      accountStatus: null,
+    },
   ],
 };
 
@@ -39,7 +63,11 @@ vi.mock('@clerk/nextjs', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, ...rest }) => <a href={href} {...rest}>{children}</a>,
+  default: ({ href, children, ...rest }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
 }));
 
 vi.mock('@/hooks/useRequireRole', () => ({
@@ -71,7 +99,10 @@ function setupChecking() {
 
 describe('School Dashboard Page', () => {
   beforeEach(() => {
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true)
+    );
     vi.clearAllMocks();
     fetchSchoolDashboard.mockResolvedValue(mockDashboard);
     setupUser();
@@ -120,8 +151,7 @@ describe('School Dashboard Page', () => {
   it('renders the school name in the hero', async () => {
     render(<SchoolDashboardPage />);
     await waitFor(() => {
-      // 'Testville High' appears in both sidebar and hero h1
-      expect(screen.getAllByText('Testville High').length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText('Testville High')).toBeTruthy();
     });
   });
 
@@ -153,7 +183,15 @@ describe('School Dashboard Page', () => {
     const noScores = {
       ...mockDashboard,
       entrants: [
-        { id: 'e1', name: 'Alice Alpha', grade: '10', submissionCount: 0, averageScore: null, email: 'alice@school.com', accountStatus: 'active' },
+        {
+          id: 'e1',
+          name: 'Alice Alpha',
+          grade: '10',
+          submissionCount: 0,
+          averageScore: null,
+          email: 'alice@school.com',
+          accountStatus: 'active',
+        },
       ],
     };
     fetchSchoolDashboard.mockResolvedValue(noScores);
@@ -238,36 +276,8 @@ describe('School Dashboard Page', () => {
     });
   });
 
-  // ── navigation links ────────────────────────────────────────────────────
-
-  it('has a sidebar link to rounds', async () => {
-    render(<SchoolDashboardPage />);
-    await waitFor(() => {
-      const link = screen.getByText('Rounds');
-      expect(link.closest('a').getAttribute('href')).toBe('/educator');
-    });
-  });
-
-  it('has a sidebar link to paper archive', async () => {
-    render(<SchoolDashboardPage />);
-    await waitFor(() => {
-      const link = screen.getByText('Paper Archive');
-      expect(link.closest('a').getAttribute('href')).toBe('/archive');
-    });
-  });
-
-  // ── logout ───────────────────────────────────────────────────────────────
-
-  it('calls signOut when log out is clicked (after confirm)', async () => {
-    render(<SchoolDashboardPage />);
-    await waitFor(() => {
-      expect(screen.getByText(/Welcome back/)).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByText('Log out'));
-    expect(global.confirm).toHaveBeenCalledWith('Are you sure you want to log out?');
-    expect(mockSignOut).toHaveBeenCalledWith({ redirectUrl: '/login' });
-  });
+  // ── navigation: the shared sidebar lives in app/educator/layout.js and is
+  // covered by components/EducatorSidebar.test.jsx ────────────────────────
 
   // ── fetchSchoolDashboard called with correct args ────────────────────────
 
@@ -376,7 +386,13 @@ describe('School Dashboard Page', () => {
   });
 
   it('calls createEntrant when adding a student (after confirm)', async () => {
-    createEntrant.mockResolvedValue({ id: 'e4', name: 'New Kid', grade: '10', schoolId: 'school-1', invitationSent: true });
+    createEntrant.mockResolvedValue({
+      id: 'e4',
+      name: 'New Kid',
+      grade: '10',
+      schoolId: 'school-1',
+      invitationSent: true,
+    });
     fetchSchoolDashboard.mockResolvedValue({
       school: { id: 'school-1', name: 'Testville High' },
       entrantCount: 0,
@@ -389,7 +405,9 @@ describe('School Dashboard Page', () => {
     });
 
     fireEvent.change(screen.getByPlaceholderText('Student name'), { target: { value: 'New Kid' } });
-    fireEvent.change(screen.getByPlaceholderText('Student email'), { target: { value: 'newkid@school.com' } });
+    fireEvent.change(screen.getByPlaceholderText('Student email'), {
+      target: { value: 'newkid@school.com' },
+    });
     fireEvent.change(screen.getByDisplayValue('Grade'), { target: { value: '10' } });
     fireEvent.click(screen.getByText('Add Student'));
 
@@ -444,7 +462,7 @@ describe('School Dashboard Page', () => {
 
   // ── account status + resend invite ────────────────────────────────────
 
-  it('shows each entrant\'s email on their card', async () => {
+  it("shows each entrant's email on their card", async () => {
     render(<SchoolDashboardPage />);
     await waitFor(() => {
       expect(screen.getByText('alice@school.com')).toBeTruthy();
@@ -473,9 +491,9 @@ describe('School Dashboard Page', () => {
     // buttons; Alice (active) has none.
     expect(screen.getByRole('button', { name: 'Resend invite' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Send invite' })).toBeTruthy();
-    const inviteButtons = screen.getAllByRole('button').filter(
-      (btn) => /invite/i.test(btn.textContent)
-    );
+    const inviteButtons = screen
+      .getAllByRole('button')
+      .filter((btn) => /invite/i.test(btn.textContent));
     expect(inviteButtons).toHaveLength(2);
   });
 
@@ -500,7 +518,10 @@ describe('School Dashboard Page', () => {
   });
 
   it('prompts for an email when inviting a legacy entrant without an account', async () => {
-    vi.stubGlobal('prompt', vi.fn(() => 'carol@school.com'));
+    vi.stubGlobal(
+      'prompt',
+      vi.fn(() => 'carol@school.com')
+    );
     resendEntrantInvite.mockResolvedValue({ message: 'Invitation sent', invitationSent: true });
     render(<SchoolDashboardPage />);
     await waitFor(() => {
