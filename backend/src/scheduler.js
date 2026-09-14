@@ -81,6 +81,21 @@ const roundIncludeForNotifications = {
   },
 };
 
+// Same as roundIncludeForNotifications, plus each entrant's submissions —
+// needed to spot which entrants haven't submitted yet.
+const roundIncludeForMissingSubmissions = {
+  roundEntrants: {
+    include: {
+      entrant: {
+        include: {
+          school: { include: { educators: { include: { user: true } } } },
+          submissions: true,
+        },
+      },
+    },
+  },
+};
+
 async function sendBeforeOpenNotifications(now) {
   const windowEnd = new Date(now.getTime() + NOTIFY_BEFORE_OPEN_MS);
 
@@ -196,18 +211,7 @@ async function sendResultsReleasedNotifications() {
 async function sendMissingSubmissionNotifications() {
   const recentlyClosedRounds = await prisma.round.findMany({
     where: { state: 'closed' },
-    include: {
-      roundEntrants: {
-        include: {
-          entrant: {
-            include: {
-              school: { include: { educators: { include: { user: true } } } },
-              submissions: true,
-            },
-          },
-        },
-      },
-    },
+    include: roundIncludeForMissingSubmissions,
   });
 
   for (const round of recentlyClosedRounds) {
@@ -248,4 +252,13 @@ async function sendMissingSubmissionNotifications() {
   }
 }
 
-module.exports = { startScheduler };
+// getRecipientsForRound, isTriggerEnabled and the include shapes are exported
+// so the notification dry-run route (routes/rounds.js) can reuse the exact
+// same recipient + enablement logic the scheduler runs on.
+module.exports = {
+  startScheduler,
+  getRecipientsForRound,
+  isTriggerEnabled,
+  roundIncludeForNotifications,
+  roundIncludeForMissingSubmissions,
+};

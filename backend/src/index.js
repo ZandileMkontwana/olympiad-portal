@@ -9,6 +9,7 @@ const submissionsRouter = require('./routes/submissions');
 const sittingsRouter = require('./routes/sittings');
 const entrantsRouter = require('./routes/entrants');
 const authRouter = require('./routes/auth');
+const certificatesRouter = require('./routes/certificates');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
 
@@ -32,6 +33,7 @@ app.use('/api', submissionsRouter);
 app.use('/api', sittingsRouter);
 app.use('/api', entrantsRouter);
 app.use('/api', authRouter);
+app.use('/api', certificatesRouter);
 
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;

@@ -20,14 +20,23 @@ async function sendSubmissionReceipt({ toEmail, entrantName, roundName, submitte
   }
 }
 
+// Message template for the "round opening soon" notification. Kept separate
+// from the send + log logic so the dry-run route can preview the exact
+// email the scheduler would send.
+function buildRoundOpeningMessage({ roundName, opensAt }) {
+  return {
+    subject: `${roundName} opens soon`,
+    text: `${roundName} opens at ${opensAt}. Make sure you're ready to download the paper once it opens.`,
+    html: `<p><strong>${roundName}</strong> opens at ${opensAt}. Make sure you're ready to download the paper once it opens.</p>`,
+  };
+}
+
 // Sends a "round opening soon" notification and logs the attempt.
 async function sendRoundOpeningNotification({ toEmail, roundId, roundName, opensAt, entrantId }) {
   const msg = {
     to: toEmail,
     from: process.env.SENDGRID_FROM_EMAIL,
-    subject: `${roundName} opens soon`,
-    text: `${roundName} opens at ${opensAt}. Make sure you're ready to download the paper once it opens.`,
-    html: `<p><strong>${roundName}</strong> opens at ${opensAt}. Make sure you're ready to download the paper once it opens.</p>`,
+    ...buildRoundOpeningMessage({ roundName, opensAt }),
   };
 
   try {
@@ -57,14 +66,23 @@ async function sendRoundOpeningNotification({ toEmail, roundId, roundName, opens
   }
 }
 
+// Message template for the "round closing soon" notification. Kept separate
+// from the send + log logic so the dry-run route can preview the exact
+// email the scheduler would send.
+function buildRoundClosingMessage({ roundName, closesAt }) {
+  return {
+    subject: `${roundName} closes soon`,
+    text: `${roundName} closes at ${closesAt}. Make sure your submission is in before then.`,
+    html: `<p><strong>${roundName}</strong> closes at ${closesAt}. Make sure your submission is in before then.</p>`,
+  };
+}
+
 // Sends a "round closing soon" notification and logs the attempt.
 async function sendRoundClosingNotification({ toEmail, roundId, roundName, closesAt, entrantId }) {
   const msg = {
     to: toEmail,
     from: process.env.SENDGRID_FROM_EMAIL,
-    subject: `${roundName} closes soon`,
-    text: `${roundName} closes at ${closesAt}. Make sure your submission is in before then.`,
-    html: `<p><strong>${roundName}</strong> closes at ${closesAt}. Make sure your submission is in before then.</p>`,
+    ...buildRoundClosingMessage({ roundName, closesAt }),
   };
 
   try {
@@ -94,14 +112,23 @@ async function sendRoundClosingNotification({ toEmail, roundId, roundName, close
   }
 }
 
+// Message template for the "results released" notification. Kept separate
+// from the send + log logic so the dry-run route can preview the exact
+// email the scheduler would send.
+function buildResultsReleasedMessage({ roundName }) {
+  return {
+    subject: `Results are out for ${roundName}`,
+    text: `Results for ${roundName} have been released. Log in to view them.`,
+    html: `<p>Results for <strong>${roundName}</strong> have been released. Log in to view them.</p>`,
+  };
+}
+
 // Sends a "results released" notification and logs the attempt.
 async function sendResultsReleasedNotification({ toEmail, roundId, roundName, entrantId }) {
   const msg = {
     to: toEmail,
     from: process.env.SENDGRID_FROM_EMAIL,
-    subject: `Results are out for ${roundName}`,
-    text: `Results for ${roundName} have been released. Log in to view them.`,
-    html: `<p>Results for <strong>${roundName}</strong> have been released. Log in to view them.</p>`,
+    ...buildResultsReleasedMessage({ roundName }),
   };
 
   try {
@@ -131,14 +158,23 @@ async function sendResultsReleasedNotification({ toEmail, roundId, roundName, en
   }
 }
 
+// Message template for the "missing submission" notification. Kept separate
+// from the send + log logic so the dry-run route can preview the exact
+// email the scheduler would send.
+function buildMissingSubmissionMessage({ roundName, entrantName }) {
+  return {
+    subject: `Missing submission for ${entrantName} - ${roundName}`,
+    text: `${roundName} has closed and no submission was received for ${entrantName}.`,
+    html: `<p><strong>${roundName}</strong> has closed and no submission was received for <strong>${entrantName}</strong>.</p>`,
+  };
+}
+
 // Sends a "missing submission" notification and logs the attempt.
 async function sendMissingSubmissionNotification({ toEmail, roundId, roundName, entrantName, entrantId }) {
   const msg = {
     to: toEmail,
     from: process.env.SENDGRID_FROM_EMAIL,
-    subject: `Missing submission for ${entrantName} - ${roundName}`,
-    text: `${roundName} has closed and no submission was received for ${entrantName}.`,
-    html: `<p><strong>${roundName}</strong> has closed and no submission was received for <strong>${entrantName}</strong>.</p>`,
+    ...buildMissingSubmissionMessage({ roundName, entrantName }),
   };
 
   try {
@@ -161,4 +197,8 @@ module.exports = {
   sendRoundClosingNotification,
   sendResultsReleasedNotification,
   sendMissingSubmissionNotification,
+  buildRoundOpeningMessage,
+  buildRoundClosingMessage,
+  buildResultsReleasedMessage,
+  buildMissingSubmissionMessage,
 };

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 
 function formatRemaining(ms) {
@@ -19,12 +20,16 @@ function formatRemaining(ms) {
 function RoundViewContent() {
   const searchParams = useSearchParams();
   const roundId = searchParams.get('id');
+  const { getToken } = useAuth();
 
   const [round, setRound] = useState(null);
   const [loading, setLoading] = useState(!!roundId);
   const [error, setError] = useState('');
   const [downloadError, setDownloadError] = useState('');
   const [timeRemaining, setTimeRemaining] = useState('');
+  const [certificateEntrants, setCertificateEntrants] = useState([]);
+  const [certificateError, setCertificateError] = useState('');
+  const [certificateLoading, setCertificateLoading] = useState(false);
 
   useEffect(() => {
     if (!roundId) return;
@@ -71,6 +76,55 @@ function RoundViewContent() {
     return () => clearInterval(countdownInterval);
   }, [round?.closeTime]);
 
+  // Fetch school entrants + submissions when round is released
+  useEffect(() => {
+    if (!roundId || round?.state !== 'released') return;
+
+    async function loadCertificateData() {
+      setCertificateLoading(true);
+      setCertificateError('');
+      try {
+        const token = await getToken();
+
+        const [entrantsRes, submissionsRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/entrants`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/submissions`),
+        ]);
+
+        if (!entrantsRes.ok) throw new Error('Could not load school entrants');
+        if (!submissionsRes.ok) throw new Error('Could not load submissions');
+
+        const [entrants, submissions] = await Promise.all([
+          entrantsRes.json(),
+          submissionsRes.json(),
+        ]);
+
+        // Build a lookup: entrantId -> score (only for submissions with a result)
+        const resultsByEntrant = new Map();
+        for (const sub of submissions) {
+          if (sub.result) {
+            resultsByEntrant.set(sub.entrantId, sub.result.score);
+          }
+        }
+
+        // Only show entrants who have a result
+        const withResults = entrants
+          .filter((e) => resultsByEntrant.has(e.id))
+          .map((e) => ({ ...e, score: resultsByEntrant.get(e.id) }));
+
+        setCertificateEntrants(withResults);
+      } catch (err) {
+        setCertificateError(err.message);
+      } finally {
+        setCertificateLoading(false);
+      }
+    }
+
+    loadCertificateData();
+  }, [roundId, round?.state, getToken]);
+
   async function handleDownload() {
     setDownloadError('');
     try {
@@ -86,6 +140,35 @@ function RoundViewContent() {
       window.location.href = `${process.env.NEXT_PUBLIC_API_BASE_URL}${data.fileUrl}`;
     } catch (error) {
       setDownloadError(error.message);
+    }
+  }
+
+  async function handleCertificateDownload(entrantId) {
+    try {
+      const token = await getToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/certificates/${entrantId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to download certificate');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      a.download = match ? match[1] : 'certificate.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setCertificateError(err.message);
     }
   }
 
@@ -154,6 +237,56 @@ function RoundViewContent() {
             <Link href={`/educator/submit?id=${roundId}`} className="button">
               Submit Results
             </Link>
+          </>
+        )}
+
+        {round.state === 'released' && (
+          <>
+            <h3 style={{ marginTop: '16px' }}>Certificates</h3>
+
+            {certificateLoading && (
+              <p className="description">Loading results...</p>
+            )}
+
+            {certificateError && (
+              <p className="message">{certificateError}</p>
+            )}
+
+            {!certificateLoading && certificateEntrants.length === 0 && !certificateError && (
+              <p className="description">
+                No certificates available yet — results have not been recorded for your students.
+              </p>
+            )}
+
+            {certificateEntrants.length > 0 && (
+              <ul style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', padding: 0, listStyle: 'none' }}>
+                {certificateEntrants.map((entrant) => (
+                  <li
+                    key={entrant.id}
+                    className="card"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                    }}
+                  >
+                    <div>
+                      <strong>{entrant.name}</strong>
+                      <span style={{ marginLeft: '12px', color: '#6b7280', fontSize: '0.9em' }}>
+                        Score: {entrant.score}
+                      </span>
+                    </div>
+                    <button
+                      className="button"
+                      onClick={() => handleCertificateDownload(entrant.id)}
+                    >
+                      Download Certificate
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </>
         )}
       </div>
