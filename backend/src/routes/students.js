@@ -43,6 +43,45 @@ router.get('/students/me/sittings', ...requireRole('student'), async (req, res) 
   }
 });
 
+// GET /students/me/rounds
+// Lists open rounds the student is registered for (via RoundEntrant),
+// with an optional sitting record if they've already started the test.
+router.get('/students/me/rounds', ...requireRole('student'), async (req, res) => {
+  try {
+    const entrant = await loadEntrant(req, res);
+    if (!entrant) return;
+
+    const registrations = await prisma.roundEntrant.findMany({
+      where: {
+        entrantId: entrant.id,
+        round: { state: 'open' },
+      },
+      include: {
+        round: {
+          select: { id: true, name: true, state: true, closeTime: true },
+        },
+      },
+      orderBy: { registeredAt: 'desc' },
+    });
+
+    // For each open round, check if the student already has a sitting
+    const roundsWithStatus = await Promise.all(
+      registrations.map(async (reg) => {
+        const sitting = await prisma.sitting.findFirst({
+          where: { roundId: reg.round.id, entrantId: entrant.id },
+          select: { id: true, completedAt: true, startedAt: true, expiresAt: true },
+        });
+        return { round: reg.round, sitting };
+      })
+    );
+
+    res.json(roundsWithStatus);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch rounds' });
+  }
+});
+
 // GET /students/me/results
 // Lists the student's own released results — a submission result is only
 // visible once its releasedAt is set, so unreleased marks stay hidden.

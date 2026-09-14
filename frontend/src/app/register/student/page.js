@@ -69,7 +69,12 @@ function CompleteProfileForm() {
       setStatus('success');
     } catch (err) {
       setStatus('error');
-      if (err.status === 404) {
+      if (err.status === 409) {
+        setErrorMessage(
+          'This account already has a profile. Each person can only have one role per account. ' +
+          'If you need a student account, please sign out and create a separate Clerk account for the student.'
+        );
+      } else if (err.status === 404) {
         setErrorMessage(
           'No student record found matching your name and school. ' +
           'Your educator must add you to the school before you can create an account.'

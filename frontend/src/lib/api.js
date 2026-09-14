@@ -340,6 +340,23 @@ export function fetchMyResults(token) {
 }
 
 /**
+ * Lists open rounds the student is registered for via RoundEntrant,
+ * with an optional sitting if they've already started the test.
+ * Wired to GET /api/students/me/rounds (backend/src/routes/students.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   round: { id: string, name: string, state: string, closeTime: string },
+ *   sitting: { id: string, completedAt: string|null, startedAt: string, expiresAt: string } | null,
+ * }>>}
+ */
+export function fetchMyRounds(token) {
+  return requestJson('/api/students/me/rounds', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
  * Fetches one released result with a question-by-question review —
  * the student's answer next to the correct answer for every question.
  * Wired to GET /api/students/me/results/:resultId (backend/src/routes/students.js).

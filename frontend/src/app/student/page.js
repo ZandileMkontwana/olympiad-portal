@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { fetchMySittings, fetchMyResults } from '@/lib/api';
+import { fetchMySittings, fetchMyResults, fetchMyRounds } from '@/lib/api';
 
 function Watermark() {
   return (
@@ -65,7 +65,7 @@ function StatCard({ icon, label, value, accent }) {
   );
 }
 
-function HeroBanner({ name, school, inProgressCount, resumeHref }) {
+function HeroBanner({ name, school, inProgressCount, availableCount, resumeHref }) {
   return (
     <section className="relative mt-8 overflow-hidden rounded-2xl bg-gradient-to-br from-lavender-deep to-lavender px-8 py-10 text-white shadow-md sm:px-10">
       <div
@@ -105,6 +105,10 @@ function HeroBanner({ name, school, inProgressCount, resumeHref }) {
               </Link>
             )}
           </>
+        ) : availableCount > 0 ? (
+          <p className="text-lg font-medium text-white/90">
+            You have {availableCount} test{availableCount > 1 ? 's' : ''} ready to take — scroll down to start.
+          </p>
         ) : (
           <p className="text-lg font-medium text-white/90">
             All tests submitted — marks appear here once your teacher releases them.
@@ -177,6 +181,61 @@ function TestsSection({ tests }) {
               </li>
             );
           })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function AvailableRoundsSection({ rounds }) {
+  // Only show rounds that don't have a sitting yet (not started)
+  const available = rounds.filter((r) => !r.sitting);
+
+  return (
+    <section aria-labelledby="available-heading" className="relative">
+      <h2 id="available-heading" className="font-display text-2xl font-semibold text-ink">
+        Available tests
+      </h2>
+
+      {available.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
+          <span className="text-3xl" aria-hidden="true">
+            📋
+          </span>
+          <p className="mt-2 text-base text-ink-soft">
+            No new tests available right now. Check back when your educator opens a round.
+          </p>
+        </div>
+      ) : (
+        <ul className="mt-4 space-y-3">
+          {available.map((item) => (
+            <li
+              key={item.round.id}
+              className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm"
+            >
+              <div>
+                <p className="text-lg font-semibold text-ink">{item.round.name}</p>
+                <p className="mt-0.5 text-sm text-ink-soft">
+                  Closes {formatDate(item.round.closeTime)}
+                </p>
+              </div>
+              <Link
+                href={`/student/sit?id=${item.round.id}`}
+                onClick={(e) => {
+                  if (
+                    !window.confirm(
+                      `Start "${item.round.name}"? Once started, your time begins.`
+                    )
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
+                className="rounded-lg bg-lavender-deep px-5 py-2.5 text-base font-medium text-white transition-opacity hover:opacity-90"
+              >
+                Start test
+              </Link>
+            </li>
+          ))}
         </ul>
       )}
     </section>
@@ -297,6 +356,7 @@ export default function StudentDashboard() {
 
   const [sittings, setSittings] = useState([]);
   const [results, setResults] = useState([]);
+  const [rounds, setRounds] = useState([]);
   const [status, setStatus] = useState('loading'); // loading | ready | error
 
   useEffect(() => {
@@ -305,12 +365,14 @@ export default function StudentDashboard() {
     async function load() {
       try {
         const token = await getToken();
-        const [mySittings, myResults] = await Promise.all([
+        const [mySittings, myResults, myRounds] = await Promise.all([
           fetchMySittings(token),
           fetchMyResults(token),
+          fetchMyRounds(token),
         ]);
         setSittings(mySittings);
         setResults(myResults);
+        setRounds(myRounds);
         setStatus('ready');
       } catch (err) {
         setStatus('error');
@@ -358,6 +420,7 @@ export default function StudentDashboard() {
         name={user.name}
         school={user.school}
         inProgressCount={inProgress.length}
+        availableCount={rounds.filter((r) => !r.sitting).length}
         resumeHref={resumeHref}
       />
 
@@ -386,6 +449,10 @@ export default function StudentDashboard() {
           <div className="relative mt-12 grid gap-12 lg:grid-cols-2">
             <TestsSection tests={sittings} />
             <ResultsSection results={results} />
+          </div>
+
+          <div className="relative mt-12">
+            <AvailableRoundsSection rounds={rounds} />
           </div>
 
           <div className="relative mt-12">

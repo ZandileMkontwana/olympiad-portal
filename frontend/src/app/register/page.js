@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SignUp, useAuth } from '@clerk/nextjs';
+import { fetchCurrentUser, dashboardPathForRole } from '@/lib/api';
 
 function Watermark() {
   return (
@@ -212,11 +213,29 @@ function CompleteProfileForm({ onBack }) {
 }
 
 export default function RegisterPage() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
   const router = useRouter();
   const [role, setRole] = useState(null); // null | 'educator'
+  const [checking, setChecking] = useState(true);
 
-  if (!isLoaded) {
+  // Check if the signed-in user already has a completed profile.
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    async function check() {
+      const token = await getToken();
+      const user = await fetchCurrentUser(token);
+      if (user) {
+        // Profile already completed — go to their dashboard
+        router.replace(dashboardPathForRole(user.role));
+      } else {
+        setChecking(false);
+      }
+    }
+    check();
+  }, [isLoaded, isSignedIn, getToken, router]);
+
+  if (!isLoaded || (isSignedIn && checking)) {
     return <main className="mx-auto max-w-md px-8 py-24 text-center">Loading…</main>;
   }
 
