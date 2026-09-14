@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
-const { requireAuth, clerkClient } = require('@clerk/express');
+const clerkClient = require('@clerk/express').clerkClient;
+const { requireAuth, loadAuthUser } = require('../middleware/auth');
 
 // POST /educators/complete-profile
 // Called once, after a user signs up via Clerk, to link them to our
 // app-specific data (name, school) which Clerk doesn't know about.
-router.post('/educators/complete-profile', requireAuth(), async (req, res) => {
+router.post('/educators/complete-profile', requireAuth, async (req, res) => {
   const { userId: clerkUserId } = req.auth();
   const { name, schoolName } = req.body;
 
@@ -60,118 +61,66 @@ router.post('/educators/complete-profile', requireAuth(), async (req, res) => {
   });
 });
 
-// POST /students/complete-profile
-// Links a Clerk student account to an existing Entrant record,
-// matched by name + school (the entrant should already have been
-// created by an educator registering them for a round).
-router.post('/students/complete-profile', requireAuth(), async (req, res) => {
+// GET /auth/me
+// Dual-mode: resolves the caller from either a student JWT (Bearer token
+// issued by /api/students/login) or a Clerk session, so both student and
+// educator/organiser clients can fetch their profile.
+router.get('/auth/me', requireAuth, async (req, res) => {
   try {
-    const { userId: clerkUserId } = req.auth();
-    const { name, schoolName } = req.body;
+    const user = await loadAuthUser(req);
 
-    if (!name || !schoolName) {
-      return res.status(400).json({ error: 'name and schoolName are required' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { clerkUserId } });
-    if (existingUser) {
-      return res.status(409).json({ error: 'Profile already completed for this account' });
-    }
-
-    const school = await prisma.school.findFirst({
-      where: { name: { equals: schoolName, mode: 'insensitive' } },
-    });
-    if (!school) {
-      return res.status(404).json({ error: 'That school is not registered on the platform yet. Ask your educator to set up the school first.' });
-    }
-
-    const entrant = await prisma.entrant.findFirst({
-      where: {
-        name: { equals: name, mode: 'insensitive' },
-        schoolId: school.id,
-        userId: null,
+    const userWithRelations = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        educator: { include: { school: true } },
+        entrant: { include: { school: true } },
       },
     });
-    if (!entrant) {
-      return res.status(404).json({ error: 'No student record found matching your name and school. Ask your educator to add you to the school first.' });
-    }
 
-    const clerkUser = await clerkClient.users.getUser(clerkUserId);
-    const email = clerkUser.emailAddresses[0] && clerkUser.emailAddresses[0].emailAddress;
-    if (!email) {
-      return res.status(400).json({ error: 'No email found on Clerk account' });
-    }
+    const schoolRecord =
+      userWithRelations.educator?.school ?? userWithRelations.entrant?.school ?? null;
 
-    const user = await prisma.user.create({
-      data: {
-        clerkUserId,
-        email,
-        role: 'student',
-        name,
-        entrant: { connect: { id: entrant.id } },
-      },
-      include: { entrant: { include: { school: true } } },
-    });
-
-    res.status(201).json({
+    res.json({
       user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-        school: { id: user.entrant.school.id, name: user.entrant.school.name },
+        id: userWithRelations.id,
+        email: userWithRelations.email,
+        role: userWithRelations.role,
+        name: userWithRelations.name,
+        school: schoolRecord ? { id: schoolRecord.id, name: schoolRecord.name } : null,
+        entrantId: userWithRelations.entrant?.id ?? null,
       },
     });
   } catch (err) {
-    console.error('Student complete-profile failed:', err);
-    res.status(500).json({ error: 'Could not complete profile. Please try again.' });
+    console.error('Auth/me failed:', err);
+    res.status(500).json({ error: 'Could not load your account' });
   }
-});
-
-// GET /auth/me
-router.get('/auth/me', requireAuth(), async (req, res) => {
-  const { userId: clerkUserId } = req.auth();
-
-  const user = await prisma.user.findUnique({
-    where: { clerkUserId },
-    include: {
-      educator: { include: { school: true } },
-      entrant:  { include: { school: true } },
-    },
-  });
-
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  const schoolRecord = user.educator?.school ?? user.entrant?.school ?? null;
-
-  res.json({
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      name: user.name,
-      school: schoolRecord ? { id: schoolRecord.id, name: schoolRecord.name } : null,
-      entrantId: user.entrant?.id ?? null,
-    },
-  });
 });
 
 // DELETE /auth/account
-router.delete('/auth/account', requireAuth(), async (req, res) => {
-  const { userId: clerkUserId } = req.auth();
+router.delete('/auth/account', requireAuth, async (req, res) => {
+  try {
+    const user = await loadAuthUser(req);
 
-  const user = await prisma.user.findUnique({ where: { clerkUserId } });
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.user.delete({ where: { id: user.id } });
+    // Also delete from Clerk itself, so the account is fully gone, not just
+    // our copy. Educator-registered students have no Clerk account (null).
+    if (user.clerkUserId) {
+      await clerkClient.users.deleteUser(user.clerkUserId);
+    }
+
+    res.status(200).json({ message: 'Account deleted successfully' });
+  } catch (err) {
+    console.error('Account deletion failed:', err);
+    res.status(500).json({ error: 'Could not delete the account' });
   }
-
-  await prisma.user.delete({ where: { id: user.id } });
-  // Also delete from Clerk itself, so the account is fully gone, not just our copy
-  await clerkClient.users.deleteUser(clerkUserId);
-
-  res.status(200).json({ message: 'Account deleted successfully' });
 });
 
 module.exports = router;

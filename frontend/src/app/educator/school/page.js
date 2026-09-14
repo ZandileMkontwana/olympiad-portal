@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useClerk, useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { fetchSchoolDashboard, createEntrant } from '@/lib/api';
+import { fetchSchoolDashboard, createEntrant, resendEntrantInvite, deleteEntrant } from '@/lib/api';
+import { GRADE_OPTIONS } from '@/lib/grade';
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
 
@@ -273,9 +274,13 @@ export default function SchoolDashboardPage() {
   const [sortOption, setSortOption] = useState('score');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newGrade, setNewGrade] = useState('');
   const [addMessage, setAddMessage] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [resendingId, setResendingId] = useState(null);
+  const [resendMessage, setResendMessage] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
 
   const noSchool = !checking && user && !(user.school && user.school.id);
 
@@ -337,22 +342,97 @@ export default function SchoolDashboardPage() {
   async function handleAddStudent(e) {
     e.preventDefault();
     setAddMessage(null);
-    if (!newName.trim() || !newGrade.trim()) {
-      setAddMessage({ type: 'error', text: 'Name and grade are required.' });
+    if (!newName.trim() || !newGrade.trim() || !newEmail.trim()) {
+      setAddMessage({ type: 'error', text: 'Name, email and grade are required.' });
       return;
     }
-    if (!window.confirm(`Add "${newName.trim()}" (Grade ${newGrade.trim()}) to your school?`)) return;
+    if (!window.confirm(`Add "${newName.trim()}" (${newEmail.trim()}, Grade ${newGrade.trim()}) to your school? They'll be emailed a link to set their password.`)) return;
     setAdding(true);
     try {
       const token = await getToken();
-      await createEntrant({ name: newName.trim(), grade: newGrade.trim() }, token);
-      setAddMessage({ type: 'success', text: `${newName.trim()} has been added to your school!` });
-      setNewName(''); setNewGrade('');
+      const result = await createEntrant(
+        { name: newName.trim(), email: newEmail.trim(), grade: newGrade.trim() },
+        token
+      );
+      setAddMessage({
+        type: 'success',
+        text: result.invitationSent
+          ? `${newName.trim()} has been added and emailed a link to set their password.`
+          : `${newName.trim()} has been added, but the invitation email could not be sent — use "Resend invite" on their card.`,
+      });
+      setNewName(''); setNewEmail(''); setNewGrade('');
       await handleRefresh();
     } catch (err) {
       setAddMessage({ type: 'error', text: err.message || 'Failed to add student.' });
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function handleResendInvite(entrant) {
+    setResendMessage(null);
+    let email = entrant.email;
+    if (!email) {
+      // Legacy entrant with no account yet — an email is needed to create one.
+      const entered = window.prompt(
+        `${entrant.name} has no account yet. Enter their student email to send the invitation:`
+      );
+      if (!entered || !entered.trim()) return;
+      email = entered.trim();
+    }
+    if (!window.confirm(`Email ${entrant.name} a link to set their password (${email})?`)) return;
+    setResendingId(entrant.id);
+    try {
+      const token = await getToken();
+      const result = await resendEntrantInvite(
+        entrant.id,
+        token,
+        entrant.email ? {} : { email }
+      );
+      setResendMessage({
+        type: result.invitationSent ? 'success' : 'error',
+        text: result.invitationSent
+          ? `Invitation emailed to ${email}.`
+          : 'The invitation email could not be sent. Please try again later.',
+      });
+      // A legacy entrant just gained an account — refresh so the card reflects it.
+      if (!entrant.email) await handleRefresh();
+    } catch (err) {
+      setResendMessage({ type: 'error', text: err.message || 'Failed to resend the invitation.' });
+    } finally {
+      setResendingId(null);
+    }
+  }
+
+  async function handleRemoveEntrant(entrant) {
+    setResendMessage(null);
+    const submissionNote =
+      entrant.submissionCount > 0
+        ? ` This permanently deletes their ${entrant.submissionCount} submission${entrant.submissionCount !== 1 ? 's' : ''} and results.`
+        : '';
+    if (
+      !window.confirm(
+        `Remove ${entrant.name} from your school? Their account and records will be deleted — this can't be undone.${submissionNote}`
+      )
+    ) {
+      return;
+    }
+    setRemovingId(entrant.id);
+    try {
+      const token = await getToken();
+      await deleteEntrant(entrant.id, token);
+      setResendMessage({
+        type: 'success',
+        text: `${entrant.name} has been removed from your school.`,
+      });
+      await handleRefresh();
+    } catch (err) {
+      setResendMessage({
+        type: 'error',
+        text: err.message || 'Could not remove the student. Please try again.',
+      });
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -444,16 +524,24 @@ export default function SchoolDashboardPage() {
             <p style={{ color: '#8b7fa8', maxWidth: '420px', margin: '0 auto 24px', lineHeight: 1.6 }}>
               Add your first student below and their performance will appear here.
             </p>
-            <form onSubmit={handleAddStudent} style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '500px', margin: '0 auto' }}>
+            <form onSubmit={handleAddStudent} style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '560px', margin: '0 auto' }}>
               <input type="text" placeholder="Student name" value={newName} onChange={(e) => setNewName(e.target.value)}
+                style={{ flex: '1 1 150px', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.88em', outline: 'none' }} />
+              <input type="email" placeholder="Student email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
                 style={{ flex: '1 1 180px', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.88em', outline: 'none' }} />
-              <input type="text" placeholder="Grade (e.g. 10)" value={newGrade} onChange={(e) => setNewGrade(e.target.value)}
-                style={{ width: '120px', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.88em', outline: 'none' }} />
+              <select value={newGrade} onChange={(e) => setNewGrade(e.target.value)}
+                style={{ width: '130px', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.88em', background: 'white' }}>
+                <option value="" disabled>Grade</option>
+                {GRADE_OPTIONS.map((g) => <option key={g} value={g}>Grade {g}</option>)}
+              </select>
               <button type="submit" disabled={adding} style={{
                 padding: '10px 20px', borderRadius: '10px', border: 'none', cursor: adding ? 'not-allowed' : 'pointer',
                 background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)', color: 'white', fontWeight: 600, fontSize: '0.88em', opacity: adding ? 0.7 : 1,
               }}>{adding ? 'Adding...' : 'Add Student'}</button>
             </form>
+            <p style={{ margin: '12px auto 0', fontSize: '0.75em', color: '#a89fc9', maxWidth: '480px' }}>
+              The student is emailed a link to set their password — they then sign in with their email and password.
+            </p>
             {addMessage && (
               <p style={{ marginTop: '12px', fontSize: '0.85em', color: addMessage.type === 'success' ? '#3fae7a' : '#e0615f', fontWeight: 600 }}>{addMessage.text}</p>
             )}
@@ -500,14 +588,22 @@ export default function SchoolDashboardPage() {
                 <h4 style={{ margin: '0 0 12px', fontSize: '0.95em', fontWeight: 700, color: '#2d2640' }}>Add a New Student</h4>
                 <form onSubmit={handleAddStudent} style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <input type="text" placeholder="Student name" value={newName} onChange={(e) => setNewName(e.target.value)}
-                    style={{ flex: '1 1 200px', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.88em', outline: 'none' }} />
-                  <input type="text" placeholder="Grade (e.g. 10)" value={newGrade} onChange={(e) => setNewGrade(e.target.value)}
-                    style={{ width: '130px', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.88em', outline: 'none' }} />
+                    style={{ flex: '1 1 160px', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.88em', outline: 'none' }} />
+                  <input type="email" placeholder="Student email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+                    style={{ flex: '1 1 180px', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.88em', outline: 'none' }} />
+                  <select value={newGrade} onChange={(e) => setNewGrade(e.target.value)}
+                    style={{ width: '130px', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.88em', background: 'white' }}>
+                    <option value="" disabled>Grade</option>
+                    {GRADE_OPTIONS.map((g) => <option key={g} value={g}>Grade {g}</option>)}
+                  </select>
                   <button type="submit" disabled={adding} style={{
                     padding: '10px 20px', borderRadius: '10px', border: 'none', cursor: adding ? 'not-allowed' : 'pointer',
                     background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)', color: 'white', fontWeight: 600, fontSize: '0.88em', opacity: adding ? 0.7 : 1,
                   }}>{adding ? 'Adding...' : 'Add Student'}</button>
                 </form>
+                <p style={{ margin: '10px 0 0', fontSize: '0.75em', color: '#a89fc9' }}>
+                  The student is emailed a link to set their password — they then sign in with their email and password.
+                </p>
                 {addMessage && (
                   <p style={{ marginTop: '10px', fontSize: '0.85em', color: addMessage.type === 'success' ? '#3fae7a' : '#e0615f', fontWeight: 600 }}>{addMessage.text}</p>
                 )}
@@ -524,6 +620,11 @@ export default function SchoolDashboardPage() {
                 </button>
               </div>
             )}
+            {resendMessage && (
+              <p role="status" style={{ marginTop: '16px', fontSize: '0.85em', fontWeight: 600, color: resendMessage.type === 'success' ? '#3fae7a' : '#e0615f' }}>
+                {resendMessage.text}
+              </p>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '14px', marginTop: '16px' }}>
               {filteredEntrants.map((entrant) => (
                 <div key={entrant.id} style={{
@@ -539,12 +640,54 @@ export default function SchoolDashboardPage() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontWeight: 600, color: '#2d2640', fontSize: '0.92em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entrant.name}</p>
+                    <p title={entrant.email || 'No account yet'} style={{ margin: '2px 0 0', fontSize: '0.72em', color: '#a89fc9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {entrant.email || 'No account yet'}
+                    </p>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}>
                       <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.68em', fontWeight: 600, background: 'rgba(139,92,246,0.08)', color: '#6d3fd1' }}>Grade {entrant.grade}</span>
                       <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.68em', fontWeight: 600, background: 'rgba(139,92,246,0.05)', color: '#8b7fa8' }}>{entrant.submissionCount} sub{entrant.submissionCount !== 1 ? 's' : ''}</span>
                       {entrant.averageScore !== null && (
                         <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.68em', fontWeight: 600, background: `${scoreColor(entrant.averageScore)}18`, color: scoreColor(entrant.averageScore) }}>{scoreLabel(entrant.averageScore)}</span>
                       )}
+                      {entrant.accountStatus === 'active' && (
+                        <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.68em', fontWeight: 600, background: 'rgba(63,174,122,0.12)', color: '#2d8a5e' }}>Active</span>
+                      )}
+                      {entrant.accountStatus === 'invite_pending' && (
+                        <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.68em', fontWeight: 600, background: 'rgba(224,168,62,0.15)', color: '#b07d1e' }}>Invite pending</span>
+                      )}
+                      {entrant.accountStatus == null && (
+                        <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.68em', fontWeight: 600, background: 'rgba(139,92,246,0.05)', color: '#8b7fa8' }}>No account</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                      {entrant.accountStatus !== 'active' && (
+                        <button
+                          type="button"
+                          onClick={() => handleResendInvite(entrant)}
+                          disabled={resendingId === entrant.id || removingId === entrant.id}
+                          style={{
+                            padding: '5px 12px', borderRadius: '8px',
+                            border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.06)',
+                            color: '#6d3fd1', fontWeight: 600, fontSize: '0.72em',
+                            cursor: resendingId === entrant.id ? 'wait' : 'pointer',
+                          }}
+                        >
+                          {resendingId === entrant.id ? 'Sending…' : entrant.accountStatus === 'invite_pending' ? 'Resend invite' : 'Send invite'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveEntrant(entrant)}
+                        disabled={removingId === entrant.id || resendingId === entrant.id}
+                        style={{
+                          padding: '5px 12px', borderRadius: '8px',
+                          border: '1px solid rgba(224,97,95,0.35)', background: 'rgba(224,97,95,0.06)',
+                          color: '#e0615f', fontWeight: 600, fontSize: '0.72em',
+                          cursor: removingId === entrant.id ? 'wait' : 'pointer',
+                        }}
+                      >
+                        {removingId === entrant.id ? 'Removing…' : 'Remove'}
+                      </button>
                     </div>
                   </div>
                   <ScoreRing score={entrant.averageScore} />

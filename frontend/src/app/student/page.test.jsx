@@ -2,22 +2,24 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 // Mutable hook state — individual tests override before rendering.
-const roleState = vi.hoisted(() => ({
-  user: { id: 'user-1', email: 'student@school.com', role: 'student', name: 'Thabo', school: { id: 'school-1', name: 'Test School' } },
+const authState = vi.hoisted(() => ({
+  user: { id: 'user-1', email: 'student@school.com', role: 'student', name: 'Thabo', school: { id: 'school-1', name: 'Test School' }, entrantId: 'entrant-1' },
   checking: true,
 }));
 
 const mocks = vi.hoisted(() => ({
   signOut: vi.fn().mockResolvedValue(undefined),
+  // Stable reference — the data-loading effect depends on getToken.
+  getToken: vi.fn().mockResolvedValue('mock-token'),
 }));
 
-vi.mock('@/hooks/useRequireRole', () => ({
-  useRequireRole: () => roleState,
-}));
-
-vi.mock('@clerk/nextjs', () => ({
-  useAuth: () => ({ getToken: vi.fn().mockResolvedValue('mock-token') }),
-  useClerk: () => ({ signOut: mocks.signOut }),
+vi.mock('@/hooks/useStudentAuth', () => ({
+  useStudentAuth: () => ({
+    user: authState.user,
+    checking: authState.checking,
+    getToken: mocks.getToken,
+    signOut: mocks.signOut,
+  }),
 }));
 
 vi.mock('@/lib/api', () => ({
@@ -62,13 +64,14 @@ describe('StudentDashboard', () => {
     vi.clearAllMocks();
     // Native confirm dialogs default to "OK" so guarded actions run.
     vi.stubGlobal('confirm', vi.fn(() => true));
-    roleState.checking = false;
-    roleState.user = {
+    authState.checking = false;
+    authState.user = {
       id: 'user-1',
       email: 'student@school.com',
       role: 'student',
       name: 'Thabo',
       school: { id: 'school-1', name: 'Test School' },
+      entrantId: 'entrant-1',
     };
   });
 
@@ -77,8 +80,16 @@ describe('StudentDashboard', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows a loading state while the role check runs', () => {
-    roleState.checking = true;
+  it('shows a loading state while the session check runs', () => {
+    authState.checking = true;
+    render(<StudentDashboard />);
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    expect(fetchMySittings).not.toHaveBeenCalled();
+  });
+
+  it('shows the loading state instead of crashing when the session is cleared (after logout)', () => {
+    // signOut clears the session before the redirect finishes — user is null
+    authState.user = null;
     render(<StudentDashboard />);
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
     expect(fetchMySittings).not.toHaveBeenCalled();

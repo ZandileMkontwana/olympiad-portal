@@ -1,18 +1,17 @@
 'use client';
 
 // Student test-taking page (Story A2: Start an online sitting).
-// Auto-detects the logged-in student via /auth/me and starts the sitting
-// directly — no name dropdown needed.
+// Uses the student JWT session (email + password login) and starts the
+// sitting directly — no name dropdown needed.
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@clerk/nextjs';
+import { useStudentAuth } from '@/hooks/useStudentAuth';
 import {
   createSitting,
   saveSittingAnswers,
   submitSitting,
-  fetchCurrentUser,
   ApiError,
 } from '@/lib/api';
 
@@ -21,7 +20,7 @@ function SitContent() {
   const router = useRouter();
   const roundId = searchParams.get('id');
 
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { user, checking, getToken } = useStudentAuth();
 
   const [phase, setPhase] = useState('loading'); // 'loading' | 'sitting' | 'error'
   const [sittingData, setSittingData] = useState(null);
@@ -34,12 +33,12 @@ function SitContent() {
   const [submitted, setSubmitted] = useState(false);
   const dirtyRef = useRef(false);
 
-  // Require sign-in
+  // Require a student session
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
+    if (!checking && !user) {
       router.replace('/login');
     }
-  }, [isLoaded, isSignedIn, router]);
+  }, [checking, user, router]);
 
   // Live countdown to the sitting's expiry (round close time)
   useEffect(() => {
@@ -47,28 +46,19 @@ function SitContent() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-detect the logged-in student and start the sitting directly.
+  // Start the sitting directly for the signed-in student's entrant record.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || !roundId) return;
+    if (checking || !user || !roundId) return;
 
     let cancelled = false;
 
-    async function detectAndStart() {
+    async function start() {
       try {
         const token = await getToken();
-        const user = await fetchCurrentUser(token);
 
-        if (!user) {
+        if (!user.entrantId) {
           if (!cancelled) {
-            setError('Could not load your account. Please try logging in again.');
-            setPhase('error');
-          }
-          return;
-        }
-
-        if (user.role !== 'student' || !user.entrantId) {
-          if (!cancelled) {
-            setError('Only students can take tests. Please log in with a student account.');
+            setError('Your account is not linked to a student record. Please contact your educator.');
             setPhase('error');
           }
           return;
@@ -94,12 +84,12 @@ function SitContent() {
       }
     }
 
-    detectAndStart();
+    start();
 
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, roundId, getToken]);
+  }, [checking, user, roundId, getToken]);
 
   const questions = useMemo(
     () => (sittingData ? sittingData.paper.questions.sort((a, b) => Number(a) - Number(b)) : []),
@@ -177,7 +167,7 @@ function SitContent() {
 
   const answeredCount = questions.filter((q) => answers[q]).length;
 
-  if (!isLoaded || !isSignedIn) {
+  if (checking || !user) {
     return (
       <main className="round-page">
         <p>Loading...</p>

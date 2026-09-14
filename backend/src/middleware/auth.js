@@ -1,19 +1,79 @@
+const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 
 /**
- * Clerk-based auth guard.
- * Relies on clerkMiddleware() having already populated req.auth().
+ * Extracts a Bearer token from the Authorization header, if any.
+ */
+function extractBearerToken(req) {
+  const header = req.headers && req.headers.authorization;
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) return null;
+  const token = header.slice('Bearer '.length).trim();
+  return token || null;
+}
+
+/**
+ * Verifies a student JWT (issued by POST /api/students/login) and returns
+ * the user id it was issued for, or null when the token is invalid.
+ */
+function verifyStudentJwt(token) {
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    return payload && payload.sub ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Dual-mode auth guard — supports both auth mechanisms in the app:
+ *   1. Students log in with email + password and send a JWT we signed
+ *      (Authorization: Bearer <jwt>).
+ *   2. Educators/organisers authenticate via Clerk; clerkMiddleware()
+ *      populates req.auth() — also from a Bearer header (the Clerk session
+ *      token), so an unverifiable Bearer token falls through to Clerk.
+ *
+ * Only establishes identity: it stashes req.authMode ('jwt' | 'clerk') and
+ * req.authUserId (our user id, or the Clerk user id). Use loadAuthUser to
+ * fetch the database record.
  */
 function requireAuth(req, res, next) {
+  const token = extractBearerToken(req);
+  if (token) {
+    const userId = verifyStudentJwt(token);
+    if (userId) {
+      req.authMode = 'jwt';
+      req.authUserId = userId;
+      return next();
+    }
+    // Not one of our JWTs — fall through to the Clerk path, where
+    // clerkMiddleware may have validated this same Bearer token.
+  }
+
   const auth = req.auth && req.auth();
   if (!auth || !auth.userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
+  req.authMode = 'clerk';
+  req.authUserId = auth.userId;
   next();
 }
 
 /**
- * Role guard — authenticates via Clerk, then checks the user's role
+ * Loads the database User for the identity established by requireAuth:
+ * by id for student JWTs, by clerkUserId for Clerk sessions.
+ */
+async function loadAuthUser(req) {
+  if (req.authMode === 'jwt') {
+    return prisma.user.findUnique({ where: { id: req.authUserId } });
+  }
+  if (req.authMode === 'clerk') {
+    return prisma.user.findUnique({ where: { clerkUserId: req.authUserId } });
+  }
+  return null;
+}
+
+/**
+ * Role guard — authenticates via requireAuth, then checks the user's role
  * in our database.
  */
 function requireRole(role) {
@@ -21,8 +81,7 @@ function requireRole(role) {
     requireAuth,
     async (req, res, next) => {
       try {
-        const { userId: clerkUserId } = req.auth();
-        const user = await prisma.user.findUnique({ where: { clerkUserId } });
+        const user = await loadAuthUser(req);
 
         if (!user) {
           return res.status(404).json({ error: 'User not found' });
@@ -42,4 +101,4 @@ function requireRole(role) {
   ];
 }
 
-module.exports = { requireAuth, requireRole };
+module.exports = { requireAuth, requireRole, loadAuthUser };

@@ -1,10 +1,147 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { listOlympiads, listSchoolEntrants, createEntrant } from '@/lib/api';
+import { listOlympiads, listSchoolEntrants } from '@/lib/api';
+
+/* ── helpers ──────────────────────────────────────────────────────────── */
+
+function initials(name) {
+  return (name || '').split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+}
+
+const STATE_STYLES = {
+  scheduled: { bg: 'rgba(139,92,246,0.08)', color: '#6d3fd1', label: 'Scheduled' },
+  open: { bg: 'rgba(63,174,122,0.1)', color: '#3fae7a', label: 'Open now' },
+  closed: { bg: 'rgba(139,92,246,0.06)', color: '#8b7fa8', label: 'Closed' },
+  released: { bg: 'rgba(224,168,62,0.12)', color: '#c99a2e', label: 'Released' },
+};
+
+function timeUntil(iso) {
+  const ms = new Date(iso) - new Date();
+  if (ms <= 0) return null;
+  const hrs = Math.floor(ms / 3600000);
+  const days = Math.floor(hrs / 24);
+  if (days > 0) return `${days}d ${hrs % 24}h`;
+  return `${hrs}h ${Math.floor((ms % 3600000) / 60000)}m`;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+
+function Sidebar({ user, onLogout }) {
+  const links = [
+    { href: '/educator', icon: '📋', label: 'Rounds', active: true },
+    { href: '/educator/school', icon: '🏫', label: 'School Dashboard' },
+    { href: '/archive', icon: '📂', label: 'Paper Archive' },
+  ];
+  return (
+    <aside style={{ width: '240px', flexShrink: 0, minHeight: '100vh', background: 'white',
+      borderRight: '1px solid rgba(139,92,246,0.1)', padding: '24px 18px',
+      display: 'flex', flexDirection: 'column', position: 'sticky', top: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 6px 24px' }}>
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px',
+          background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800 }}>O</div>
+        <div>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9em', color: '#2d2640' }}>Olympiad Portal</p>
+          <p style={{ margin: 0, fontSize: '0.7em', color: '#a89fc9' }}>Educator</p>
+        </div>
+      </div>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+        {links.map((l) => (
+          <Link key={l.label} href={l.href} style={{
+            display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px',
+            borderRadius: '10px', textDecoration: 'none', fontSize: '0.88em', fontWeight: 600,
+            color: l.active ? '#6d3fd1' : '#6b6480',
+            background: l.active ? 'rgba(139,92,246,0.1)' : 'transparent',
+          }}>
+            <span style={{ fontSize: '1.1em' }}>{l.icon}</span>{l.label}
+          </Link>
+        ))}
+      </nav>
+      <div style={{ borderTop: '1px solid rgba(139,92,246,0.1)', paddingTop: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ width: '34px', height: '34px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)', color: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8em', flexShrink: 0 }}>
+          {initials(user.name || user.email)}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: '0.8em', fontWeight: 600, color: '#2d2640', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {user.email}
+          </p>
+          <button onClick={onLogout} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: '0.75em', color: '#e0615f', fontWeight: 600 }}>
+            Log out
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/* ── Stat card ────────────────────────────────────────────────────────── */
+
+function StatCard({ icon, label, value, accent }) {
+  return (
+    <div style={{ flex: 1, background: 'white', borderRadius: '14px', padding: '18px 20px',
+      boxShadow: '0 2px 10px rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.1)',
+      display: 'flex', alignItems: 'center', gap: '14px', minWidth: '180px' }}>
+      <div style={{ width: '44px', height: '44px', borderRadius: '12px',
+        background: accent || 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3em', flexShrink: 0 }}>{icon}</div>
+      <div>
+        <p style={{ margin: 0, fontSize: '1.5em', fontWeight: 700, color: '#2d2640', lineHeight: 1 }}>{value}</p>
+        <p style={{ margin: '4px 0 0', fontSize: '0.8em', color: '#8b7fa8' }}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Next-up focus card ───────────────────────────────────────────────── */
+
+function NextUpCard({ round, olympiadName }) {
+  if (!round) {
+    return (
+      <div style={{ background: 'linear-gradient(135deg, #ede6f8, #f5effa)', borderRadius: '18px',
+        padding: '28px', border: '1px solid rgba(139,92,246,0.12)', textAlign: 'center' }}>
+        <p style={{ fontSize: '2em', margin: '0 0 8px' }}>✨</p>
+        <p style={{ margin: 0, color: '#6b6480', fontSize: '0.9em' }}>No rounds need your attention right now.</p>
+      </div>
+    );
+  }
+  const style = STATE_STYLES[round.state] || STATE_STYLES.scheduled;
+  const target = round.state === 'open' ? round.closeTime : round.openTime;
+  const countdown = timeUntil(target);
+  const actionLabel = round.state === 'open' ? 'closes in' : round.state === 'scheduled' ? 'opens in' : null;
+
+  return (
+    <div style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)', borderRadius: '18px',
+      padding: '26px 28px', color: 'white', position: 'relative', overflow: 'hidden',
+      boxShadow: '0 10px 28px rgba(91,33,182,0.28)' }}>
+      <div style={{ position: 'absolute', right: '-30px', top: '-30px', width: '140px', height: '140px', borderRadius: '50%', background: 'rgba(255,255,255,0.07)' }} />
+      <p style={{ margin: 0, fontSize: '0.72em', opacity: 0.75, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 }}>Next up</p>
+      <h3 style={{ margin: '6px 0 0', fontSize: '1.4em', fontWeight: 800 }}>{round.name}</h3>
+      <p style={{ margin: '4px 0 0', fontSize: '0.82em', opacity: 0.85 }}>{olympiadName}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '16px' }}>
+        <span style={{ background: 'rgba(255,255,255,0.15)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.78em', fontWeight: 700 }}>
+          {style.label}
+        </span>
+        {actionLabel && countdown && (
+          <span style={{ fontSize: '0.82em', opacity: 0.9 }}>{actionLabel} <strong>{countdown}</strong></span>
+        )}
+      </div>
+      <Link href={`/educator/round_view?id=${round.id}`} style={{
+        display: 'inline-block', marginTop: '18px', background: 'white', color: '#6d3fd1',
+        padding: '9px 18px', borderRadius: '10px', textDecoration: 'none', fontWeight: 700, fontSize: '0.85em',
+      }}>
+        View round →
+      </Link>
+    </div>
+  );
+}
+
+/* ── Main page ────────────────────────────────────────────────────────── */
 
 export default function EducatorDashboard() {
   const { user, checking } = useRequireRole('educator');
@@ -13,13 +150,9 @@ export default function EducatorDashboard() {
 
   const [olympiads, setOlympiads] = useState([]);
   const [roundsStatus, setRoundsStatus] = useState('loading');
-
   const [students, setStudents] = useState([]);
   const [studentsStatus, setStudentsStatus] = useState('loading');
-  const [name, setName] = useState('');
-  const [grade, setGrade] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [studentsError, setStudentsError] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
 
   async function fetchStudents(token) {
     try {
@@ -33,7 +166,6 @@ export default function EducatorDashboard() {
 
   useEffect(() => {
     if (checking) return;
-
     async function fetchOlympiads() {
       try {
         const data = await listOlympiads();
@@ -43,184 +175,178 @@ export default function EducatorDashboard() {
         setRoundsStatus('error');
       }
     }
-
     async function loadStudents() {
       const token = await getToken();
       await fetchStudents(token);
     }
-
     fetchOlympiads();
     loadStudents();
   }, [checking, getToken]);
 
-  if (checking) {
-    return (
-      <main className="round-page">
-        <p>Loading...</p>
-      </main>
-    );
-  }
+  const allRounds = useMemo(() => {
+    return olympiads.flatMap((o) => o.rounds.map((r) => ({ ...r, olympiadName: o.name })));
+  }, [olympiads]);
+
+  const nextUpRound = useMemo(() => {
+    const open = allRounds.filter((r) => r.state === 'open').sort((a, b) => new Date(a.closeTime) - new Date(b.closeTime));
+    if (open.length > 0) return open[0];
+    const scheduled = allRounds.filter((r) => r.state === 'scheduled').sort((a, b) => new Date(a.openTime) - new Date(b.openTime));
+    return scheduled[0] || null;
+  }, [allRounds]);
+
+  const roundsByState = useMemo(() => {
+    const groups = { open: [], scheduled: [], closed: [], released: [] };
+    allRounds.forEach((r) => { (groups[r.state] || groups.scheduled).push(r); });
+    return groups;
+  }, [allRounds]);
+
+  const filteredStudents = useMemo(
+    () => students.filter((s) => s.name.toLowerCase().includes(studentSearch.toLowerCase())),
+    [students, studentSearch]
+  );
 
   async function handleLogout() {
     await signOut({ redirectUrl: '/login' });
   }
 
-  async function handleAddStudent(event) {
-    event.preventDefault();
-    setStudentsError('');
-
-    if (!name.trim() || !grade.trim()) {
-      setStudentsError('Name and grade are required.');
-      return;
-    }
-
-    setAdding(true);
-    try {
-      const token = await getToken();
-      await createEntrant({ name: name.trim(), grade: grade.trim() }, token);
-      setName('');
-      setGrade('');
-      await fetchStudents(token);
-    } catch (err) {
-      setStudentsError(err.message || 'Could not add student.');
-    } finally {
-      setAdding(false);
-    }
+  if (checking) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: '#faf9fc' }}>
+        <p style={{ color: '#8b7fa8' }}>Loading...</p>
+      </div>
+    );
   }
 
-  // Educators work with rounds - only show olympiads that have at least one.
-  const olympiadsWithRounds = olympiads.filter((olympiad) => olympiad.rounds.length > 0);
+  const openCount = roundsByState.open.length;
+  const scheduledCount = roundsByState.scheduled.length;
 
   return (
-    <main className="round-page">
-      <h1>Educator Portal</h1>
-      <p className="description">
-        Logged in as <strong>{user.email}</strong> ({user.role})
-      </p>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#faf9fc' }}>
+      <Sidebar user={user} onLogout={handleLogout} />
 
-      <div className="card" style={{ display: 'flex', gap: '12px' }}>
-        <Link href="/educator/school" className="button" style={{ textDecoration: 'none' }}>
-          School Dashboard
-        </Link>
-        <button onClick={handleLogout} className="button">
-          Log out
-        </button>
-      </div>
+      <main style={{ flex: 1, padding: '32px 40px 60px', maxWidth: '1500px' }}>
+        {/* Hero */}
+        <div style={{ background: 'linear-gradient(120deg, #7c3aed 0%, #6028c9 50%, #4c1d95 100%)',
+          borderRadius: '22px', padding: '32px 36px', color: 'white', position: 'relative', overflow: 'hidden',
+          boxShadow: '0 12px 34px rgba(91,33,182,0.3)' }}>
+          <div style={{ position: 'absolute', right: '-50px', top: '-50px', width: '200px', height: '200px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
+          <p style={{ margin: 0, fontSize: '0.75em', opacity: 0.75, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 600 }}>Educator Portal</p>
+          <h1 style={{ margin: '8px 0 0', fontSize: '2em', fontWeight: 800 }}>Welcome back, {user.name || user.email}</h1>
+          <p style={{ margin: '8px 0 0', fontSize: '0.88em', opacity: 0.85 }}>
+            Manage your rounds and students from here.
+          </p>
+        </div>
 
-      <h2 style={{ marginTop: '24px' }}>My Students</h2>
+        {/* Stats + Next up */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.4fr', gap: '16px', marginTop: '22px', alignItems: 'stretch' }}>
+          <StatCard icon="👥" label="My Students" value={students.length} />
+          <StatCard icon="🟢" label="Open Rounds" value={openCount} accent="linear-gradient(135deg, #3fae7a, #2d8a5e)" />
+          <StatCard icon="🕒" label="Scheduled" value={scheduledCount} accent="linear-gradient(135deg, #f59e0b, #d97706)" />
+          <div style={{ gridRow: 'span 1' }}>
+            <NextUpCard round={nextUpRound} olympiadName={nextUpRound?.olympiadName} />
+          </div>
+        </div>
 
-      {studentsStatus === 'loading' && <p className="description">Loading students...</p>}
+        {/* Students */}
+        <div style={{ marginTop: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.15em', fontWeight: 700, color: '#2d2640' }}>My Students ({students.length})</h2>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="text" placeholder="🔍 Search students..." value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.85em' }}
+              />
+              <Link
+                href="/educator/school"
+                title="Students are added from the School Dashboard"
+                style={{
+                  padding: '8px 16px', borderRadius: '8px', border: 'none',
+                  background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)', color: 'white',
+                  fontWeight: 700, fontSize: '0.85em', cursor: 'pointer', textDecoration: 'none',
+                  display: 'inline-block',
+                }}
+              >
+                + Add students
+              </Link>
+            </div>
+          </div>
 
-      {studentsStatus === 'error' && (
-        <p className="message">Couldn&apos;t load students. Try refreshing the page.</p>
-      )}
+          {studentsStatus === 'loading' && <p style={{ color: '#8b7fa8', marginTop: '16px' }}>Loading students...</p>}
+          {studentsStatus === 'error' && <p style={{ color: '#e0615f', marginTop: '16px' }}>Couldn&apos;t load students.</p>}
 
-      {studentsStatus === 'ready' && (
-        <div className="card" style={{ marginTop: '12px' }}>
-          {students.length === 0 ? (
-            <p className="description" style={{ margin: 0 }}>
-              No students yet. Add a student below so they can register and sit rounds.
-            </p>
-          ) : (
-            <ul style={{ margin: 0, paddingLeft: '20px' }}>
-              {students.map((student) => (
-                <li key={student.id} className="description" style={{ marginBottom: '4px' }}>
-                  {student.name} — Grade {student.grade}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <form onSubmit={handleAddStudent} style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              placeholder="Student name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={{
-                flex: '1 1 160px',
-                padding: '10px 12px',
-                border: '1px solid var(--border-lavender)',
-                borderRadius: '8px',
-                fontSize: '15px',
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Grade"
-              value={grade}
-              onChange={(e) => setGrade(e.target.value)}
-              style={{
-                flex: '0 1 90px',
-                padding: '10px 12px',
-                border: '1px solid var(--border-lavender)',
-                borderRadius: '8px',
-                fontSize: '15px',
-              }}
-            />
-            <button type="submit" disabled={adding} className="button">
-              {adding ? 'Adding...' : 'Add student'}
-            </button>
-          </form>
-
-          {studentsError && (
-            <p className="message" style={{ marginTop: '8px', marginBottom: 0 }}>
-              {studentsError}
-            </p>
+          {studentsStatus === 'ready' && (
+            filteredStudents.length === 0 ? (
+              <div style={{ marginTop: '16px', padding: '32px', textAlign: 'center', background: 'white',
+                borderRadius: '14px', border: '1px solid rgba(139,92,246,0.1)' }}>
+                <p style={{ fontSize: '2em', margin: '0 0 8px' }}>🎓</p>
+                <p style={{ color: '#8b7fa8', margin: 0 }}>
+                  {students.length === 0 ? 'No students yet — add them from the School Dashboard.' : 'No students match your search.'}
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px', marginTop: '16px' }}>
+                {filteredStudents.map((s) => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '12px',
+                    background: 'white', borderRadius: '12px', padding: '12px 14px',
+                    border: '1px solid rgba(139,92,246,0.08)', boxShadow: '0 2px 8px rgba(139,92,246,0.05)' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)', color: 'white',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.78em', flexShrink: 0 }}>
+                      {initials(s.name)}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: 600, fontSize: '0.88em', color: '#2d2640', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</p>
+                      <p style={{ margin: 0, fontSize: '0.75em', color: '#8b7fa8' }}>Grade {s.grade}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
-      )}
 
-      <h2 style={{ marginTop: '24px' }}>Rounds</h2>
+        {/* Rounds board */}
+        <div style={{ marginTop: '36px' }}>
+          <h2 style={{ margin: '0 0 16px', fontSize: '1.15em', fontWeight: 700, color: '#2d2640' }}>Rounds</h2>
 
-      {roundsStatus === 'loading' && <p className="description">Loading rounds...</p>}
+          {roundsStatus === 'loading' && <p style={{ color: '#8b7fa8' }}>Loading rounds...</p>}
+          {roundsStatus === 'empty' && (
+            <div style={{ padding: '32px', textAlign: 'center', background: 'white', borderRadius: '14px', border: '1px solid rgba(139,92,246,0.1)' }}>
+              <p style={{ color: '#8b7fa8', margin: 0 }}>No rounds yet.</p>
+            </div>
+          )}
+          {roundsStatus === 'error' && <p style={{ color: '#e0615f' }}>Couldn&apos;t load rounds.</p>}
 
-      {roundsStatus === 'empty' && <p className="description">No rounds yet.</p>}
-
-      {roundsStatus === 'error' && (
-        <p className="message">Couldn&apos;t load rounds. Try refreshing the page.</p>
-      )}
-
-      {roundsStatus === 'ready' && (
-        <ul style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {olympiadsWithRounds.map((olympiad) => (
-            <li key={olympiad.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ background: 'var(--lavender)', padding: '10px 16px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.05em', color: 'white' }}>{olympiad.name}</h3>
-              </div>
-              <div style={{ padding: '12px 16px 16px' }}>
-                <p className="description" style={{ margin: '0 0 12px 0', fontSize: '0.85em' }}>
-                  {olympiad.timezone} · {olympiad.rounds.length} round
-                  {olympiad.rounds.length !== 1 ? 's' : ''}
-                </p>
-                <ul style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {olympiad.rounds.map((round) => (
-                    <li key={round.id}>
-                      <Link
-                        href={`/educator/round_view?id=${round.id}`}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          padding: '8px 12px',
-                          borderRadius: '6px',
-                          border: '1px solid rgba(139, 92, 246, 0.2)',
-                          textDecoration: 'none',
-                          fontSize: '0.9em',
-                        }}
-                      >
-                        <span>{round.name}</span>
-                        <span style={{ textTransform: 'capitalize', opacity: 0.7 }}>
-                          {round.state}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+          {roundsStatus === 'ready' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+              {['open', 'scheduled', 'closed', 'released'].map((state) =>
+                roundsByState[state].length > 0 ? (
+                  <div key={state} style={{ background: 'white', borderRadius: '16px', padding: '18px',
+                    border: '1px solid rgba(139,92,246,0.1)', boxShadow: '0 2px 10px rgba(139,92,246,0.06)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: STATE_STYLES[state].color }} />
+                      <h3 style={{ margin: 0, fontSize: '0.9em', fontWeight: 700, color: '#2d2640' }}>{STATE_STYLES[state].label}</h3>
+                      <span style={{ marginLeft: 'auto', fontSize: '0.75em', color: '#a89fc9' }}>{roundsByState[state].length}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {roundsByState[state].map((round) => (
+                        <Link key={round.id} href={`/educator/round_view?id=${round.id}`} style={{
+                          display: 'flex', flexDirection: 'column', gap: '2px', padding: '10px 12px',
+                          borderRadius: '10px', background: STATE_STYLES[state].bg, textDecoration: 'none',
+                        }}>
+                          <span style={{ fontSize: '0.88em', fontWeight: 600, color: '#2d2640' }}>{round.name}</span>
+                          <span style={{ fontSize: '0.72em', color: '#8b7fa8' }}>{round.olympiadName}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ) : null
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }

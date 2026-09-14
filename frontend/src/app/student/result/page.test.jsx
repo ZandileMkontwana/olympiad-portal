@@ -8,18 +8,22 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(paramsState.id ? `id=${paramsState.id}` : ''),
 }));
 
-// Mutable hook state — individual tests override before rendering.
-const roleState = vi.hoisted(() => ({
-  user: { id: 'user-1', email: 'student@school.com', role: 'student', name: 'Thabo', school: 'Test School' },
+// Mutable session state — individual tests override before rendering.
+const authState = vi.hoisted(() => ({
+  user: { id: 'user-1', email: 'student@school.com', role: 'student', name: 'Thabo', school: { id: 'school-1', name: 'Test School' }, entrantId: 'entrant-1' },
   checking: false,
 }));
 
-vi.mock('@/hooks/useRequireRole', () => ({
-  useRequireRole: () => roleState,
-}));
+// Stable reference — the result-loading effect depends on getToken.
+const mockGetToken = vi.fn().mockResolvedValue('mock-token');
 
-vi.mock('@clerk/nextjs', () => ({
-  useAuth: () => ({ getToken: vi.fn().mockResolvedValue('mock-token') }),
+vi.mock('@/hooks/useStudentAuth', () => ({
+  useStudentAuth: () => ({
+    user: authState.user,
+    checking: authState.checking,
+    getToken: mockGetToken,
+    signOut: vi.fn(),
+  }),
 }));
 
 vi.mock('@/lib/api', () => ({
@@ -55,7 +59,8 @@ function resultData(overrides = {}) {
 describe('StudentResultPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    roleState.checking = false;
+    authState.checking = false;
+    authState.user = { id: 'user-1', email: 'student@school.com', role: 'student', name: 'Thabo', entrantId: 'entrant-1' };
     paramsState.id = 'result-1';
   });
 

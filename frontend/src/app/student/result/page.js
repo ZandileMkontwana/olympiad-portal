@@ -7,8 +7,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { fetchMyResult } from '@/lib/api';
 
 function formatDate(isoString) {
@@ -83,8 +82,7 @@ function ResultContent() {
   const searchParams = useSearchParams();
   const resultId = searchParams.get('id');
 
-  const { user, checking } = useRequireRole('student');
-  const { getToken } = useAuth();
+  const { user, checking, getToken } = useStudentAuth();
 
   const [result, setResult] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error

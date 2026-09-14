@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useAuth, useClerk } from '@clerk/nextjs';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { fetchMySittings, fetchMyResults, fetchMyRounds } from '@/lib/api';
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
@@ -401,9 +400,7 @@ function ResultsSection({ results }) {
 /* ── Main page ────────────────────────────────────────────────────────── */
 
 export default function StudentDashboard() {
-  const { user, checking } = useRequireRole('student');
-  const { signOut } = useClerk();
-  const { getToken } = useAuth();
+  const { user, checking, getToken, signOut } = useStudentAuth();
 
   const [sittings, setSittings] = useState([]);
   const [results, setResults] = useState([]);
@@ -412,7 +409,7 @@ export default function StudentDashboard() {
   const [activeSection, setActiveSection] = useState('overview');
 
   useEffect(() => {
-    if (checking) return;
+    if (checking || !user) return;
     async function load() {
       try {
         const token = await getToken();
@@ -430,14 +427,16 @@ export default function StudentDashboard() {
       }
     }
     load();
-  }, [checking, getToken]);
+  }, [checking, user, getToken]);
 
   async function handleLogout() {
     if (!window.confirm('Log out of the Olympiad Portal?')) return;
     await signOut({ redirectUrl: '/login' });
   }
 
-  if (checking || status === 'loading') {
+  // `!user` covers the window after sign-out clears the session but before
+  // the redirect away finishes — otherwise user.name below would crash.
+  if (checking || !user || status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas">
         <p className="text-lg text-ink-soft">Loading...</p>

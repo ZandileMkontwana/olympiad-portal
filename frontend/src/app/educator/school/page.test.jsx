@@ -16,9 +16,9 @@ const mockDashboard = {
   entrantCount: 3,
   totalSubmissions: 5,
   entrants: [
-    { id: 'e1', name: 'Alice Alpha', grade: '10', submissionCount: 2, averageScore: 85 },
-    { id: 'e2', name: 'Bob Beta', grade: '11', submissionCount: 2, averageScore: 60 },
-    { id: 'e3', name: 'Carol Gamma', grade: '10', submissionCount: 1, averageScore: null },
+    { id: 'e1', name: 'Alice Alpha', grade: '10', submissionCount: 2, averageScore: 85, email: 'alice@school.com', accountStatus: 'active' },
+    { id: 'e2', name: 'Bob Beta', grade: '11', submissionCount: 2, averageScore: 60, email: 'bob@school.com', accountStatus: 'invite_pending' },
+    { id: 'e3', name: 'Carol Gamma', grade: '10', submissionCount: 1, averageScore: null, email: null, accountStatus: null },
   ],
 };
 
@@ -49,11 +49,13 @@ vi.mock('@/hooks/useRequireRole', () => ({
 vi.mock('@/lib/api', () => ({
   fetchSchoolDashboard: vi.fn(),
   createEntrant: vi.fn(),
+  resendEntrantInvite: vi.fn(),
+  deleteEntrant: vi.fn(),
 }));
 
 import SchoolDashboardPage from './page';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { fetchSchoolDashboard, createEntrant } from '@/lib/api';
+import { fetchSchoolDashboard, createEntrant, resendEntrantInvite, deleteEntrant } from '@/lib/api';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -151,7 +153,7 @@ describe('School Dashboard Page', () => {
     const noScores = {
       ...mockDashboard,
       entrants: [
-        { id: 'e1', name: 'Alice Alpha', grade: '10', submissionCount: 0, averageScore: null },
+        { id: 'e1', name: 'Alice Alpha', grade: '10', submissionCount: 0, averageScore: null, email: 'alice@school.com', accountStatus: 'active' },
       ],
     };
     fetchSchoolDashboard.mockResolvedValue(noScores);
@@ -352,11 +354,29 @@ describe('School Dashboard Page', () => {
       expect(screen.getByText(/No Students Yet/)).toBeTruthy();
     });
     expect(screen.getByPlaceholderText('Student name')).toBeTruthy();
-    expect(screen.getByPlaceholderText(/Grade/)).toBeTruthy();
+    expect(screen.getByPlaceholderText('Student email')).toBeTruthy();
+    expect(screen.getByDisplayValue('Grade')).toBeTruthy();
+  });
+
+  it('only offers real grades 1 to 12 in the grade dropdown', async () => {
+    fetchSchoolDashboard.mockResolvedValue({
+      school: { id: 'school-1', name: 'Testville High' },
+      entrantCount: 0,
+      totalSubmissions: 0,
+      entrants: [],
+    });
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/No Students Yet/)).toBeTruthy();
+    });
+
+    const gradeSelect = screen.getByDisplayValue('Grade');
+    const options = Array.from(gradeSelect.options).map((o) => o.value);
+    expect(options).toEqual(['', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
   });
 
   it('calls createEntrant when adding a student (after confirm)', async () => {
-    createEntrant.mockResolvedValue({ id: 'e4', name: 'New Kid', grade: '10', schoolId: 'school-1' });
+    createEntrant.mockResolvedValue({ id: 'e4', name: 'New Kid', grade: '10', schoolId: 'school-1', invitationSent: true });
     fetchSchoolDashboard.mockResolvedValue({
       school: { id: 'school-1', name: 'Testville High' },
       entrantCount: 0,
@@ -369,13 +389,42 @@ describe('School Dashboard Page', () => {
     });
 
     fireEvent.change(screen.getByPlaceholderText('Student name'), { target: { value: 'New Kid' } });
-    fireEvent.change(screen.getByPlaceholderText(/Grade/), { target: { value: '10' } });
+    fireEvent.change(screen.getByPlaceholderText('Student email'), { target: { value: 'newkid@school.com' } });
+    fireEvent.change(screen.getByDisplayValue('Grade'), { target: { value: '10' } });
     fireEvent.click(screen.getByText('Add Student'));
 
-    expect(global.confirm).toHaveBeenCalledWith('Add "New Kid" (Grade 10) to your school?');
+    expect(global.confirm).toHaveBeenCalledWith(
+      'Add "New Kid" (newkid@school.com, Grade 10) to your school? They\'ll be emailed a link to set their password.'
+    );
     await waitFor(() => {
-      expect(createEntrant).toHaveBeenCalledWith({ name: 'New Kid', grade: '10' }, 'mock-token');
+      expect(createEntrant).toHaveBeenCalledWith(
+        { name: 'New Kid', email: 'newkid@school.com', grade: '10' },
+        'mock-token'
+      );
     });
+    await waitFor(() => {
+      expect(screen.getByText(/has been added and emailed a link/i)).toBeTruthy();
+    });
+  });
+
+  it('blocks adding a student when the email is missing', async () => {
+    fetchSchoolDashboard.mockResolvedValue({
+      school: { id: 'school-1', name: 'Testville High' },
+      entrantCount: 0,
+      totalSubmissions: 0,
+      entrants: [],
+    });
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Student name')).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('Student name'), { target: { value: 'New Kid' } });
+    fireEvent.change(screen.getByDisplayValue('Grade'), { target: { value: '10' } });
+    fireEvent.click(screen.getByText('Add Student'));
+
+    expect(screen.getByText('Name, email and grade are required.')).toBeTruthy();
+    expect(createEntrant).not.toHaveBeenCalled();
   });
 
   it('toggles add student form when button is clicked', async () => {
@@ -391,5 +440,161 @@ describe('School Dashboard Page', () => {
     // Click Cancel to hide
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByText('Add a New Student')).toBeNull();
+  });
+
+  // ── account status + resend invite ────────────────────────────────────
+
+  it('shows each entrant\'s email on their card', async () => {
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('alice@school.com')).toBeTruthy();
+      expect(screen.getByText('bob@school.com')).toBeTruthy();
+    });
+    // Legacy entrant with no account yet
+    expect(screen.getByText('No account yet')).toBeTruthy();
+  });
+
+  it('shows account status chips on entrant cards', async () => {
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeTruthy();
+      expect(screen.getByText('Invite pending')).toBeTruthy();
+      expect(screen.getByText('No account')).toBeTruthy();
+    });
+  });
+
+  it('shows resend invite only for pending or account-less entrants', async () => {
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Bob Beta')).toBeTruthy();
+    });
+
+    // Bob is invite-pending and Carol has no account — both offer invite
+    // buttons; Alice (active) has none.
+    expect(screen.getByRole('button', { name: 'Resend invite' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Send invite' })).toBeTruthy();
+    const inviteButtons = screen.getAllByRole('button').filter(
+      (btn) => /invite/i.test(btn.textContent)
+    );
+    expect(inviteButtons).toHaveLength(2);
+  });
+
+  it('resends an invitation for an invite-pending student (after confirm)', async () => {
+    resendEntrantInvite.mockResolvedValue({ message: 'Invitation sent', invitationSent: true });
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Bob Beta')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText('Resend invite'));
+
+    expect(global.confirm).toHaveBeenCalledWith(
+      'Email Bob Beta a link to set their password (bob@school.com)?'
+    );
+    await waitFor(() => {
+      expect(resendEntrantInvite).toHaveBeenCalledWith('e2', 'mock-token', {});
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Invitation emailed to bob@school.com.')).toBeTruthy();
+    });
+  });
+
+  it('prompts for an email when inviting a legacy entrant without an account', async () => {
+    vi.stubGlobal('prompt', vi.fn(() => 'carol@school.com'));
+    resendEntrantInvite.mockResolvedValue({ message: 'Invitation sent', invitationSent: true });
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Carol Gamma')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText('Send invite'));
+
+    expect(global.prompt).toHaveBeenCalledWith(
+      'Carol Gamma has no account yet. Enter their student email to send the invitation:'
+    );
+    expect(global.confirm).toHaveBeenCalledWith(
+      'Email Carol Gamma a link to set their password (carol@school.com)?'
+    );
+    await waitFor(() => {
+      expect(resendEntrantInvite).toHaveBeenCalledWith('e3', 'mock-token', {
+        email: 'carol@school.com',
+      });
+    });
+  });
+
+  it('shows an error message when the resend fails', async () => {
+    resendEntrantInvite.mockRejectedValue(new Error('Could not resend the invitation'));
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Bob Beta')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText('Resend invite'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/could not resend the invitation/i)).toBeTruthy();
+    });
+  });
+
+  // ── remove entrant ────────────────────────────────────────────────────────
+
+  it('shows a Remove button on every entrant card', async () => {
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Alice Alpha')).toBeTruthy();
+    });
+
+    expect(screen.getAllByText('Remove')).toHaveLength(3);
+  });
+
+  it('removes an entrant after confirmation and refreshes the list', async () => {
+    deleteEntrant.mockResolvedValue({ message: 'Entrant removed' });
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Alice Alpha')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getAllByText('Remove')[0]);
+
+    // Alice has 2 submissions, so the warning mentions them
+    expect(global.confirm).toHaveBeenCalledWith(
+      "Remove Alice Alpha from your school? Their account and records will be deleted — this can't be undone. This permanently deletes their 2 submissions and results."
+    );
+    await waitFor(() => {
+      expect(deleteEntrant).toHaveBeenCalledWith('e1', 'mock-token');
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Alice Alpha has been removed from your school.')).toBeTruthy();
+    });
+    // The dashboard re-fetches after a removal
+    expect(fetchSchoolDashboard).toHaveBeenCalledWith('school-1', 'mock-token');
+  });
+
+  it('keeps the entrant when the removal confirmation is cancelled', async () => {
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Alice Alpha')).toBeTruthy();
+    });
+
+    confirm.mockReturnValue(false);
+    fireEvent.click(screen.getAllByText('Remove')[0]);
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/Remove Alice Alpha/));
+    expect(deleteEntrant).not.toHaveBeenCalled();
+    expect(screen.getByText('Alice Alpha')).toBeTruthy();
+  });
+
+  it('shows an error message when the removal fails', async () => {
+    deleteEntrant.mockRejectedValue(new Error('Could not remove the entrant'));
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Alice Alpha')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getAllByText('Remove')[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/could not remove the entrant/i)).toBeTruthy();
+    });
   });
 });
