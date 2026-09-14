@@ -244,6 +244,17 @@ export function releaseResults(roundId, token) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * Hides all released results for a round so students can no longer view them.
+ * Wired to POST /api/rounds/:id/unrelease-results (backend/src/routes/rounds.js).
+ */
+export function unreleaseResults(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/unrelease-results`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
 /**
  * Fetches a single round by id.
  * Wired to GET /api/rounds/:id (backend/src/routes/rounds.js).

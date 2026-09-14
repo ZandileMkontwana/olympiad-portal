@@ -73,7 +73,16 @@ router.get('/rounds/:id', async (req, res) => {
   try {
     const round = await prisma.round.findUnique({ where: { id: req.params.id } });
     if (!round) return res.status(404).json({ error: 'Round not found' });
-    res.json(round);
+
+    // Check if any results have been released for this round
+    const releasedCount = await prisma.result.count({
+      where: {
+        releasedAt: { not: null },
+        submission: { roundId: round.id },
+      },
+    });
+
+    res.json({ ...round, hasReleasedResults: releasedCount > 0 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch round' });
@@ -202,6 +211,30 @@ router.post('/rounds/:id/release-results', ...requireRole('educator'), async (re
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not release results' });
+  }
+});
+
+// POST /rounds/:id/unrelease-results
+// Hides all released results for a round so students can no longer view them.
+router.post('/rounds/:id/unrelease-results', ...requireRole('educator'), async (req, res) => {
+  try {
+    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const updated = await prisma.result.updateMany({
+      where: {
+        releasedAt: { not: null },
+        submission: { roundId: round.id },
+      },
+      data: { releasedAt: null },
+    });
+
+    res.json({ unreleasedCount: updated.count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not unrelease results' });
   }
 });
 

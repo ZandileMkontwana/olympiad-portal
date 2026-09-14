@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
-import { releaseResults } from '@/lib/api';
+import { releaseResults, unreleaseResults } from '@/lib/api';
 
 function formatRemaining(ms) {
   if (ms <= 0) return 'closing any moment';
@@ -28,8 +28,16 @@ function RoundViewContent() {
   const [error, setError] = useState('');
   const [downloadError, setDownloadError] = useState('');
   const [timeRemaining, setTimeRemaining] = useState('');
-  const [releaseStatus, setReleaseStatus] = useState('idle'); // idle | releasing | released | error
+  const [releaseStatus, setReleaseStatus] = useState('idle'); // idle | releasing | released | unreleasing | error
   const [releaseMessage, setReleaseMessage] = useState('');
+
+  // Detect release state from the round data
+  useEffect(() => {
+    if (round?.hasReleasedResults && releaseStatus === 'idle') {
+      setReleaseStatus('released');
+      setReleaseMessage('Results have been released to students.');
+    }
+  }, [round?.hasReleasedResults, releaseStatus]);
 
   useEffect(() => {
     if (!roundId) return;
@@ -161,8 +169,38 @@ function RoundViewContent() {
         {round.state === 'closed' && (
           <div style={{ marginTop: '12px' }}>
             {releaseStatus === 'released' ? (
-              <div className="message" style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }}>
-                {releaseMessage}
+              <div>
+                <div className="message" style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }}>
+                  {releaseMessage}
+                </div>
+                <button
+                  className="button"
+                  style={{ marginTop: '8px', background: 'transparent', color: '#e0615f', border: '1px solid rgba(224,97,95,0.3)' }}
+                  disabled={releaseStatus === 'unreleasing'}
+                  onClick={async () => {
+                    if (!window.confirm(
+                      'Are you sure you want to hide results? Students will no longer be able to see their marks.'
+                    )) return;
+                    setReleaseStatus('unreleasing');
+                    try {
+                      const token = await getToken();
+                      const data = await unreleaseResults(roundId, token);
+                      setReleaseStatus('idle');
+                      setReleaseMessage('');
+                      // Force re-fetch to update hasReleasedResults
+                      const response = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`
+                      );
+                      const freshRound = await response.json();
+                      if (response.ok) setRound(freshRound);
+                    } catch (err) {
+                      setReleaseStatus('error');
+                      setReleaseMessage(err.message || 'Could not unrelease results.');
+                    }
+                  }}
+                >
+                  {releaseStatus === 'unreleasing' ? 'Hiding…' : 'Hide Results from Students'}
+                </button>
               </div>
             ) : (
               <>
@@ -184,6 +222,12 @@ function RoundViewContent() {
                           ? `Released ${data.releasedCount} result${data.releasedCount !== 1 ? 's' : ''}. Students can now view their marks.`
                           : 'No unreleased results found for this round.'
                       );
+                      // Force re-fetch to update hasReleasedResults
+                      const response = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`
+                      );
+                      const freshRound = await response.json();
+                      if (response.ok) setRound(freshRound);
                     } catch (err) {
                       setReleaseStatus('error');
                       setReleaseMessage(err.message || 'Could not release results.');
