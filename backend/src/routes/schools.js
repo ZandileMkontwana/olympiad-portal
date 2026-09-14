@@ -1,6 +1,6 @@
 ﻿const express = require('express');
 const prisma = require('../lib/prisma');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, loadAuthUser } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -14,8 +14,7 @@ function requireSchoolAccess() {
     requireAuth,
     async (req, res, next) => {
       try {
-        const { userId: clerkUserId } = req.auth();
-        const user = await prisma.user.findUnique({ where: { clerkUserId } });
+        const user = await loadAuthUser(req);
 
         if (!user) {
           return res.status(404).json({ error: 'User not found' });
@@ -76,9 +75,23 @@ router.get('/schools/:id/entrants', ...requireSchoolAccess(), async (req, res) =
     const entrants = await prisma.entrant.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' },
+      include: {
+        user: { select: { email: true, passwordHash: true } },
+      },
     });
 
-    res.json(entrants);
+    res.json(
+      entrants.map((entrant) => ({
+        ...entrant,
+        email: entrant.user ? entrant.user.email : null,
+        accountStatus: entrant.user
+          ? entrant.user.passwordHash
+            ? 'active'
+            : 'invite_pending'
+          : null,
+        user: undefined,
+      }))
+    );
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch entrants' });
@@ -106,6 +119,7 @@ router.get('/schools/:id/dashboard', ...requireSchoolAccess(), async (req, res) 
       where: { schoolId },
       include: {
         submissions: { include: { result: true } },
+        user: { select: { email: true, passwordHash: true } },
       },
     });
 
@@ -121,6 +135,12 @@ router.get('/schools/:id/dashboard', ...requireSchoolAccess(), async (req, res) 
         id: entrant.id,
         name: entrant.name,
         grade: entrant.grade,
+        email: entrant.user ? entrant.user.email : null,
+        accountStatus: entrant.user
+          ? entrant.user.passwordHash
+            ? 'active'
+            : 'invite_pending'
+          : null,
         submissionCount: entrant.submissions.length,
         averageScore,
       };

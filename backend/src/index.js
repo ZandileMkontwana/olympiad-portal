@@ -11,6 +11,7 @@ const entrantsRouter = require('./routes/entrants');
 const schoolsRouter = require('./routes/schools');
 const studentsRouter = require('./routes/students');
 const authRouter = require('./routes/auth');
+const studentAuthRouter = require('./routes/studentAuth');
 const certificatesRouter = require('./routes/certificates');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
@@ -37,6 +38,7 @@ app.use('/api', entrantsRouter);
 app.use('/api', schoolsRouter);
 app.use('/api', studentsRouter);
 app.use('/api', authRouter);
+app.use('/api', studentAuthRouter);
 app.use('/api', certificatesRouter);
 
 // JSON 404 for unmatched /api routes (prevents Express's default HTML response)

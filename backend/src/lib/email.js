@@ -210,12 +210,47 @@ async function sendMissingSubmissionNotification({
   }
 }
 
+// Sends a student their invitation to set a password and activate the
+// account their educator created. Unlike the round notifications this is
+// not round-scoped, so nothing is logged to NotificationLog; the caller
+// uses the return value to report whether the invitation went out.
+async function sendStudentInvitation({ toEmail, studentName, schoolName, invitationUrl }) {
+  const msg = {
+    to: toEmail,
+    from: process.env.SENDGRID_FROM_EMAIL,
+    subject: 'Set up your Olympiad Portal account',
+    text:
+      `Hi ${studentName},\n\n` +
+      `Your educator at ${schoolName} has registered you for the Olympiad Portal.\n` +
+      `Set a password to activate your account:\n\n${invitationUrl}\n\n` +
+      `This link expires in 48 hours — after that, ask your educator to resend the invitation.\n\n` +
+      `If you were not expecting this email, you can ignore it.`,
+    html:
+      `<p>Hi <strong>${studentName}</strong>,</p>` +
+      `<p>Your educator at <strong>${schoolName}</strong> has registered you for the Olympiad Portal. ` +
+      `Set a password to activate your account:</p>` +
+      `<p><a href="${invitationUrl}">Set my password</a></p>` +
+      `<p>This link expires in 48 hours — after that, ask your educator to resend the invitation.</p>` +
+      `<p>If you were not expecting this email, you can ignore it.</p>`,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`Student invitation sent to ${toEmail}`);
+    return true;
+  } catch (err) {
+    console.error('Failed to send student invitation:', err.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendSubmissionReceipt,
   sendRoundOpeningNotification,
   sendRoundClosingNotification,
   sendResultsReleasedNotification,
   sendMissingSubmissionNotification,
+  sendStudentInvitation,
   buildRoundOpeningMessage,
   buildRoundClosingMessage,
   buildResultsReleasedMessage,

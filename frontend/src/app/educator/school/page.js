@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
-import { useClerk, useAuth } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { fetchSchoolDashboard, createEntrant } from '@/lib/api';
+import { fetchSchoolDashboard, createEntrant, resendEntrantInvite, deleteEntrant } from '@/lib/api';
+import { GRADE_OPTIONS } from '@/lib/grade';
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
 
@@ -77,140 +77,6 @@ function ScoreRing({ score, size = 52 }) {
         {score === null ? '—' : `${score.toFixed(0)}%`}
       </div>
     </div>
-  );
-}
-
-/* ── Sidebar ──────────────────────────────────────────────────────────── */
-
-function Sidebar({ user, onLogout, schoolName }) {
-  const links = [
-    { href: '/educator', icon: '📋', label: 'Rounds' },
-    { href: '/educator/school', icon: '🏫', label: 'School Dashboard', active: true },
-    { href: '/archive', icon: '📂', label: 'Paper Archive' },
-  ];
-  return (
-    <aside
-      style={{
-        width: '240px',
-        flexShrink: 0,
-        height: '100vh',
-        background: 'white',
-        borderRight: '1px solid rgba(139,92,246,0.1)',
-        padding: '24px 18px',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        overflowY: 'auto',
-        zIndex: 10,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 6px 24px' }}>
-        <div
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 800,
-          }}
-        >
-          O
-        </div>
-        <div>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9em', color: '#2d2640' }}>
-            Olympiad Portal
-          </p>
-          <p style={{ margin: 0, fontSize: '0.7em', color: '#a89fc9' }}>{schoolName}</p>
-        </div>
-      </div>
-
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-        {links.map((l) => (
-          <Link
-            key={l.label}
-            href={l.href}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '11px 14px',
-              borderRadius: '10px',
-              textDecoration: 'none',
-              fontSize: '0.88em',
-              fontWeight: 600,
-              color: l.active ? '#6d3fd1' : '#6b6480',
-              background: l.active ? 'rgba(139,92,246,0.1)' : 'transparent',
-            }}
-          >
-            <span style={{ fontSize: '1.1em' }}>{l.icon}</span>
-            {l.label}
-          </Link>
-        ))}
-      </nav>
-
-      <div
-        style={{
-          borderTop: '1px solid rgba(139,92,246,0.1)',
-          paddingTop: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-        }}
-      >
-        <div
-          style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            fontSize: '0.8em',
-            flexShrink: 0,
-          }}
-        >
-          {initials(user.name || user.email)}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p
-            style={{
-              margin: 0,
-              fontSize: '0.8em',
-              fontWeight: 600,
-              color: '#2d2640',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {user.name || user.email}
-          </p>
-          <button
-            onClick={onLogout}
-            style={{
-              border: 'none',
-              background: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              fontSize: '0.75em',
-              color: '#e0615f',
-              fontWeight: 600,
-            }}
-          >
-            Log out
-          </button>
-        </div>
-      </div>
-    </aside>
   );
 }
 
@@ -599,7 +465,6 @@ function TopPodium({ entrants }) {
 
 export default function SchoolDashboardPage() {
   const { user, checking } = useRequireRole('educator');
-  const { signOut } = useClerk();
   const { getToken } = useAuth();
 
   const [dashboard, setDashboard] = useState(null);
@@ -609,9 +474,13 @@ export default function SchoolDashboardPage() {
   const [sortOption, setSortOption] = useState('score');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newGrade, setNewGrade] = useState('');
   const [addMessage, setAddMessage] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [resendingId, setResendingId] = useState(null);
+  const [resendMessage, setResendMessage] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
 
   const noSchool = !checking && user && !(user.school && user.school.id);
 
@@ -686,24 +555,100 @@ export default function SchoolDashboardPage() {
   async function handleAddStudent(e) {
     e.preventDefault();
     setAddMessage(null);
-    if (!newName.trim() || !newGrade.trim()) {
-      setAddMessage({ type: 'error', text: 'Name and grade are required.' });
+    if (!newName.trim() || !newGrade.trim() || !newEmail.trim()) {
+      setAddMessage({ type: 'error', text: 'Name, email and grade are required.' });
       return;
     }
-    if (!window.confirm(`Add "${newName.trim()}" (Grade ${newGrade.trim()}) to your school?`))
+    if (
+      !window.confirm(
+        `Add "${newName.trim()}" (${newEmail.trim()}, Grade ${newGrade.trim()}) to your school? They'll be emailed a link to set their password.`
+      )
+    )
       return;
     setAdding(true);
     try {
       const token = await getToken();
-      await createEntrant({ name: newName.trim(), grade: newGrade.trim() }, token);
-      setAddMessage({ type: 'success', text: `${newName.trim()} has been added to your school!` });
+      const result = await createEntrant(
+        { name: newName.trim(), email: newEmail.trim(), grade: newGrade.trim() },
+        token
+      );
+      setAddMessage({
+        type: 'success',
+        text: result.invitationSent
+          ? `${newName.trim()} has been added and emailed a link to set their password.`
+          : `${newName.trim()} has been added, but the invitation email could not be sent — use "Resend invite" on their card.`,
+      });
       setNewName('');
+      setNewEmail('');
       setNewGrade('');
       await handleRefresh();
     } catch (err) {
       setAddMessage({ type: 'error', text: err.message || 'Failed to add student.' });
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function handleResendInvite(entrant) {
+    setResendMessage(null);
+    let email = entrant.email;
+    if (!email) {
+      // Legacy entrant with no account yet — an email is needed to create one.
+      const entered = window.prompt(
+        `${entrant.name} has no account yet. Enter their student email to send the invitation:`
+      );
+      if (!entered || !entered.trim()) return;
+      email = entered.trim();
+    }
+    if (!window.confirm(`Email ${entrant.name} a link to set their password (${email})?`)) return;
+    setResendingId(entrant.id);
+    try {
+      const token = await getToken();
+      const result = await resendEntrantInvite(entrant.id, token, entrant.email ? {} : { email });
+      setResendMessage({
+        type: result.invitationSent ? 'success' : 'error',
+        text: result.invitationSent
+          ? `Invitation emailed to ${email}.`
+          : 'The invitation email could not be sent. Please try again later.',
+      });
+      // A legacy entrant just gained an account — refresh so the card reflects it.
+      if (!entrant.email) await handleRefresh();
+    } catch (err) {
+      setResendMessage({ type: 'error', text: err.message || 'Failed to resend the invitation.' });
+    } finally {
+      setResendingId(null);
+    }
+  }
+
+  async function handleRemoveEntrant(entrant) {
+    setResendMessage(null);
+    const submissionNote =
+      entrant.submissionCount > 0
+        ? ` This permanently deletes their ${entrant.submissionCount} submission${entrant.submissionCount !== 1 ? 's' : ''} and results.`
+        : '';
+    if (
+      !window.confirm(
+        `Remove ${entrant.name} from your school? Their account and records will be deleted — this can't be undone.${submissionNote}`
+      )
+    ) {
+      return;
+    }
+    setRemovingId(entrant.id);
+    try {
+      const token = await getToken();
+      await deleteEntrant(entrant.id, token);
+      setResendMessage({
+        type: 'success',
+        text: `${entrant.name} has been removed from your school.`,
+      });
+      await handleRefresh();
+    } catch (err) {
+      setResendMessage({
+        type: 'error',
+        text: err.message || 'Could not remove the student. Please try again.',
+      });
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -742,334 +687,453 @@ export default function SchoolDashboardPage() {
     );
   }
 
-  async function handleLogout() {
-    if (window.confirm('Are you sure you want to log out?'))
-      await signOut({ redirectUrl: '/login' });
-  }
-
   if (noSchool || status === 'error') {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#faf9fc' }}>
-        <main
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '40px',
-          }}
-        >
-          <div style={{ textAlign: 'center', maxWidth: '420px' }}>
-            <p style={{ fontSize: '3em', margin: '0 0 12px' }}>{noSchool ? '🏫' : '⚠️'}</p>
-            <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>
-              {noSchool ? 'No School Linked' : 'Something went wrong'}
-            </h2>
-            <p style={{ color: '#8b7fa8' }}>
-              {noSchool
-                ? 'Complete your educator profile to link a school.'
-                : "Couldn't load the dashboard. Try refreshing."}
-            </p>
-          </div>
-        </main>
+      <div
+        style={{
+          display: 'flex',
+          minHeight: '60vh',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '40px',
+        }}
+      >
+        <div style={{ textAlign: 'center', maxWidth: '420px' }}>
+          <p style={{ fontSize: '3em', margin: '0 0 12px' }}>{noSchool ? '🏫' : '⚠️'}</p>
+          <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>
+            {noSchool ? 'No School Linked' : 'Something went wrong'}
+          </h2>
+          <p style={{ color: '#8b7fa8' }}>
+            {noSchool
+              ? 'Complete your educator profile to link a school.'
+              : "Couldn't load the dashboard. Try refreshing."}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#faf9fc' }}>
-      <Sidebar user={user} onLogout={handleLogout} schoolName={dashboard.school.name} />
-
-      <main style={{ flex: 1, padding: '32px 40px 60px', marginLeft: '240px' }}>
-        {/* Hero */}
+    <>
+      {/* Hero */}
+      <div
+        style={{
+          background: 'linear-gradient(120deg, #7c3aed 0%, #6028c9 45%, #4c1d95 100%)',
+          borderRadius: '24px',
+          padding: '40px 44px',
+          color: 'white',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 14px 40px rgba(91,33,182,0.32)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '24px',
+        }}
+      >
         <div
           style={{
-            background: 'linear-gradient(120deg, #7c3aed 0%, #6028c9 45%, #4c1d95 100%)',
-            borderRadius: '24px',
-            padding: '40px 44px',
-            color: 'white',
+            position: 'absolute',
+            right: '-60px',
+            top: '-60px',
+            width: '240px',
+            height: '240px',
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.06)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            right: '120px',
+            bottom: '-90px',
+            width: '180px',
+            height: '180px',
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.04)',
+          }}
+        />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.78em',
+              opacity: 0.75,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+            }}
+          >
+            School Dashboard
+          </p>
+          <h1 style={{ margin: '8px 0 0', fontSize: '2.4em', fontWeight: 800 }}>
+            {dashboard.school.name}
+          </h1>
+          <p style={{ margin: '10px 0 0', fontSize: '0.92em', opacity: 0.85 }}>
+            Welcome back, <strong>{user.name || user.email}</strong> — here&apos;s how your students
+            are doing.
+          </p>
+        </div>
+        <div
+          style={{
             position: 'relative',
-            overflow: 'hidden',
-            boxShadow: '0 14px 40px rgba(91,33,182,0.32)',
+            zIndex: 1,
             display: 'flex',
-            justifyContent: 'space-between',
+            gap: '28px',
             alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '24px',
           }}
         >
-          <div
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: '2em', fontWeight: 800 }}>{dashboard.entrantCount}</p>
+            <p style={{ margin: 0, fontSize: '0.75em', opacity: 0.8 }}>Entrants</p>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: '2em', fontWeight: 800 }}>
+              {schoolAverage !== null ? `${schoolAverage.toFixed(0)}%` : '—'}
+            </p>
+            <p style={{ margin: 0, fontSize: '0.75em', opacity: 0.8 }}>Avg. Score</p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            title="Refresh data"
             style={{
-              position: 'absolute',
-              right: '-60px',
-              top: '-60px',
-              width: '240px',
-              height: '240px',
+              width: '40px',
+              height: '40px',
               borderRadius: '50%',
-              background: 'rgba(255,255,255,0.06)',
+              border: '2px solid rgba(255,255,255,0.3)',
+              background: 'rgba(255,255,255,0.1)',
+              color: 'white',
+              fontSize: '1.2em',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.2s',
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+            }}
+          >
+            ↻
+          </button>
+        </div>
+      </div>
+
+      {/* Stat cards */}
+      <div style={{ display: 'flex', gap: '18px', marginTop: '22px', flexWrap: 'wrap' }}>
+        <StatCard
+          icon="👥"
+          label="Total Entrants"
+          value={dashboard.entrantCount}
+          sub="Registered at your school"
+        />
+        <StatCard
+          icon="📝"
+          label="Submissions"
+          value={dashboard.totalSubmissions}
+          sub="Across all rounds"
+        />
+        <StatCard
+          icon="📊"
+          label="School Average"
+          value={schoolAverage !== null ? `${schoolAverage.toFixed(1)}%` : '—'}
+          accent="linear-gradient(135deg, #3fae7a, #2d8a5e)"
+          sub="Weighted across entrants"
+        />
+        {topPerformer && (
+          <StatCard
+            icon="🏆"
+            label="Top Performer"
+            value={topPerformer.name.split(' ')[0]}
+            sub={`${topPerformer.averageScore.toFixed(1)}% avg`}
+            accent="linear-gradient(135deg, #f59e0b, #d97706)"
           />
-          <div
+        )}
+      </div>
+
+      {dashboard.entrants.length === 0 ? (
+        <div
+          style={{
+            marginTop: '32px',
+            padding: '60px 32px',
+            textAlign: 'center',
+            borderRadius: '20px',
+            background: 'white',
+            border: '1px solid rgba(139,92,246,0.12)',
+          }}
+        >
+          <p style={{ fontSize: '3em', margin: '0 0 12px' }}>🎓</p>
+          <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>No Students Yet</h2>
+          <p
+            style={{ color: '#8b7fa8', maxWidth: '420px', margin: '0 auto 24px', lineHeight: 1.6 }}
+          >
+            Add your first student below and their performance will appear here.
+          </p>
+          <form
+            onSubmit={handleAddStudent}
             style={{
-              position: 'absolute',
-              right: '120px',
-              bottom: '-90px',
-              width: '180px',
-              height: '180px',
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,0.04)',
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              maxWidth: '560px',
+              margin: '0 auto',
             }}
-          />
-          <div style={{ position: 'relative', zIndex: 1 }}>
+          >
+            <input
+              type="text"
+              placeholder="Student name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              style={{
+                flex: '1 1 150px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: '1px solid rgba(139,92,246,0.25)',
+                fontSize: '0.88em',
+                outline: 'none',
+              }}
+            />
+            <input
+              type="email"
+              placeholder="Student email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              style={{
+                flex: '1 1 180px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: '1px solid rgba(139,92,246,0.25)',
+                fontSize: '0.88em',
+                outline: 'none',
+              }}
+            />
+            <select
+              value={newGrade}
+              onChange={(e) => setNewGrade(e.target.value)}
+              style={{
+                width: '130px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: '1px solid rgba(139,92,246,0.25)',
+                fontSize: '0.88em',
+                background: 'white',
+              }}
+            >
+              <option value="" disabled>
+                Grade
+              </option>
+              {GRADE_OPTIONS.map((g) => (
+                <option key={g} value={g}>
+                  Grade {g}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              disabled={adding}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: adding ? 'not-allowed' : 'pointer',
+                background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
+                color: 'white',
+                fontWeight: 600,
+                fontSize: '0.88em',
+                opacity: adding ? 0.7 : 1,
+              }}
+            >
+              {adding ? 'Adding...' : 'Add Student'}
+            </button>
+          </form>
+          <p
+            style={{
+              margin: '12px auto 0',
+              fontSize: '0.75em',
+              color: '#a89fc9',
+              maxWidth: '480px',
+            }}
+          >
+            The student is emailed a link to set their password — they then sign in with their email
+            and password.
+          </p>
+          {addMessage && (
             <p
               style={{
-                margin: 0,
-                fontSize: '0.78em',
-                opacity: 0.75,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
+                marginTop: '12px',
+                fontSize: '0.85em',
+                color: addMessage.type === 'success' ? '#3fae7a' : '#e0615f',
                 fontWeight: 600,
               }}
             >
-              School Dashboard
+              {addMessage.text}
             </p>
-            <h1 style={{ margin: '8px 0 0', fontSize: '2.4em', fontWeight: 800 }}>
-              {dashboard.school.name}
-            </h1>
-            <p style={{ margin: '10px 0 0', fontSize: '0.92em', opacity: 0.85 }}>
-              Welcome back, <strong>{user.name || user.email}</strong> — here&apos;s how your
-              students are doing.
-            </p>
-          </div>
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 1,
-              display: 'flex',
-              gap: '28px',
-              alignItems: 'center',
-            }}
-          >
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: '2em', fontWeight: 800 }}>
-                {dashboard.entrantCount}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.75em', opacity: 0.8 }}>Entrants</p>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: '2em', fontWeight: 800 }}>
-                {schoolAverage !== null ? `${schoolAverage.toFixed(0)}%` : '—'}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.75em', opacity: 0.8 }}>Avg. Score</p>
-            </div>
-            <button
-              onClick={handleRefresh}
-              title="Refresh data"
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                border: '2px solid rgba(255,255,255,0.3)',
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white',
-                fontSize: '1.2em',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-              }}
-            >
-              ↻
-            </button>
-          </div>
-        </div>
-
-        {/* Stat cards */}
-        <div style={{ display: 'flex', gap: '18px', marginTop: '22px', flexWrap: 'wrap' }}>
-          <StatCard
-            icon="👥"
-            label="Total Entrants"
-            value={dashboard.entrantCount}
-            sub="Registered at your school"
-          />
-          <StatCard
-            icon="📝"
-            label="Submissions"
-            value={dashboard.totalSubmissions}
-            sub="Across all rounds"
-          />
-          <StatCard
-            icon="📊"
-            label="School Average"
-            value={schoolAverage !== null ? `${schoolAverage.toFixed(1)}%` : '—'}
-            accent="linear-gradient(135deg, #3fae7a, #2d8a5e)"
-            sub="Weighted across entrants"
-          />
-          {topPerformer && (
-            <StatCard
-              icon="🏆"
-              label="Top Performer"
-              value={topPerformer.name.split(' ')[0]}
-              sub={`${topPerformer.averageScore.toFixed(1)}% avg`}
-              accent="linear-gradient(135deg, #f59e0b, #d97706)"
-            />
           )}
         </div>
+      ) : (
+        <>
+          {/* Analytics row - 3 columns, fills the width */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1.3fr 1fr 1fr',
+              gap: '18px',
+              marginTop: '24px',
+              alignItems: 'stretch',
+            }}
+          >
+            <GradeChart entrants={dashboard.entrants} />
+            <DistributionPanel entrants={dashboard.entrants} />
+            <TopPodium entrants={dashboard.entrants} />
+          </div>
 
-        {dashboard.entrants.length === 0 ? (
+          {/* Entrant list */}
           <div
             style={{
               marginTop: '32px',
-              padding: '60px 32px',
-              textAlign: 'center',
-              borderRadius: '20px',
-              background: 'white',
-              border: '1px solid rgba(139,92,246,0.12)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
             }}
           >
-            <p style={{ fontSize: '3em', margin: '0 0 12px' }}>🎓</p>
-            <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>No Students Yet</h2>
-            <p
-              style={{
-                color: '#8b7fa8',
-                maxWidth: '420px',
-                margin: '0 auto 24px',
-                lineHeight: 1.6,
-              }}
-            >
-              Add your first student below and their performance will appear here.
-            </p>
-            <form
-              onSubmit={handleAddStudent}
-              style={{
-                display: 'flex',
-                gap: '12px',
-                justifyContent: 'center',
-                flexWrap: 'wrap',
-                maxWidth: '500px',
-                margin: '0 auto',
-              }}
-            >
-              <input
-                type="text"
-                placeholder="Student name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                style={{
-                  flex: '1 1 180px',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(139,92,246,0.25)',
-                  fontSize: '0.88em',
-                  outline: 'none',
-                }}
-              />
-              <input
-                type="text"
-                placeholder="Grade (e.g. 10)"
-                value={newGrade}
-                onChange={(e) => setNewGrade(e.target.value)}
-                style={{
-                  width: '120px',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(139,92,246,0.25)',
-                  fontSize: '0.88em',
-                  outline: 'none',
-                }}
-              />
+            <h3 style={{ margin: 0, fontSize: '1.1em', fontWeight: 700, color: '#2d2640' }}>
+              All Entrants ({filteredEntrants.length})
+            </h3>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
               <button
-                type="submit"
-                disabled={adding}
+                onClick={() => setShowAddForm(!showAddForm)}
                 style={{
-                  padding: '10px 20px',
+                  padding: '10px 16px',
                   borderRadius: '10px',
                   border: 'none',
-                  cursor: adding ? 'not-allowed' : 'pointer',
                   background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
                   color: 'white',
                   fontWeight: 600,
-                  fontSize: '0.88em',
-                  opacity: adding ? 0.7 : 1,
-                }}
-              >
-                {adding ? 'Adding...' : 'Add Student'}
-              </button>
-            </form>
-            {addMessage && (
-              <p
-                style={{
-                  marginTop: '12px',
                   fontSize: '0.85em',
-                  color: addMessage.type === 'success' ? '#3fae7a' : '#e0615f',
-                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {addMessage.text}
-              </p>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* Analytics row - 3 columns, fills the width */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1.3fr 1fr 1fr',
-                gap: '18px',
-                marginTop: '24px',
-                alignItems: 'stretch',
-              }}
-            >
-              <GradeChart entrants={dashboard.entrants} />
-              <DistributionPanel entrants={dashboard.entrants} />
-              <TopPodium entrants={dashboard.entrants} />
+                {showAddForm ? 'Cancel' : '+ Add Student'}
+              </button>
+              <input
+                type="text"
+                placeholder="🔍  Search by name..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  width: '240px',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(139,92,246,0.25)',
+                  fontSize: '0.88em',
+                  outline: 'none',
+                }}
+              />
+              <select
+                value={gradeFilter}
+                onChange={(e) => setGradeFilter(e.target.value)}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(139,92,246,0.25)',
+                  fontSize: '0.88em',
+                  background: 'white',
+                }}
+              >
+                <option value="all">All grades</option>
+                {grades.map((g) => (
+                  <option key={g} value={g}>
+                    Grade {g}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value)}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(139,92,246,0.25)',
+                  fontSize: '0.88em',
+                  background: 'white',
+                }}
+              >
+                <option value="score">Sort: Score</option>
+                <option value="name">Sort: Name</option>
+                <option value="submissions">Sort: Submissions</option>
+              </select>
+              <button
+                onClick={handleClearFilters}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(139,92,246,0.25)',
+                  fontSize: '0.88em',
+                  background: 'white',
+                  color: '#6d3fd1',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Clear
+              </button>
             </div>
+          </div>
 
-            {/* Entrant list */}
+          {showAddForm && (
             <div
               style={{
-                marginTop: '32px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '12px',
+                marginTop: '16px',
+                padding: '20px 24px',
+                borderRadius: '14px',
+                background: 'white',
+                border: '1px solid rgba(139,92,246,0.12)',
+                boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
               }}
             >
-              <h3 style={{ margin: 0, fontSize: '1.1em', fontWeight: 700, color: '#2d2640' }}>
-                All Entrants ({filteredEntrants.length})
-              </h3>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => setShowAddForm(!showAddForm)}
-                  style={{
-                    padding: '10px 16px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
-                    color: 'white',
-                    fontWeight: 600,
-                    fontSize: '0.85em',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {showAddForm ? 'Cancel' : '+ Add Student'}
-                </button>
+              <h4
+                style={{
+                  margin: '0 0 12px',
+                  fontSize: '0.95em',
+                  fontWeight: 700,
+                  color: '#2d2640',
+                }}
+              >
+                Add a New Student
+              </h4>
+              <form
+                onSubmit={handleAddStudent}
+                style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}
+              >
                 <input
                   type="text"
-                  placeholder="🔍  Search by name..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Student name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
                   style={{
-                    width: '240px',
+                    flex: '1 1 160px',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(139,92,246,0.25)',
+                    fontSize: '0.88em',
+                    outline: 'none',
+                  }}
+                />
+                <input
+                  type="email"
+                  placeholder="Student email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  style={{
+                    flex: '1 1 180px',
                     padding: '10px 14px',
                     borderRadius: '10px',
                     border: '1px solid rgba(139,92,246,0.25)',
@@ -1078,9 +1142,10 @@ export default function SchoolDashboardPage() {
                   }}
                 />
                 <select
-                  value={gradeFilter}
-                  onChange={(e) => setGradeFilter(e.target.value)}
+                  value={newGrade}
+                  onChange={(e) => setNewGrade(e.target.value)}
                   style={{
+                    width: '130px',
                     padding: '10px 14px',
                     borderRadius: '10px',
                     border: '1px solid rgba(139,92,246,0.25)',
@@ -1088,242 +1153,241 @@ export default function SchoolDashboardPage() {
                     background: 'white',
                   }}
                 >
-                  <option value="all">All grades</option>
-                  {grades.map((g) => (
+                  <option value="" disabled>
+                    Grade
+                  </option>
+                  {GRADE_OPTIONS.map((g) => (
                     <option key={g} value={g}>
                       Grade {g}
                     </option>
                   ))}
                 </select>
-                <select
-                  value={sortOption}
-                  onChange={(e) => setSortOption(e.target.value)}
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1px solid rgba(139,92,246,0.25)',
-                    fontSize: '0.88em',
-                    background: 'white',
-                  }}
-                >
-                  <option value="score">Sort: Score</option>
-                  <option value="name">Sort: Name</option>
-                  <option value="submissions">Sort: Submissions</option>
-                </select>
                 <button
-                  onClick={handleClearFilters}
+                  type="submit"
+                  disabled={adding}
                   style={{
-                    padding: '10px 14px',
+                    padding: '10px 20px',
                     borderRadius: '10px',
-                    border: '1px solid rgba(139,92,246,0.25)',
-                    fontSize: '0.88em',
-                    background: 'white',
-                    color: '#6d3fd1',
+                    border: 'none',
+                    cursor: adding ? 'not-allowed' : 'pointer',
+                    background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
+                    color: 'white',
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    fontSize: '0.88em',
+                    opacity: adding ? 0.7 : 1,
                   }}
                 >
-                  Clear
+                  {adding ? 'Adding...' : 'Add Student'}
                 </button>
-              </div>
-            </div>
-
-            {showAddForm && (
-              <div
-                style={{
-                  marginTop: '16px',
-                  padding: '20px 24px',
-                  borderRadius: '14px',
-                  background: 'white',
-                  border: '1px solid rgba(139,92,246,0.12)',
-                  boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
-                }}
-              >
-                <h4
+              </form>
+              <p style={{ margin: '10px 0 0', fontSize: '0.75em', color: '#a89fc9' }}>
+                The student is emailed a link to set their password — they then sign in with their
+                email and password.
+              </p>
+              {addMessage && (
+                <p
                   style={{
-                    margin: '0 0 12px',
-                    fontSize: '0.95em',
-                    fontWeight: 700,
-                    color: '#2d2640',
-                  }}
-                >
-                  Add a New Student
-                </h4>
-                <form
-                  onSubmit={handleAddStudent}
-                  style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}
-                >
-                  <input
-                    type="text"
-                    placeholder="Student name"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    style={{
-                      flex: '1 1 200px',
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      border: '1px solid rgba(139,92,246,0.25)',
-                      fontSize: '0.88em',
-                      outline: 'none',
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Grade (e.g. 10)"
-                    value={newGrade}
-                    onChange={(e) => setNewGrade(e.target.value)}
-                    style={{
-                      width: '130px',
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      border: '1px solid rgba(139,92,246,0.25)',
-                      fontSize: '0.88em',
-                      outline: 'none',
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={adding}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      cursor: adding ? 'not-allowed' : 'pointer',
-                      background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
-                      color: 'white',
-                      fontWeight: 600,
-                      fontSize: '0.88em',
-                      opacity: adding ? 0.7 : 1,
-                    }}
-                  >
-                    {adding ? 'Adding...' : 'Add Student'}
-                  </button>
-                </form>
-                {addMessage && (
-                  <p
-                    style={{
-                      marginTop: '10px',
-                      fontSize: '0.85em',
-                      color: addMessage.type === 'success' ? '#3fae7a' : '#e0615f',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {addMessage.text}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {filteredEntrants.length === 0 && dashboard.entrants.length > 0 && (
-              <div
-                style={{
-                  marginTop: '24px',
-                  padding: '40px',
-                  textAlign: 'center',
-                  borderRadius: '16px',
-                  background: 'white',
-                  border: '1px solid rgba(139,92,246,0.1)',
-                }}
-              >
-                <p style={{ fontSize: '2em', margin: '0 0 8px' }}>🔍</p>
-                <p style={{ margin: 0, color: '#8b7fa8', fontWeight: 600 }}>
-                  No students match your filters
-                </p>
-                <button
-                  onClick={handleClearFilters}
-                  style={{
-                    marginTop: '12px',
-                    padding: '8px 20px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(139,92,246,0.25)',
-                    background: 'white',
-                    color: '#6d3fd1',
-                    fontWeight: 600,
+                    marginTop: '10px',
                     fontSize: '0.85em',
-                    cursor: 'pointer',
+                    color: addMessage.type === 'success' ? '#3fae7a' : '#e0615f',
+                    fontWeight: 600,
                   }}
                 >
-                  Clear filters
-                </button>
-              </div>
-            )}
+                  {addMessage.text}
+                </p>
+              )}
+            </div>
+          )}
+
+          {filteredEntrants.length === 0 && dashboard.entrants.length > 0 && (
             <div
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: '14px',
-                marginTop: '16px',
+                marginTop: '24px',
+                padding: '40px',
+                textAlign: 'center',
+                borderRadius: '16px',
+                background: 'white',
+                border: '1px solid rgba(139,92,246,0.1)',
               }}
             >
-              {filteredEntrants.map((entrant) => (
+              <p style={{ fontSize: '2em', margin: '0 0 8px' }}>🔍</p>
+              <p style={{ margin: 0, color: '#8b7fa8', fontWeight: 600 }}>
+                No students match your filters
+              </p>
+              <button
+                onClick={handleClearFilters}
+                style={{
+                  marginTop: '12px',
+                  padding: '8px 20px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(139,92,246,0.25)',
+                  background: 'white',
+                  color: '#6d3fd1',
+                  fontWeight: 600,
+                  fontSize: '0.85em',
+                  cursor: 'pointer',
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+          {resendMessage && (
+            <p
+              role="status"
+              style={{
+                marginTop: '16px',
+                fontSize: '0.85em',
+                fontWeight: 600,
+                color: resendMessage.type === 'success' ? '#3fae7a' : '#e0615f',
+              }}
+            >
+              {resendMessage.text}
+            </p>
+          )}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '14px',
+              marginTop: '16px',
+            }}
+          >
+            {filteredEntrants.map((entrant) => (
+              <div
+                key={entrant.id}
+                style={{
+                  background: 'white',
+                  borderRadius: '16px',
+                  padding: '16px 18px',
+                  border: '1px solid rgba(139,92,246,0.08)',
+                  boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '14px',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 18px rgba(139,92,246,0.14)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 10px rgba(139,92,246,0.06)';
+                }}
+              >
                 <div
-                  key={entrant.id}
                   style={{
-                    background: 'white',
-                    borderRadius: '16px',
-                    padding: '16px 18px',
-                    border: '1px solid rgba(139,92,246,0.08)',
-                    boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)',
+                    color: 'white',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '14px',
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 8px 18px rgba(139,92,246,0.14)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 10px rgba(139,92,246,0.06)';
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: '0.85em',
+                    flexShrink: 0,
                   }}
                 >
-                  <div
+                  {initials(entrant.name)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p
                     style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)',
-                      color: 'white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: '0.85em',
-                      flexShrink: 0,
+                      margin: 0,
+                      fontWeight: 600,
+                      color: '#2d2640',
+                      fontSize: '0.92em',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {initials(entrant.name)}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p
+                    {entrant.name}
+                  </p>
+                  <p
+                    title={entrant.email || 'No account yet'}
+                    style={{
+                      margin: '2px 0 0',
+                      fontSize: '0.72em',
+                      color: '#a89fc9',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {entrant.email || 'No account yet'}
+                  </p>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}>
+                    <span
                       style={{
-                        margin: 0,
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.68em',
                         fontWeight: 600,
-                        color: '#2d2640',
-                        fontSize: '0.92em',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        background: 'rgba(139,92,246,0.08)',
+                        color: '#6d3fd1',
                       }}
                     >
-                      {entrant.name}
-                    </p>
-                    <div
-                      style={{ display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}
+                      Grade {entrant.grade}
+                    </span>
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.68em',
+                        fontWeight: 600,
+                        background: 'rgba(139,92,246,0.05)',
+                        color: '#8b7fa8',
+                      }}
                     >
+                      {entrant.submissionCount} sub{entrant.submissionCount !== 1 ? 's' : ''}
+                    </span>
+                    {entrant.averageScore !== null && (
                       <span
                         style={{
                           padding: '2px 8px',
                           borderRadius: '6px',
                           fontSize: '0.68em',
                           fontWeight: 600,
-                          background: 'rgba(139,92,246,0.08)',
-                          color: '#6d3fd1',
+                          background: `${scoreColor(entrant.averageScore)}18`,
+                          color: scoreColor(entrant.averageScore),
                         }}
                       >
-                        Grade {entrant.grade}
+                        {scoreLabel(entrant.averageScore)}
                       </span>
+                    )}
+                    {entrant.accountStatus === 'active' && (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.68em',
+                          fontWeight: 600,
+                          background: 'rgba(63,174,122,0.12)',
+                          color: '#2d8a5e',
+                        }}
+                      >
+                        Active
+                      </span>
+                    )}
+                    {entrant.accountStatus === 'invite_pending' && (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.68em',
+                          fontWeight: 600,
+                          background: 'rgba(224,168,62,0.15)',
+                          color: '#b07d1e',
+                        }}
+                      >
+                        Invite pending
+                      </span>
+                    )}
+                    {entrant.accountStatus == null && (
                       <span
                         style={{
                           padding: '2px 8px',
@@ -1334,31 +1398,59 @@ export default function SchoolDashboardPage() {
                           color: '#8b7fa8',
                         }}
                       >
-                        {entrant.submissionCount} sub{entrant.submissionCount !== 1 ? 's' : ''}
+                        No account
                       </span>
-                      {entrant.averageScore !== null && (
-                        <span
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.68em',
-                            fontWeight: 600,
-                            background: `${scoreColor(entrant.averageScore)}18`,
-                            color: scoreColor(entrant.averageScore),
-                          }}
-                        >
-                          {scoreLabel(entrant.averageScore)}
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
-                  <ScoreRing score={entrant.averageScore} />
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                    {entrant.accountStatus !== 'active' && (
+                      <button
+                        type="button"
+                        onClick={() => handleResendInvite(entrant)}
+                        disabled={resendingId === entrant.id || removingId === entrant.id}
+                        style={{
+                          padding: '5px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(139,92,246,0.3)',
+                          background: 'rgba(139,92,246,0.06)',
+                          color: '#6d3fd1',
+                          fontWeight: 600,
+                          fontSize: '0.72em',
+                          cursor: resendingId === entrant.id ? 'wait' : 'pointer',
+                        }}
+                      >
+                        {resendingId === entrant.id
+                          ? 'Sending…'
+                          : entrant.accountStatus === 'invite_pending'
+                            ? 'Resend invite'
+                            : 'Send invite'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveEntrant(entrant)}
+                      disabled={removingId === entrant.id || resendingId === entrant.id}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(224,97,95,0.35)',
+                        background: 'rgba(224,97,95,0.06)',
+                        color: '#e0615f',
+                        fontWeight: 600,
+                        fontSize: '0.72em',
+                        cursor: removingId === entrant.id ? 'wait' : 'pointer',
+                      }}
+                    >
+                      {removingId === entrant.id ? 'Removing…' : 'Remove'}
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
-      </main>
-    </div>
+                <ScoreRing score={entrant.averageScore} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </>
   );
 }

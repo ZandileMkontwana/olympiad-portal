@@ -1,16 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 
 // ===== Clerk mock setup (must happen BEFORE loading auth.js) =====
 const clerk = require('@clerk/express');
 const mockGetUser = vi.fn();
 const mockDeleteUser = vi.fn();
-
-vi.spyOn(clerk, 'requireAuth').mockReturnValue((req, res, next) => {
-  req.auth = () => ({ userId: 'clerk-user-1' });
-  next();
-});
 
 clerk.clerkClient = {
   users: {
@@ -23,9 +19,16 @@ clerk.clerkClient = {
 const prisma = require('../lib/prisma');
 const authRouter = require('./auth');
 
+// Simulate Clerk's clerkMiddleware() having run: req.auth() returns the
+// signed-in Clerk user. The dual-mode middleware (middleware/auth.js) reads
+// it when no student JWT is present.
 function createApp() {
   const app = express();
   app.use(express.json());
+  app.use((req, _res, next) => {
+    req.auth = () => ({ userId: 'clerk-user-1' });
+    next();
+  });
   app.use('/api', authRouter);
   return app;
 }
@@ -39,7 +42,6 @@ describe('Auth routes', () => {
     vi.spyOn(prisma.user, 'delete');
     vi.spyOn(prisma.school, 'findFirst');
     vi.spyOn(prisma.school, 'create');
-    vi.spyOn(prisma.entrant, 'findFirst');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetUser.mockReset();
     mockDeleteUser.mockReset();
@@ -134,131 +136,6 @@ describe('Auth routes', () => {
     });
   });
 
-  describe('POST /api/students/complete-profile', () => {
-    it('returns 400 when name is missing', async () => {
-      const res = await request(app)
-        .post('/api/students/complete-profile')
-        .send({ schoolName: 'Test School' });
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/required/);
-    });
-
-    it('returns 400 when schoolName is missing', async () => {
-      const res = await request(app).post('/api/students/complete-profile').send({ name: 'Test' });
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/required/);
-    });
-
-    it('returns 409 when profile already completed', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: '1', clerkUserId: 'clerk-user-1' });
-      const res = await request(app)
-        .post('/api/students/complete-profile')
-        .send({ name: 'Test', schoolName: 'Test School' });
-      expect(res.status).toBe(409);
-      expect(res.body.error).toMatch(/already completed/);
-    });
-
-    it('returns 404 when school not registered', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-      prisma.school.findFirst.mockResolvedValue(null);
-      const res = await request(app)
-        .post('/api/students/complete-profile')
-        .send({ name: 'Test', schoolName: 'Unknown School' });
-      expect(res.status).toBe(404);
-      expect(res.body.error).toMatch(/school is not registered/);
-    });
-
-    it('returns 404 when no student record matches name and school', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-      prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
-      prisma.entrant.findFirst.mockResolvedValue(null);
-      const res = await request(app)
-        .post('/api/students/complete-profile')
-        .send({ name: 'Nobody', schoolName: 'Test School' });
-      expect(res.status).toBe(404);
-      expect(res.body.error).toMatch(/No student record found/);
-      expect(prisma.entrant.findFirst).toHaveBeenCalledWith({
-        where: {
-          name: { equals: 'Nobody', mode: 'insensitive' },
-          schoolId: 'school-1',
-          userId: null,
-        },
-      });
-    });
-
-    it('matches school and entrant names case-insensitively', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-      prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
-      prisma.entrant.findFirst.mockResolvedValue({ id: 'entrant-1', name: 'Test', userId: null });
-      mockGetUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'student@b.com' }],
-      });
-      prisma.user.create.mockResolvedValue({
-        id: 'user-1',
-        email: 'student@b.com',
-        role: 'student',
-        name: 'Test',
-        entrant: { school: { name: 'Test School' } },
-      });
-
-      const res = await request(app)
-        .post('/api/students/complete-profile')
-        .send({ name: 'test', schoolName: 'test school' });
-
-      expect(res.status).toBe(201);
-      expect(prisma.school.findFirst).toHaveBeenCalledWith({
-        where: { name: { equals: 'test school', mode: 'insensitive' } },
-      });
-    });
-
-    it('returns 400 when Clerk has no email', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-      prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
-      prisma.entrant.findFirst.mockResolvedValue({ id: 'entrant-1', name: 'Test' });
-      mockGetUser.mockResolvedValue({ emailAddresses: [] });
-      const res = await request(app)
-        .post('/api/students/complete-profile')
-        .send({ name: 'Test', schoolName: 'Test School' });
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/No email/);
-    });
-
-    it('links user to the claimed entrant and returns 201', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-      prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
-      prisma.entrant.findFirst.mockResolvedValue({ id: 'entrant-1', name: 'Test', userId: null });
-      mockGetUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'student@b.com' }],
-      });
-      prisma.user.create.mockResolvedValue({
-        id: 'user-1',
-        email: 'student@b.com',
-        role: 'student',
-        name: 'Test',
-        entrant: { school: { id: 'school-1', name: 'Test School' } },
-      });
-
-      const res = await request(app)
-        .post('/api/students/complete-profile')
-        .send({ name: 'Test', schoolName: 'Test School' });
-
-      expect(res.status).toBe(201);
-      expect(res.body.user.role).toBe('student');
-      expect(res.body.user.school).toEqual({ id: 'school-1', name: 'Test School' });
-      expect(prisma.user.create).toHaveBeenCalledWith({
-        data: {
-          clerkUserId: 'clerk-user-1',
-          email: 'student@b.com',
-          role: 'student',
-          name: 'Test',
-          entrant: { connect: { id: 'entrant-1' } },
-        },
-        include: { entrant: { include: { school: true } } },
-      });
-      expect(prisma.school.create).not.toHaveBeenCalled();
-    });
-  });
-
   describe('GET /api/auth/me', () => {
     it('returns 404 when user not found', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
@@ -267,14 +144,22 @@ describe('Auth routes', () => {
       expect(res.body.error).toBe('User not found');
     });
 
-    it('returns user on success', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        id: '1',
-        email: 'a@b.com',
-        role: 'educator',
-        name: 'Test',
-        educator: { school: { id: 'school-1', name: 'Test School' } },
-        entrant: null,
+    it('returns user on success via a Clerk session', async () => {
+      prisma.user.findUnique.mockImplementation(({ where }) => {
+        if (where.clerkUserId === 'clerk-user-1') {
+          return Promise.resolve({ id: 'user-1' });
+        }
+        if (where.id === 'user-1') {
+          return Promise.resolve({
+            id: 'user-1',
+            email: 'a@b.com',
+            role: 'educator',
+            name: 'Test',
+            educator: { school: { id: 'school-1', name: 'Test School' } },
+            entrant: null,
+          });
+        }
+        return Promise.resolve(null);
       });
       const res = await request(app).get('/api/auth/me');
       expect(res.status).toBe(200);
@@ -284,19 +169,65 @@ describe('Auth routes', () => {
     });
 
     it('returns school from entrant for student users', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        id: '2',
-        email: 'student@b.com',
-        role: 'student',
-        name: 'Test',
-        educator: null,
-        entrant: { id: 'entrant-1', school: { id: 'school-1', name: 'Test School' } },
+      prisma.user.findUnique.mockImplementation(({ where }) => {
+        if (where.clerkUserId === 'clerk-user-1') {
+          return Promise.resolve({ id: 'user-2' });
+        }
+        if (where.id === 'user-2') {
+          return Promise.resolve({
+            id: 'user-2',
+            email: 'student@b.com',
+            role: 'student',
+            name: 'Test',
+            educator: null,
+            entrant: { id: 'entrant-1', school: { id: 'school-1', name: 'Test School' } },
+          });
+        }
+        return Promise.resolve(null);
       });
       const res = await request(app).get('/api/auth/me');
       expect(res.status).toBe(200);
       expect(res.body.user.role).toBe('student');
       expect(res.body.user.school).toEqual({ id: 'school-1', name: 'Test School' });
       expect(res.body.user.entrantId).toBe('entrant-1');
+    });
+
+    it('resolves the user from a student JWT bearer token', async () => {
+      const token = jwt.sign({ sub: 'user-2', role: 'student' }, 'test-secret');
+      prisma.user.findUnique.mockImplementation(({ where }) => {
+        if (where.id === 'user-2') {
+          return Promise.resolve({
+            id: 'user-2',
+            email: 'student@b.com',
+            role: 'student',
+            name: 'Test',
+            educator: null,
+            entrant: { id: 'entrant-1', school: { id: 'school-1', name: 'Test School' } },
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe('student');
+      expect(res.body.user.entrantId).toBe('entrant-1');
+      // Must NOT have gone down the Clerk lookup path
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'user-2' } });
+    });
+
+    it('returns 404 when the JWT points at a deleted user', async () => {
+      const token = jwt.sign({ sub: 'user-gone', role: 'student' }, 'test-secret');
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      const res = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
     });
   });
 
@@ -307,16 +238,30 @@ describe('Auth routes', () => {
       expect(res.status).toBe(404);
     });
 
-    it('deletes user and returns 200', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: '1' });
+    it('deletes the user and their Clerk account', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', clerkUserId: 'clerk-user-1' });
       prisma.user.delete.mockResolvedValue({});
       mockDeleteUser.mockResolvedValue({});
 
       const res = await request(app).delete('/api/auth/account');
       expect(res.status).toBe(200);
       expect(res.body.message).toMatch(/deleted/i);
-      expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: '1' } });
+      expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
       expect(mockDeleteUser).toHaveBeenCalledWith('clerk-user-1');
+    });
+
+    it('skips Clerk deletion for students without a Clerk account', async () => {
+      const token = jwt.sign({ sub: 'user-2', role: 'student' }, 'test-secret');
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-2', clerkUserId: null });
+      prisma.user.delete.mockResolvedValue({});
+
+      const res = await request(app)
+        .delete('/api/auth/account')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'user-2' } });
+      expect(mockDeleteUser).not.toHaveBeenCalled();
     });
   });
 });

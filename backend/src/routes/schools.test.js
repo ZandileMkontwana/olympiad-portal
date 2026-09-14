@@ -98,9 +98,43 @@ describe('Schools routes', () => {
       expect(prisma.entrant.findMany).toHaveBeenCalledWith({
         where: { schoolId: 'school-1' },
         orderBy: { name: 'asc' },
+        include: { user: { select: { email: true, passwordHash: true } } },
       });
       // Organiser path should NOT query educator
       expect(prisma.educator.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('exposes each entrant email and account status', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        {
+          id: 'entrant-1',
+          schoolId: 'school-1',
+          name: 'Alice',
+          grade: '10',
+          user: { email: 'alice@school.com', passwordHash: 'hashed' },
+        },
+        {
+          id: 'entrant-2',
+          schoolId: 'school-1',
+          name: 'Bob',
+          grade: '11',
+          user: { email: 'bob@school.com', passwordHash: null },
+        },
+        { id: 'entrant-3', schoolId: 'school-1', name: 'No User', grade: '10' },
+      ]);
+      const res = await request(app).get('/api/schools/school-1/entrants');
+      expect(res.status).toBe(200);
+      expect(res.body[0]).toMatchObject({
+        email: 'alice@school.com',
+        accountStatus: 'active',
+      });
+      expect(res.body[1]).toMatchObject({
+        email: 'bob@school.com',
+        accountStatus: 'invite_pending',
+      });
+      expect(res.body[2]).toMatchObject({ email: null, accountStatus: null });
+      // The embedded user record must never be serialized
+      expect(res.body[0].user).toBeUndefined();
     });
 
     it('allows an educator to view their own school', async () => {
@@ -204,6 +238,7 @@ describe('Schools routes', () => {
           id: 'entrant-1',
           name: 'Alice',
           grade: '10',
+          user: { email: 'alice@school.com', passwordHash: 'hashed' },
           submissions: [
             { id: 'sub-1', result: { score: 80 } },
             { id: 'sub-2', result: { score: 90 } },
@@ -236,6 +271,8 @@ describe('Schools routes', () => {
       const alice = res.body.entrants.find((e) => e.id === 'entrant-1');
       expect(alice.submissionCount).toBe(2);
       expect(alice.averageScore).toBe(85);
+      expect(alice.email).toBe('alice@school.com');
+      expect(alice.accountStatus).toBe('active');
 
       // Bob: avg 70
       const bob = res.body.entrants.find((e) => e.id === 'entrant-2');

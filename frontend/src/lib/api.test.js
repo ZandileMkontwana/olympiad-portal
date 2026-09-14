@@ -11,13 +11,15 @@ import {
   fetchCurrentUser,
   listSchoolEntrants,
   createEntrant,
+  resendEntrantInvite,
+  deleteEntrant,
   registerRoundEntrant,
   submitSitting,
-  listSchools,
+  studentLogin,
+  setStudentPassword,
   fetchMySittings,
   fetchMyResults,
   fetchMyResult,
-  dashboardPathForRole,
   fetchMyRounds,
   fetchSchoolDashboard,
   fetchStandings,
@@ -25,6 +27,7 @@ import {
   fetchNotificationRules,
   updateNotificationRule,
   testNotificationTrigger,
+  dashboardPathForRole,
 } from './api';
 
 describe('api client', () => {
@@ -382,14 +385,18 @@ describe('api client', () => {
   });
 
   describe('createEntrant', () => {
-    it('sends POST with correct body and Bearer token', async () => {
+    it('sends POST with name, email and grade and Bearer token', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 201,
-        json: () => Promise.resolve({ id: 'e1', name: 'Alice', grade: '10' }),
+        json: () => Promise.resolve({ id: 'e1', name: 'Alice', grade: '10', email: 'alice@school.com', accountStatus: 'invite_pending', invitationSent: true }),
       });
-      const result = await createEntrant({ name: 'Alice', grade: '10' }, 'test-token');
+      const result = await createEntrant(
+        { name: 'Alice', email: 'alice@school.com', grade: '10' },
+        'test-token'
+      );
       expect(result.id).toBe('e1');
+      expect(result.invitationSent).toBe(true);
       expect(fetchMock).toHaveBeenCalledWith(
         'http://localhost:5000/api/entrants',
         expect.objectContaining({
@@ -399,9 +406,28 @@ describe('api client', () => {
             'Content-Type': 'application/json',
             Authorization: 'Bearer test-token',
           },
-          body: JSON.stringify({ name: 'Alice', grade: '10' }),
+          body: JSON.stringify({ name: 'Alice', email: 'alice@school.com', grade: '10' }),
         })
       );
+    });
+
+    it('throws ApiError when the email is already registered', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: () => Promise.resolve({ error: 'An account with this email already exists' }),
+      });
+      try {
+        await createEntrant(
+          { name: 'Alice', email: 'alice@school.com', grade: '10' },
+          'test-token'
+        );
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err.status).toBe(409);
+        expect(err.message).toBe('An account with this email already exists');
+      }
     });
 
     it('throws ApiError when the school link is missing', async () => {
@@ -411,12 +437,101 @@ describe('api client', () => {
         json: () => Promise.resolve({ error: 'No school linked to this account' }),
       });
       try {
-        await createEntrant({ name: 'Alice', grade: '10' }, 'test-token');
+        await createEntrant(
+          { name: 'Alice', email: 'alice@school.com', grade: '10' },
+          'test-token'
+        );
         expect.fail('Should have thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(ApiError);
         expect(err.status).toBe(403);
         expect(err.message).toBe('No school linked to this account');
+      }
+    });
+  });
+
+  describe('resendEntrantInvite', () => {
+    it('sends POST to the resend path with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ message: 'Invitation sent', invitationSent: true }),
+      });
+
+      const result = await resendEntrantInvite('e1', 'test-token');
+
+      expect(result.invitationSent).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/entrants/e1/resend-invite',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-token',
+          },
+          body: JSON.stringify({}),
+        })
+      );
+    });
+
+    it('passes the email in the body for legacy entrants without an account', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ message: 'Invitation sent', invitationSent: true }),
+      });
+
+      await resendEntrantInvite('e2', 'test-token', { email: 'legacy@school.com' });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/entrants/e2/resend-invite',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ email: 'legacy@school.com' }),
+        })
+      );
+    });
+  });
+
+  describe('deleteEntrant', () => {
+    it('sends DELETE to the entrant path with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ message: 'Entrant removed' }),
+      });
+
+      const result = await deleteEntrant('e1', 'test-token');
+
+      expect(result.message).toBe('Entrant removed');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/entrants/e1',
+        expect.objectContaining({
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-token',
+          },
+        })
+      );
+    });
+
+    it('throws ApiError when the entrant is not at the educator school', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: 'Entrant not found at your school' }),
+      });
+
+      try {
+        await deleteEntrant('e99', 'test-token');
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err.status).toBe(404);
+        expect(err.message).toBe('Entrant not found at your school');
       }
     });
   });
@@ -485,26 +600,89 @@ describe('api client', () => {
     });
   });
 
-  describe('listSchools', () => {
-    it('fetches the school list from /api/schools', async () => {
+  describe('studentLogin', () => {
+    it('sends POST to /api/students/login with credentials', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () =>
-          Promise.resolve([
-            { id: 'school-1', name: 'Alpha School' },
-            { id: 'school-2', name: 'Beta School' },
-          ]),
+        json: () => Promise.resolve({
+          token: 'jwt-token',
+          user: { id: 'user-1', email: 'student@school.com', role: 'student' },
+        }),
       });
 
-      const result = await listSchools();
+      const result = await studentLogin({ email: 'student@school.com', password: 'secret123' });
 
-      expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('Alpha School');
+      expect(result.token).toBe('jwt-token');
+      expect(result.user.role).toBe('student');
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:5000/api/schools',
-        expect.objectContaining({ credentials: 'include' })
+        'http://localhost:5000/api/students/login',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'student@school.com', password: 'secret123' }),
+        })
       );
+    });
+
+    it('throws ApiError with the backend message on invalid credentials', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: 'Invalid email or password' }),
+      });
+
+      try {
+        await studentLogin({ email: 'student@school.com', password: 'wrong' });
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err.status).toBe(401);
+        expect(err.message).toBe('Invalid email or password');
+      }
+    });
+  });
+
+  describe('setStudentPassword', () => {
+    it('sends POST to /api/students/set-password with the invitation token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          token: 'jwt-token',
+          user: { id: 'user-1', email: 'student@school.com', role: 'student' },
+        }),
+      });
+
+      const result = await setStudentPassword({ token: 'invite-token', password: 'newpass123' });
+
+      expect(result.token).toBe('jwt-token');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/students/set-password',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: 'invite-token', password: 'newpass123' }),
+        })
+      );
+    });
+
+    it('throws ApiError when the invitation token is invalid or expired', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: 'This invitation link is invalid or has expired' }),
+      });
+
+      try {
+        await setStudentPassword({ token: 'bad-token', password: 'newpass123' });
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err.status).toBe(400);
+        expect(err.message).toMatch(/invalid or has expired/i);
+      }
     });
   });
 
@@ -555,15 +733,12 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () =>
-          Promise.resolve({
-            id: 'result-1',
-            score: 80,
-            round: { id: 'round-1', name: 'Round 1' },
-            questions: [
-              { questionId: 'q1', correctAnswer: 'A', studentAnswer: 'A', isCorrect: true },
-            ],
-          }),
+        json: () => Promise.resolve({
+          id: 'result-1',
+          score: 80,
+          round: { id: 'round-1', name: 'Round 1' },
+          questions: [{ questionId: 'q1', correctAnswer: 'A', studentAnswer: 'A', isCorrect: true }],
+        }),
       });
 
       const result = await fetchMyResult('result-1', 'test-token');
@@ -601,6 +776,7 @@ describe('api client', () => {
       expect(dashboardPathForRole(undefined)).toBe('/login');
     });
   });
+
   describe('fetchMyRounds', () => {
     it('sends GET to /api/students/me/rounds with Bearer token', async () => {
       fetchMock.mockResolvedValue({

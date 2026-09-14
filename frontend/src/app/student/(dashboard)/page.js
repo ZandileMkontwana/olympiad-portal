@@ -2,9 +2,12 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useAuth, useClerk } from '@clerk/nextjs';
-import { useRequireRole } from '@/hooks/useRequireRole';
+import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { fetchMySittings, fetchMyResults, fetchMyRounds } from '@/lib/api';
+
+// Student dashboard. The persistent sidebar lives in the (dashboard) layout;
+// this page shows everything in one scroll — a single unified "My tests" list
+// (started tests plus rounds not yet started) and one results list.
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
 
@@ -34,15 +37,6 @@ function scoreHex(score) {
   return '#dc2626';
 }
 
-function initials(name) {
-  return (name || '')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0].toUpperCase())
-    .join('');
-}
-
 function timeLeft(expiresAt) {
   const ms = new Date(expiresAt) - new Date();
   if (ms <= 0) return 'Expired';
@@ -54,62 +48,16 @@ function timeLeft(expiresAt) {
 
 const STATUS_STYLES = {
   'in-progress': 'bg-sage/10 text-sage border border-sage/30',
+  'not-started': 'bg-gold/10 text-gold border border-gold/30',
   completed: 'bg-lavender/10 text-lavender-deep border border-lavender/30',
   expired: 'bg-slate/10 text-slate border border-slate/30',
 };
-const STATUS_LABELS = { 'in-progress': 'In progress', completed: 'Completed', expired: 'Expired' };
-
-/* ── Sidebar ──────────────────────────────────────────────────────────── */
-
-function Sidebar({ user, onLogout, activeSection, setActiveSection }) {
-  const sections = [
-    { id: 'overview', icon: '🏠', label: 'Overview' },
-    { id: 'tests', icon: '📝', label: 'My Tests' },
-    { id: 'results', icon: '🏆', label: 'Results' },
-  ];
-  return (
-    <aside className="fixed left-0 top-0 flex h-screen w-60 flex-shrink-0 flex-col border-r border-lavender/15 bg-surface px-4 py-6">
-      <div className="flex items-center gap-2.5 px-2 pb-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-lavender to-lavender-deep font-display text-lg font-bold text-white">
-          O
-        </div>
-        <div>
-          <p className="font-display text-sm font-semibold text-ink">Olympiad Portal</p>
-          <p className="text-xs text-ink-soft">Student</p>
-        </div>
-      </div>
-
-      <nav className="flex flex-1 flex-col gap-1">
-        {sections.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setActiveSection(s.id)}
-            className={`flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-left text-sm font-semibold transition-colors ${
-              activeSection === s.id
-                ? 'bg-lavender/10 text-lavender-deep'
-                : 'text-ink-soft hover:bg-lavender/5'
-            }`}
-          >
-            <span className="text-base">{s.icon}</span>
-            {s.label}
-          </button>
-        ))}
-      </nav>
-
-      <div className="flex items-center gap-2.5 border-t border-lavender/15 pt-4">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-lavender to-lavender-deep text-xs font-bold text-white">
-          {initials(user.name || user.email)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-ink">{user.name || user.email}</p>
-          <button onClick={onLogout} className="text-xs font-semibold text-red-500 hover:underline">
-            Log out
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
-}
+const STATUS_LABELS = {
+  'in-progress': 'In progress',
+  'not-started': 'Not started',
+  completed: 'Completed',
+  expired: 'Expired',
+};
 
 /* ── Stat card ────────────────────────────────────────────────────────── */
 
@@ -321,10 +269,41 @@ function HeroBanner({ name, school, inProgress, availableCount, resumeHref }) {
   );
 }
 
-/* ── Sections (tests / available / results) ──────────────────────────── */
+/* ── My tests: one unified list ───────────────────────────────────────── */
 
-function TestsSection({ tests }) {
-  const inProgress = tests.filter((t) => testStatus(t) === 'in-progress').length;
+function TestsSection({ tests, rounds }) {
+  const items = useMemo(() => {
+    const started = tests.map((t) => ({
+      kind: 'sitting',
+      id: t.id,
+      name: t.round.name,
+      status: testStatus(t),
+      test: t,
+    }));
+    const notStarted = rounds
+      .filter((r) => !r.sitting)
+      .map((r) => ({
+        kind: 'available',
+        id: r.round.id,
+        name: r.round.name,
+        status: 'not-started',
+        round: r.round,
+      }));
+    // Urgent first: in-progress, then tests waiting to be started (both by
+    // their deadline), then finished/expired ones by most recent.
+    const order = { 'in-progress': 0, 'not-started': 1, completed: 2, expired: 3 };
+    return [...started, ...notStarted].sort((a, b) => {
+      if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+      if (a.status === 'in-progress')
+        return new Date(a.test.expiresAt) - new Date(b.test.expiresAt);
+      if (a.status === 'not-started')
+        return new Date(a.round.closeTime) - new Date(b.round.closeTime);
+      return new Date(b.test.startedAt) - new Date(a.test.startedAt);
+    });
+  }, [tests, rounds]);
+
+  const inProgress = items.filter((i) => i.status === 'in-progress').length;
+
   return (
     <section>
       <div className="flex items-baseline justify-between">
@@ -333,7 +312,7 @@ function TestsSection({ tests }) {
           <span className="text-sm font-medium text-sage">{inProgress} to finish</span>
         )}
       </div>
-      {tests.length === 0 ? (
+      {items.length === 0 ? (
         <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
           <span className="text-3xl">📝</span>
           <p className="mt-2 text-base text-ink-soft">
@@ -342,33 +321,41 @@ function TestsSection({ tests }) {
         </div>
       ) : (
         <ul className="mt-4 space-y-3">
-          {tests.map((test) => {
-            const status = testStatus(test);
+          {items.map((item) => {
+            const isSitting = item.kind === 'sitting';
             return (
               <li
-                key={test.id}
+                key={item.id}
                 className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm"
               >
                 <div>
-                  <p className="text-lg font-semibold text-ink">{test.round.name}</p>
-                  <p className="mt-0.5 text-sm text-ink-soft">
-                    Started {formatDate(test.startedAt)}
-                  </p>
-                  {status === 'in-progress' && (
-                    <p className="mt-0.5 text-xs font-semibold text-sage">
-                      {timeLeft(test.expiresAt)}
+                  <p className="text-lg font-semibold text-ink">{item.name}</p>
+                  {isSitting ? (
+                    <>
+                      <p className="mt-0.5 text-sm text-ink-soft">
+                        Started {formatDate(item.test.startedAt)}
+                      </p>
+                      {item.status === 'in-progress' && (
+                        <p className="mt-0.5 text-xs font-semibold text-sage">
+                          {timeLeft(item.test.expiresAt)}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="mt-0.5 text-sm text-ink-soft">
+                      Closes {formatDate(item.round.closeTime)}
                     </p>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
                   <span
-                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium ${STATUS_STYLES[status]}`}
+                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium ${STATUS_STYLES[item.status]}`}
                   >
-                    {STATUS_LABELS[status]}
+                    {STATUS_LABELS[item.status]}
                   </span>
-                  {status === 'in-progress' && (
+                  {item.status === 'in-progress' && (
                     <Link
-                      href={`/student/sit?id=${test.roundId}`}
+                      href={`/student/sit?id=${item.test.roundId}`}
                       onClick={(e) => {
                         if (!window.confirm('Continue this test? Your answers are saved.'))
                           e.preventDefault();
@@ -376,6 +363,20 @@ function TestsSection({ tests }) {
                       className="rounded-lg bg-lavender-deep px-5 py-2.5 text-base font-medium text-white transition-opacity hover:opacity-90"
                     >
                       Resume
+                    </Link>
+                  )}
+                  {item.status === 'not-started' && (
+                    <Link
+                      href={`/student/sit?id=${item.round.id}`}
+                      onClick={(e) => {
+                        if (
+                          !window.confirm(`Start "${item.name}"? Once started, your time begins.`)
+                        )
+                          e.preventDefault();
+                      }}
+                      className="rounded-lg bg-lavender-deep px-5 py-2.5 text-base font-medium text-white transition-opacity hover:opacity-90"
+                    >
+                      Start test
                     </Link>
                   )}
                 </div>
@@ -388,48 +389,7 @@ function TestsSection({ tests }) {
   );
 }
 
-function AvailableRoundsSection({ rounds }) {
-  const available = rounds.filter((r) => !r.sitting);
-  return (
-    <section>
-      <h2 className="font-display text-2xl font-semibold text-ink">Available tests</h2>
-      {available.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
-          <span className="text-3xl">📋</span>
-          <p className="mt-2 text-base text-ink-soft">No new tests available right now.</p>
-        </div>
-      ) : (
-        <ul className="mt-4 space-y-3">
-          {available.map((item) => (
-            <li
-              key={item.round.id}
-              className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm"
-            >
-              <div>
-                <p className="text-lg font-semibold text-ink">{item.round.name}</p>
-                <p className="mt-0.5 text-sm text-ink-soft">
-                  Closes {formatDate(item.round.closeTime)}
-                </p>
-              </div>
-              <Link
-                href={`/student/sit?id=${item.round.id}`}
-                onClick={(e) => {
-                  if (
-                    !window.confirm(`Start "${item.round.name}"? Once started, your time begins.`)
-                  )
-                    e.preventDefault();
-                }}
-                className="rounded-lg bg-lavender-deep px-5 py-2.5 text-base font-medium text-white transition-opacity hover:opacity-90"
-              >
-                Start test
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
+/* ── My results ───────────────────────────────────────────────────────── */
 
 function ResultsSection({ results }) {
   const [search, setSearch] = useState('');
@@ -497,18 +457,15 @@ function ResultsSection({ results }) {
 /* ── Main page ────────────────────────────────────────────────────────── */
 
 export default function StudentDashboard() {
-  const { user, checking } = useRequireRole('student');
-  const { signOut } = useClerk();
-  const { getToken } = useAuth();
+  const { user, checking, getToken } = useStudentAuth();
 
   const [sittings, setSittings] = useState([]);
   const [results, setResults] = useState([]);
   const [rounds, setRounds] = useState([]);
   const [status, setStatus] = useState('loading');
-  const [activeSection, setActiveSection] = useState('overview');
 
   useEffect(() => {
-    if (checking) return;
+    if (checking || !user) return;
     async function load() {
       try {
         const token = await getToken();
@@ -526,16 +483,13 @@ export default function StudentDashboard() {
       }
     }
     load();
-  }, [checking, getToken]);
+  }, [checking, user, getToken]);
 
-  async function handleLogout() {
-    if (!window.confirm('Log out of the Olympiad Portal?')) return;
-    await signOut({ redirectUrl: '/login' });
-  }
-
-  if (checking || status === 'loading') {
+  // `!user` covers the window after sign-out clears the session but before
+  // the redirect away finishes — otherwise user.name below would crash.
+  if (checking || !user || status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <p className="text-lg text-ink-soft">Loading...</p>
       </div>
     );
@@ -552,90 +506,63 @@ export default function StudentDashboard() {
       : null;
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <Sidebar
-        user={user}
-        onLogout={handleLogout}
-        activeSection={activeSection}
-        setActiveSection={setActiveSection}
+    <>
+      <HeroBanner
+        name={user.name}
+        school={user.school}
+        inProgress={inProgress}
+        availableCount={rounds.filter((r) => !r.sitting).length}
+        resumeHref={resumeHref}
       />
 
-      <main className="relative ml-60 w-[calc(100%-15rem)] max-w-6xl overflow-hidden px-8 py-10">
-        <HeroBanner
-          name={user.name}
-          school={user.school}
-          inProgress={inProgress}
-          availableCount={rounds.filter((r) => !r.sitting).length}
-          resumeHref={resumeHref}
-        />
+      {status === 'error' && (
+        <div
+          role="alert"
+          className="relative mt-8 rounded-lg border border-red-200 bg-red-50 p-5 text-base text-red-800"
+        >
+          Couldn&apos;t load your tests or results. Try refreshing the page.
+        </div>
+      )}
 
-        {status === 'error' && (
-          <div
-            role="alert"
-            className="relative mt-8 rounded-lg border border-red-200 bg-red-50 p-5 text-base text-red-800"
-          >
-            Couldn&apos;t load your tests or results. Try refreshing the page.
+      {status === 'ready' && (
+        <>
+          <div className="relative mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <StatCard icon="📝" label="Tests" value={sittings.length} />
+            <StatCard icon="✅" label="Completed" value={completed} />
+            <StatCard
+              icon="📊"
+              label="Average"
+              value={avgScore !== null ? `${avgScore}%` : '—'}
+              accent={avgScore !== null ? scoreStyle(avgScore) : undefined}
+            />
+            <StatCard
+              icon="🏆"
+              label="Best score"
+              value={bestScore}
+              accent={
+                results.length > 0
+                  ? scoreStyle(Math.max(...results.map((r) => r.score)))
+                  : undefined
+              }
+            />
           </div>
-        )}
 
-        {status === 'ready' && (
-          <>
-            <div className="relative mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <StatCard icon="📝" label="Tests" value={sittings.length} />
-              <StatCard icon="✅" label="Completed" value={completed} />
-              <StatCard
-                icon="📊"
-                label="Average"
-                value={avgScore !== null ? `${avgScore}%` : '—'}
-                accent={avgScore !== null ? scoreStyle(avgScore) : undefined}
-              />
-              <StatCard
-                icon="🏆"
-                label="Best score"
-                value={bestScore}
-                accent={
-                  results.length > 0
-                    ? scoreStyle(Math.max(...results.map((r) => r.score)))
-                    : undefined
-                }
-              />
+          <div className="relative mt-10 grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <TrendChart results={results} />
             </div>
+            <AchievementBadges results={results} sittings={sittings} />
+          </div>
 
-            {activeSection === 'overview' && (
-              <>
-                <div className="relative mt-10 grid gap-6 lg:grid-cols-3">
-                  <div className="lg:col-span-2">
-                    <TrendChart results={results} />
-                  </div>
-                  <AchievementBadges results={results} sittings={sittings} />
-                </div>
+          <div className="relative mt-12">
+            <TestsSection tests={sittings} rounds={rounds} />
+          </div>
 
-                <div className="relative mt-12 grid gap-12 lg:grid-cols-2">
-                  <TestsSection tests={sittings} />
-                  <ResultsSection results={results} />
-                </div>
-
-                <div className="relative mt-12">
-                  <AvailableRoundsSection rounds={rounds} />
-                </div>
-              </>
-            )}
-
-            {activeSection === 'tests' && (
-              <div className="relative mt-10 space-y-12">
-                <TestsSection tests={sittings} />
-                <AvailableRoundsSection rounds={rounds} />
-              </div>
-            )}
-
-            {activeSection === 'results' && (
-              <div className="relative mt-10">
-                <ResultsSection results={results} />
-              </div>
-            )}
-          </>
-        )}
-      </main>
-    </div>
+          <div className="relative mt-12">
+            <ResultsSection results={results} />
+          </div>
+        </>
+      )}
+    </>
   );
 }

@@ -8,15 +8,28 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('id=round-1'),
 }));
 
-// Stable references for Clerk auth — getToken MUST be stable across renders,
-// otherwise the auto-save useEffect (which depends on getToken) clears and
-// restarts its debounce timer on every render, causing timeouts.
+// Mutable session state — individual tests override before rendering.
+const authState = vi.hoisted(() => ({
+  user: {
+    id: 'user-1',
+    email: 'student@school.com',
+    role: 'student',
+    name: 'Thabo',
+    entrantId: 'entrant-1',
+  },
+  checking: false,
+}));
+
+// Stable references for the student session — getToken MUST be stable across
+// renders, otherwise the auto-save useEffect (which depends on getToken) clears
+// and restarts its debounce timer on every render, causing timeouts.
 const mockGetToken = vi.fn().mockResolvedValue('mock-token');
-vi.mock('@clerk/nextjs', () => ({
-  useAuth: () => ({
-    isLoaded: true,
-    isSignedIn: true,
+vi.mock('@/hooks/useStudentAuth', () => ({
+  useStudentAuth: () => ({
+    user: authState.user,
+    checking: authState.checking,
     getToken: mockGetToken,
+    signOut: vi.fn(),
   }),
 }));
 
@@ -25,12 +38,11 @@ vi.mock('@/lib/api', () => ({
   createSitting: vi.fn(),
   saveSittingAnswers: vi.fn(),
   submitSitting: vi.fn(),
-  fetchCurrentUser: vi.fn(),
   ApiError: class ApiError extends Error {},
 }));
 
 import SitPage from './page';
-import { createSitting, saveSittingAnswers, submitSitting, fetchCurrentUser, ApiError } from '@/lib/api';
+import { createSitting, saveSittingAnswers, submitSitting, ApiError } from '@/lib/api';
 
 const sittingResponse = (answers) => ({
   sitting: {
@@ -50,7 +62,6 @@ const sittingResponse = (answers) => ({
 });
 
 async function renderAndStart(answers) {
-  fetchCurrentUser.mockResolvedValue({ role: 'student', entrantId: 'entrant-1' });
   createSitting.mockResolvedValue(sittingResponse(answers));
   const view = render(<SitPage />);
   await screen.findByLabelText(/answer for question q1/i);
@@ -61,46 +72,49 @@ describe('SitPage auto-detect and start', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     saveSittingAnswers.mockResolvedValue({});
+    authState.checking = false;
+    authState.user = {
+      id: 'user-1',
+      email: 'student@school.com',
+      role: 'student',
+      name: 'Thabo',
+      entrantId: 'entrant-1',
+    };
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('auto-detects the student and starts the sitting without a dropdown', async () => {
+  it('starts the sitting for the signed-in student without a dropdown', async () => {
     await renderAndStart(null);
 
-    expect(fetchCurrentUser).toHaveBeenCalledWith('mock-token');
     expect(createSitting).toHaveBeenCalledWith('round-1', 'entrant-1', 'mock-token');
     // No dropdown should exist
     expect(screen.queryByLabelText(/who are you/i)).toBeNull();
   });
 
-  it('shows an error when the user is not a student', async () => {
-    fetchCurrentUser.mockResolvedValue({ role: 'educator', entrantId: null });
+  it('redirects to the login page when there is no student session', async () => {
+    authState.user = null;
     render(<SitPage />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/only students/i);
+    await vi.waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/login');
+    });
     expect(createSitting).not.toHaveBeenCalled();
   });
 
-  it('shows an error when the user has no entrantId', async () => {
-    fetchCurrentUser.mockResolvedValue({ role: 'student', entrantId: null });
+  it('shows an error when the account has no linked entrant record', async () => {
+    authState.user = { id: 'user-2', email: 'orphan@school.com', role: 'student', entrantId: null };
     render(<SitPage />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/only students/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /not linked to a student record/i
+    );
     expect(createSitting).not.toHaveBeenCalled();
-  });
-
-  it('shows an error when fetchCurrentUser returns null', async () => {
-    fetchCurrentUser.mockResolvedValue(null);
-    render(<SitPage />);
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not load your account/i);
   });
 
   it('shows the backend error when createSitting fails', async () => {
-    fetchCurrentUser.mockResolvedValue({ role: 'student', entrantId: 'entrant-1' });
     createSitting.mockRejectedValue(new ApiError('Not registered for this round', 403));
     render(<SitPage />);
 
@@ -112,6 +126,14 @@ describe('SitPage auto-save (Story A3)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     saveSittingAnswers.mockResolvedValue({});
+    authState.checking = false;
+    authState.user = {
+      id: 'user-1',
+      email: 'student@school.com',
+      role: 'student',
+      name: 'Thabo',
+      entrantId: 'entrant-1',
+    };
   });
 
   afterEach(() => {
@@ -169,6 +191,14 @@ describe('SitPage submit (Story A5)', () => {
     vi.stubGlobal('confirm', vi.fn(() => true));
     saveSittingAnswers.mockResolvedValue({});
     submitSitting.mockResolvedValue({ submission: { id: 'sub-1' }, result: null });
+    authState.checking = false;
+    authState.user = {
+      id: 'user-1',
+      email: 'student@school.com',
+      role: 'student',
+      name: 'Thabo',
+      entrantId: 'entrant-1',
+    };
   });
 
   afterEach(() => {
