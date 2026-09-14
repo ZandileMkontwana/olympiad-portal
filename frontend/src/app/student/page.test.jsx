@@ -23,10 +23,11 @@ vi.mock('@clerk/nextjs', () => ({
 vi.mock('@/lib/api', () => ({
   fetchMySittings: vi.fn(),
   fetchMyResults: vi.fn(),
+  fetchMyRounds: vi.fn(),
 }));
 
 import StudentDashboard from './page';
-import { fetchMySittings, fetchMyResults } from '@/lib/api';
+import { fetchMySittings, fetchMyResults, fetchMyRounds } from '@/lib/api';
 
 const FUTURE = '2030-01-01T00:00:00.000Z';
 const PAST = '2020-01-01T00:00:00.000Z';
@@ -86,6 +87,7 @@ describe('StudentDashboard', () => {
   it('shows a loading state while tests and results load', () => {
     fetchMySittings.mockReturnValue(new Promise(() => {}));
     fetchMyResults.mockReturnValue(new Promise(() => {}));
+    fetchMyRounds.mockReturnValue(new Promise(() => {}));
     render(<StudentDashboard />);
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
@@ -93,25 +95,29 @@ describe('StudentDashboard', () => {
   it('greets the student by name with their school', async () => {
     fetchMySittings.mockResolvedValue([]);
     fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
-    expect(await screen.findByRole('heading', { name: /welcome back, thabo/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^thabo$/i })).toBeInTheDocument();
+    expect(screen.getByText('Welcome back')).toBeInTheDocument();
     expect(screen.getByText('Test School')).toBeInTheDocument();
   });
 
   it('shows empty states when there are no tests or results', async () => {
     fetchMySittings.mockResolvedValue([]);
     fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
     expect(await screen.findByText(/no tests yet/i)).toBeInTheDocument();
     expect(screen.getByText(/no results released yet/i)).toBeInTheDocument();
-    expect(screen.getByText('—')).toBeInTheDocument(); // best score placeholder
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1); // average and best score placeholders
   });
 
   it('shows stat cards with counts and best score', async () => {
     fetchMySittings.mockResolvedValue([sitting(), sitting({ id: 'sitting-2', completedAt: PAST })]);
     fetchMyResults.mockResolvedValue([result({ score: 85 }), result({ id: 'result-2', score: 60 })]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
     await screen.findByText('Best score');
@@ -125,6 +131,7 @@ describe('StudentDashboard', () => {
   it('shows an in-progress test with a resume link to the sit page', async () => {
     fetchMySittings.mockResolvedValue([sitting()]);
     fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
     expect(await screen.findByText('Round 1')).toBeInTheDocument();
@@ -136,14 +143,16 @@ describe('StudentDashboard', () => {
   it('prompts about tests to finish in the hero when one is in progress', async () => {
     fetchMySittings.mockResolvedValue([sitting()]);
     fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
-    expect(await screen.findByText(/1 test to finish/i)).toBeInTheDocument();
+    expect(await screen.findByText(/1 test.* in progress/i)).toBeInTheDocument();
   });
 
   it('shows a completed test without a resume link', async () => {
     fetchMySittings.mockResolvedValue([sitting({ completedAt: PAST })]);
     fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
     // 'Completed' appears in both the test's status chip and the stat label.
@@ -156,6 +165,7 @@ describe('StudentDashboard', () => {
   it('shows an expired test with an Expired chip and no resume link', async () => {
     fetchMySittings.mockResolvedValue([sitting({ expiresAt: PAST })]);
     fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
     expect(await screen.findByText('Expired')).toBeInTheDocument();
@@ -165,6 +175,7 @@ describe('StudentDashboard', () => {
   it('shows released results with their score percentage and a view-test link', async () => {
     fetchMySittings.mockResolvedValue([]);
     fetchMyResults.mockResolvedValue([result()]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
     // 85% shows in the results list and the best-score stat.
@@ -175,9 +186,37 @@ describe('StudentDashboard', () => {
     expect(viewTest).toHaveAttribute('href', '/student/result?id=result-1');
   });
 
+  it('shows available rounds with a start-test link', async () => {
+    fetchMySittings.mockResolvedValue([]);
+    fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([
+      { round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: FUTURE }, sitting: null },
+    ]);
+    render(<StudentDashboard />);
+
+    expect(await screen.findByText(/available tests/i)).toBeInTheDocument();
+    expect(screen.getByText('Round 1')).toBeInTheDocument();
+    const startLink = screen.getByRole('link', { name: /start test/i });
+    expect(startLink).toHaveAttribute('href', '/student/sit?id=round-1');
+  });
+
+  it('hides available rounds that already have a sitting', async () => {
+    fetchMySittings.mockResolvedValue([sitting()]);
+    fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([
+      { round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: FUTURE }, sitting: { id: 'sitting-1' } },
+    ]);
+    render(<StudentDashboard />);
+
+    // The round appears in "My tests" but not in "Available tests"
+    expect(await screen.findByText('Round 1')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /start test/i })).not.toBeInTheDocument();
+  });
+
   it('shows an error alert when the API call fails', async () => {
     fetchMySittings.mockRejectedValue(new Error('backend down'));
     fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't load your tests/i);
@@ -186,6 +225,7 @@ describe('StudentDashboard', () => {
   it('signs the student out when clicking log out and confirming', async () => {
     fetchMySittings.mockResolvedValue([]);
     fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
     fireEvent.click(await screen.findByRole('button', { name: /log out/i }));
@@ -198,6 +238,7 @@ describe('StudentDashboard', () => {
     confirm.mockReturnValue(false);
     fetchMySittings.mockResolvedValue([]);
     fetchMyResults.mockResolvedValue([]);
+    fetchMyRounds.mockResolvedValue([]);
     render(<StudentDashboard />);
 
     fireEvent.click(await screen.findByRole('button', { name: /log out/i }));

@@ -233,6 +233,28 @@ export function submitSitting(sittingId, token) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * Releases all automarked results for a closed round so students can view them.
+ * Wired to POST /api/rounds/:id/release-results (backend/src/routes/rounds.js).
+ */
+export function releaseResults(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/release-results`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Hides all released results for a round so students can no longer view them.
+ * Wired to POST /api/rounds/:id/unrelease-results (backend/src/routes/rounds.js).
+ */
+export function unreleaseResults(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/unrelease-results`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
 /**
  * Fetches a single round by id.
  * Wired to GET /api/rounds/:id (backend/src/routes/rounds.js).
@@ -340,6 +362,23 @@ export function fetchMyResults(token) {
 }
 
 /**
+ * Lists open rounds the student is registered for via RoundEntrant,
+ * with an optional sitting if they've already started the test.
+ * Wired to GET /api/students/me/rounds (backend/src/routes/students.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   round: { id: string, name: string, state: string, closeTime: string },
+ *   sitting: { id: string, completedAt: string|null, startedAt: string, expiresAt: string } | null,
+ * }>>}
+ */
+export function fetchMyRounds(token) {
+  return requestJson('/api/students/me/rounds', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
  * Fetches one released result with a question-by-question review —
  * the student's answer next to the correct answer for every question.
  * Wired to GET /api/students/me/results/:resultId (backend/src/routes/students.js).
@@ -386,4 +425,83 @@ export function dashboardPathForRole(role) {
   if (role === 'educator') return '/educator';
   if (role === 'student') return '/student';
   return '/login';
+}
+
+export function fetchStandings(roundId) {
+  return requestJson(`/api/rounds/${roundId}/standings`);
+}
+
+/**
+ * Fetches ranked standings grouped by school for a round.
+ * Wired to GET /api/rounds/:id/standings/schools (backend/src/routes/rounds.js).
+ *
+ * @param {string} roundId
+ * @returns {Promise<Array<{
+ *   rank: number,
+ *   schoolId: string,
+ *   schoolName: string,
+ *   totalScore: number,
+ *   entrantCount: number,
+ * }>>}
+ */
+export function getSchoolStandings(roundId) {
+  return requestJson(`/api/rounds/${roundId}/standings/schools`);
+}
+
+/**
+ * Fetches all 4 notification trigger types for a round, with their current
+ * enabled/recipientRole state (defaults shown for any not yet configured).
+ * Wired to GET /api/rounds/:id/notifications (backend/src/routes/rounds.js).
+ * Requires organiser role.
+ *
+ * @param {string} roundId
+ * @returns {Promise<Array<{id: string|null, roundId: string, triggerType: string, enabled: boolean, recipientRole: string}>>}
+ */
+export function fetchNotificationRules(roundId) {
+  return requestJson(`/api/rounds/${roundId}/notifications`);
+}
+
+/**
+ * Updates (or creates) the notification rule for a specific trigger type.
+ * Wired to PUT /api/rounds/:id/notifications/:triggerType (backend/src/routes/rounds.js).
+ * Requires organiser role.
+ *
+ * @param {string} roundId
+ * @param {string} triggerType
+ * @param {{enabled?: boolean, recipientRole?: string}} updates
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{id: string, roundId: string, triggerType: string, enabled: boolean, recipientRole: string}>}
+ */
+export function updateNotificationRule(roundId, triggerType, updates, token) {
+  return requestJson(`/api/rounds/${roundId}/notifications/${triggerType}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(updates),
+  });
+}
+
+/**
+ * Dry-run preview of a notification trigger: returns who would be emailed
+ * and a rendered email preview, without sending anything.
+ * Wired to POST /api/rounds/:id/notifications/test (backend/src/routes/rounds.js).
+ * Requires organiser role.
+ *
+ * @param {string} roundId
+ * @param {string} triggerType
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   dryRun: boolean,
+ *   round: object,
+ *   triggerType: string,
+ *   enabled: boolean,
+ *   recipients: Array<{email: string, alreadyNotified: boolean, entrantId?: string, entrantName?: string}>,
+ *   emailPreview: {subject: string, text: string}|null,
+ * }>}
+ */
+export function testNotificationTrigger(roundId, triggerType, token) {
+  return requestJson(`/api/rounds/${roundId}/notifications/test`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ triggerType }),
+  });
 }

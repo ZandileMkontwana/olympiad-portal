@@ -82,7 +82,12 @@ router.post('/students/complete-profile', requireAuth(), async (req, res) => {
       where: { name: { equals: schoolName, mode: 'insensitive' } },
     });
     if (!school) {
-      return res.status(404).json({ error: 'No school found with that name' });
+      return res
+        .status(404)
+        .json({
+          error:
+            'That school is not registered on the platform yet. Ask your educator to set up the school first.',
+        });
     }
 
     const entrant = await prisma.entrant.findFirst({
@@ -93,7 +98,12 @@ router.post('/students/complete-profile', requireAuth(), async (req, res) => {
       },
     });
     if (!entrant) {
-      return res.status(404).json({ error: 'No unclaimed entrant record found matching that name and school' });
+      return res
+        .status(404)
+        .json({
+          error:
+            'No student record found matching your name and school. Ask your educator to add you to the school first.',
+        });
     }
 
     const clerkUser = await clerkClient.users.getUser(clerkUserId);
@@ -136,7 +146,7 @@ router.get('/auth/me', requireAuth(), async (req, res) => {
     where: { clerkUserId },
     include: {
       educator: { include: { school: true } },
-      entrant:  { include: { school: true } },
+      entrant: { include: { school: true } },
     },
   });
 
@@ -153,6 +163,7 @@ router.get('/auth/me', requireAuth(), async (req, res) => {
       role: user.role,
       name: user.name,
       school: schoolRecord ? { id: schoolRecord.id, name: schoolRecord.name } : null,
+      entrantId: user.entrant?.id ?? null,
     },
   });
 });

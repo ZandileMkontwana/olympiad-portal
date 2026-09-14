@@ -11,6 +11,7 @@ const entrantsRouter = require('./routes/entrants');
 const schoolsRouter = require('./routes/schools');
 const studentsRouter = require('./routes/students');
 const authRouter = require('./routes/auth');
+const certificatesRouter = require('./routes/certificates');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
 
@@ -36,6 +37,7 @@ app.use('/api', entrantsRouter);
 app.use('/api', schoolsRouter);
 app.use('/api', studentsRouter);
 app.use('/api', authRouter);
+app.use('/api', certificatesRouter);
 
 // JSON 404 for unmatched /api routes (prevents Express's default HTML response)
 app.use('/api', (req, res) => {
@@ -43,7 +45,8 @@ app.use('/api', (req, res) => {
 });
 
 // Global error handler — always returns JSON
-app.use((err, req, res, _next) => {
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: err.message || 'Internal server error' });
 });

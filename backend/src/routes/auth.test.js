@@ -158,17 +158,17 @@ describe('Auth routes', () => {
       expect(res.body.error).toMatch(/already completed/);
     });
 
-    it('returns 404 when no school found', async () => {
+    it('returns 404 when school not registered', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
       prisma.school.findFirst.mockResolvedValue(null);
       const res = await request(app)
         .post('/api/students/complete-profile')
         .send({ name: 'Test', schoolName: 'Unknown School' });
       expect(res.status).toBe(404);
-      expect(res.body.error).toMatch(/No school/);
+      expect(res.body.error).toMatch(/school is not registered/);
     });
 
-    it('returns 404 when no unclaimed entrant matches name and school', async () => {
+    it('returns 404 when no student record matches name and school', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
       prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
       prisma.entrant.findFirst.mockResolvedValue(null);
@@ -176,7 +176,7 @@ describe('Auth routes', () => {
         .post('/api/students/complete-profile')
         .send({ name: 'Nobody', schoolName: 'Test School' });
       expect(res.status).toBe(404);
-      expect(res.body.error).toMatch(/No unclaimed entrant/);
+      expect(res.body.error).toMatch(/No student record found/);
       expect(prisma.entrant.findFirst).toHaveBeenCalledWith({
         where: {
           name: { equals: 'Nobody', mode: 'insensitive' },
@@ -274,11 +274,13 @@ describe('Auth routes', () => {
         role: 'educator',
         name: 'Test',
         educator: { school: { id: 'school-1', name: 'Test School' } },
+        entrant: null,
       });
       const res = await request(app).get('/api/auth/me');
       expect(res.status).toBe(200);
       expect(res.body.user.email).toBe('a@b.com');
       expect(res.body.user.school).toEqual({ id: 'school-1', name: 'Test School' });
+      expect(res.body.user.entrantId).toBeNull();
     });
 
     it('returns school from entrant for student users', async () => {
@@ -288,12 +290,13 @@ describe('Auth routes', () => {
         role: 'student',
         name: 'Test',
         educator: null,
-        entrant: { school: { id: 'school-1', name: 'Test School' } },
+        entrant: { id: 'entrant-1', school: { id: 'school-1', name: 'Test School' } },
       });
       const res = await request(app).get('/api/auth/me');
       expect(res.status).toBe(200);
       expect(res.body.user.role).toBe('student');
       expect(res.body.user.school).toEqual({ id: 'school-1', name: 'Test School' });
+      expect(res.body.user.entrantId).toBe('entrant-1');
     });
   });
 
