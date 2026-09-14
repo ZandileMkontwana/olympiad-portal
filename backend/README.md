@@ -5,6 +5,8 @@ sidebar_position: 1
 ![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-98.8%25-brightgreen)
 ![Tests](https://img.shields.io/badge/tests-117%20passing-brightgreen)
 
+**Live API (Render):** <https://olympiad-portal.onrender.com> — e.g. <https://olympiad-portal.onrender.com/api/olympiads>
+
 # Getting Started — Backend
 
 ## Prerequisites
@@ -13,7 +15,7 @@ sidebar_position: 1
   nvm install 20
   nvm use 20
 ```
-- Access to the shared Railway Postgres database (ask a teammate for the connection string)
+- Access to the shared Supabase Postgres database (ask a teammate for the connection string — use the **Connection Pooler** string, as the direct connection is IPv6-only)
 
 ## Setup
 
@@ -31,7 +33,7 @@ npm i
 **3. Set up your environment variables**
 Create a `.env` file in `backend/` (never commit this — it's gitignored):
 ```
-DATABASE_URL="<ask a teammate for the shared Railway connection string>"
+DATABASE_URL="<ask a teammate for the shared Supabase connection string>"
 ```
 
 **4. Generate the Prisma client**
@@ -90,7 +92,7 @@ backend/
 link to Olympiad Portal documentation: https://olympiad-portal-docs.netlify.app/
 
 ## Database
-Uses PostgreSQL (hosted on Railway) via Prisma. Run migrations with:
+Uses PostgreSQL (hosted on Supabase) via Prisma. Run migrations with:
 npx prisma migrate dev
 
 ## Scheduler

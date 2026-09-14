@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect,useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { fetchStandings, getSchoolStandings, ApiError } from '@/lib/api';
 
@@ -104,9 +104,7 @@ export default function StandingsPage() {
           aria-selected={activeTab === 'schools'}
           onClick={() => setActiveTab('schools')}
           className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
-            activeTab === 'schools'
-              ? 'bg-lavender-deep text-white'
-              : 'text-ink-soft hover:text-ink'
+            activeTab === 'schools' ? 'bg-lavender-deep text-white' : 'text-ink-soft hover:text-ink'
           }`}
         >
           Per School
@@ -115,19 +113,21 @@ export default function StandingsPage() {
 
       {activeTab === 'entrants' && (
         <>
-          {status === 'loading' && (
-            <p className="mt-8 text-sm text-ink-soft">Loading standings…</p>
-          )}
+          {status === 'loading' && <p className="mt-8 text-sm text-ink-soft">Loading standings…</p>}
 
           {status === 'error' && (
-            <div role="alert" className="mt-8 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div
+              role="alert"
+              className="mt-8 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+            >
               {errorMessage}
             </div>
           )}
 
           {status === 'empty' && (
             <p className="mt-8 text-sm text-ink-soft">
-              No scored submissions yet — standings will appear here once entrants&apos; results are marked.
+              No scored submissions yet — standings will appear here once entrants&apos; results are
+              marked.
             </p>
           )}
 
@@ -136,19 +136,32 @@ export default function StandingsPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-lavender/20 bg-surface">
-                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">Rank</th>
-                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">Entrant</th>
-                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">School</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium text-ink-soft">Score</th>
+                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">
+                      Rank
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">
+                      Entrant
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">
+                      School
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium text-ink-soft">
+                      Score
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {standings.map((row) => (
-                    <tr key={row.entrantId} className="border-b border-lavender/10 last:border-0 hover:bg-lavender/5">
+                    <tr
+                      key={row.entrantId}
+                      className="border-b border-lavender/10 last:border-0 hover:bg-lavender/5"
+                    >
                       <td className="px-4 py-3 font-mono text-ink-soft">{row.rank}</td>
                       <td className="px-4 py-3 font-medium text-ink">{row.entrantName}</td>
                       <td className="px-4 py-3 text-ink-soft">{row.schoolName}</td>
-                      <td className="px-4 py-3 text-right font-mono text-ink">{row.score.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-ink">
+                        {row.score.toFixed(2)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -165,7 +178,10 @@ export default function StandingsPage() {
           )}
 
           {schoolStatus === 'error' && (
-            <div role="alert" className="mt-8 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div
+              role="alert"
+              className="mt-8 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+            >
               {schoolErrorMessage}
             </div>
           )}
@@ -181,19 +197,34 @@ export default function StandingsPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-lavender/20 bg-surface">
-                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">Rank</th>
-                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">School</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium text-ink-soft">Entrants</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium text-ink-soft">Total Score</th>
+                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">
+                      Rank
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium text-ink-soft">
+                      School
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium text-ink-soft">
+                      Entrants
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium text-ink-soft">
+                      Total Score
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {schoolStandings.map((row) => (
-                    <tr key={row.schoolId} className="border-b border-lavender/10 last:border-0 hover:bg-lavender/5">
+                    <tr
+                      key={row.schoolId}
+                      className="border-b border-lavender/10 last:border-0 hover:bg-lavender/5"
+                    >
                       <td className="px-4 py-3 font-mono text-ink-soft">{row.rank}</td>
                       <td className="px-4 py-3 font-medium text-ink">{row.schoolName}</td>
-                      <td className="px-4 py-3 text-right font-mono text-ink-soft">{row.entrantCount}</td>
-                      <td className="px-4 py-3 text-right font-mono text-ink">{row.totalScore.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-ink-soft">
+                        {row.entrantCount}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-ink">
+                        {row.totalScore.toFixed(2)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

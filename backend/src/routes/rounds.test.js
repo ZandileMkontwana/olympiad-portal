@@ -568,9 +568,18 @@ describe('Rounds routes', () => {
       it('gives tied school totals the same rank, skipping the next rank accordingly', async () => {
         prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
         prisma.submission.findMany.mockResolvedValue([
-          { entrant: { id: 'e1', school: { id: 'school-1', name: 'School A' } }, result: { score: 50 } },
-          { entrant: { id: 'e2', school: { id: 'school-2', name: 'School B' } }, result: { score: 50 } },
-          { entrant: { id: 'e3', school: { id: 'school-3', name: 'School C' } }, result: { score: 40 } },
+          {
+            entrant: { id: 'e1', school: { id: 'school-1', name: 'School A' } },
+            result: { score: 50 },
+          },
+          {
+            entrant: { id: 'e2', school: { id: 'school-2', name: 'School B' } },
+            result: { score: 50 },
+          },
+          {
+            entrant: { id: 'e3', school: { id: 'school-3', name: 'School C' } },
+            result: { score: 40 },
+          },
         ]);
 
         const res = await request(app).get('/api/rounds/round-1/standings/schools');
@@ -755,9 +764,7 @@ describe('Rounds routes', () => {
         recipientRole: 'educator',
       });
 
-      const res = await request(app)
-        .put('/api/rounds/round-1/notifications/before_close')
-        .send({});
+      const res = await request(app).put('/api/rounds/round-1/notifications/before_close').send({});
 
       expect(res.status).toBe(200);
       expect(res.body.enabled).toBe(true);
@@ -982,7 +989,9 @@ describe('Rounds routes', () => {
           },
         ],
       });
-      prisma.notificationLog.findMany.mockResolvedValue([{ recipientEmail: 'teacher-a@school.com' }]);
+      prisma.notificationLog.findMany.mockResolvedValue([
+        { recipientEmail: 'teacher-a@school.com' },
+      ]);
 
       const res = await request(app)
         .post('/api/rounds/round-1/notifications/test')
@@ -1044,7 +1053,9 @@ describe('Rounds routes', () => {
         .send({ triggerType: 'before_close' });
       expect(closing.status).toBe(200);
       expect(closing.body.emailPreview.subject).toBe('Round One closes soon');
-      expect(closing.body.emailPreview.text).toContain('Round One closes at 2026-01-02T10:00:00.000Z');
+      expect(closing.body.emailPreview.text).toContain(
+        'Round One closes at 2026-01-02T10:00:00.000Z'
+      );
 
       const released = await request(app)
         .post('/api/rounds/round-1/notifications/test')
@@ -1094,8 +1105,18 @@ describe('Rounds routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.recipients).toEqual([
-        { email: 'teacher@school.com', entrantId: 'entrant-2', entrantName: 'Bob', alreadyNotified: false },
-        { email: 'teacher@school.com', entrantId: 'entrant-3', entrantName: 'Carol', alreadyNotified: true },
+        {
+          email: 'teacher@school.com',
+          entrantId: 'entrant-2',
+          entrantName: 'Bob',
+          alreadyNotified: false,
+        },
+        {
+          email: 'teacher@school.com',
+          entrantId: 'entrant-3',
+          entrantName: 'Carol',
+          alreadyNotified: true,
+        },
       ]);
       expect(res.body.emailPreview.subject).toBe('Missing submission for Bob - Round One');
     });

@@ -267,10 +267,7 @@ describe('Entrants routes', () => {
         name: 'Alice',
         grade: '10',
       });
-      prisma.round.findMany.mockResolvedValue([
-        { id: 'round-1' },
-        { id: 'round-2' },
-      ]);
+      prisma.round.findMany.mockResolvedValue([{ id: 'round-1' }, { id: 'round-2' }]);
       prisma.roundEntrant.createMany.mockResolvedValue({ count: 2 });
 
       const res = await request(app)

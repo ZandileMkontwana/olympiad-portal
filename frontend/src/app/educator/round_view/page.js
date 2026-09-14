@@ -145,6 +145,9 @@ function RoundViewContent() {
         throw new Error(data.error || 'Failed to fetch paper');
       }
 
+      // External API URL (paper file download), not an internal Next.js route,
+      // so window.location is intentional here.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = `${process.env.NEXT_PUBLIC_API_BASE_URL}${data.fileUrl}`;
     } catch (error) {
       setDownloadError(error.message);
@@ -248,13 +251,9 @@ function RoundViewContent() {
           <>
             <h3 style={{ marginTop: '16px' }}>Certificates</h3>
 
-            {certificateLoading && (
-              <p className="description">Loading results...</p>
-            )}
+            {certificateLoading && <p className="description">Loading results...</p>}
 
-            {certificateError && (
-              <p className="message">{certificateError}</p>
-            )}
+            {certificateError && <p className="message">{certificateError}</p>}
 
             {!certificateLoading && certificateEntrants.length === 0 && !certificateError && (
               <p className="description">
@@ -263,7 +262,16 @@ function RoundViewContent() {
             )}
 
             {certificateEntrants.length > 0 && (
-              <ul style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', padding: 0, listStyle: 'none' }}>
+              <ul
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  marginTop: '8px',
+                  padding: 0,
+                  listStyle: 'none',
+                }}
+              >
                 {certificateEntrants.map((entrant) => (
                   <li
                     key={entrant.id}
@@ -298,17 +306,28 @@ function RoundViewContent() {
           <div style={{ marginTop: '12px' }}>
             {releaseStatus === 'released' ? (
               <div>
-                <div className="message" style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }}>
+                <div
+                  className="message"
+                  style={{ background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7' }}
+                >
                   {releaseMessage}
                 </div>
                 <button
                   className="button"
-                  style={{ marginTop: '8px', background: 'transparent', color: '#e0615f', border: '1px solid rgba(224,97,95,0.3)' }}
+                  style={{
+                    marginTop: '8px',
+                    background: 'transparent',
+                    color: '#e0615f',
+                    border: '1px solid rgba(224,97,95,0.3)',
+                  }}
                   disabled={releaseStatus === 'unreleasing'}
                   onClick={async () => {
-                    if (!window.confirm(
-                      'Are you sure you want to hide results? Students will no longer be able to see their marks.'
-                    )) return;
+                    if (
+                      !window.confirm(
+                        'Are you sure you want to hide results? Students will no longer be able to see their marks.'
+                      )
+                    )
+                      return;
                     setReleaseStatus('unreleasing');
                     try {
                       const token = await getToken();
@@ -336,9 +355,12 @@ function RoundViewContent() {
                   className="button"
                   disabled={releaseStatus === 'releasing'}
                   onClick={async () => {
-                    if (!window.confirm(
-                      'Are you sure you want to release results? Students will immediately be able to see their marks.'
-                    )) return;
+                    if (
+                      !window.confirm(
+                        'Are you sure you want to release results? Students will immediately be able to see their marks.'
+                      )
+                    )
+                      return;
                     setReleaseStatus('releasing');
                     setReleaseMessage('');
                     try {
@@ -362,10 +384,14 @@ function RoundViewContent() {
                     }
                   }}
                 >
-                  {releaseStatus === 'releasing' ? 'Releasing\u2026' : 'Release Results to Students'}
+                  {releaseStatus === 'releasing'
+                    ? 'Releasing\u2026'
+                    : 'Release Results to Students'}
                 </button>
                 {releaseStatus === 'error' && (
-                  <p className="message" style={{ marginTop: '8px' }}>{releaseMessage}</p>
+                  <p className="message" style={{ marginTop: '8px' }}>
+                    {releaseMessage}
+                  </p>
                 )}
               </>
             )}

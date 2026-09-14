@@ -475,7 +475,6 @@ export function getSchoolStandings(roundId) {
   return requestJson(`/api/rounds/${roundId}/standings/schools`);
 }
 
-
 /**
  * Fetches all 4 notification trigger types for a round, with their current
  * enabled/recipientRole state (defaults shown for any not yet configured).

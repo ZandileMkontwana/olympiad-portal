@@ -13,7 +13,14 @@ const PDFDocument = require('pdfkit');
  * }} data
  * @returns {Promise<Buffer>}
  */
-function generateCertificate({ entrantName, roundName, olympiadName, schoolName, score, issuedDate }) {
+function generateCertificate({
+  entrantName,
+  roundName,
+  olympiadName,
+  schoolName,
+  score,
+  issuedDate,
+}) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: 'A4', landscape: true, margin: 0 });
