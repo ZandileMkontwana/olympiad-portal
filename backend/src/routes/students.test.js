@@ -32,6 +32,8 @@ describe('Students routes', () => {
     vi.spyOn(prisma.submission, 'findFirst');
     vi.spyOn(prisma.paper, 'findUnique');
     vi.spyOn(prisma.roundEntrant, 'findMany');
+    vi.spyOn(prisma.roundEntrant, 'upsert');
+    vi.spyOn(prisma.round, 'findMany');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: the Clerk user maps to a student linked to entrant-1
     prisma.user.findUnique.mockResolvedValue({
@@ -309,21 +311,12 @@ describe('Students routes', () => {
       expect(res.body.error).toMatch(/No entrant record linked/);
     });
 
-    it('returns open rounds with sitting status', async () => {
-      prisma.roundEntrant.findMany.mockResolvedValue([
-        {
-          id: 're-1',
-          roundId: 'round-1',
-          entrantId: 'entrant-1',
-          round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' },
-        },
-        {
-          id: 're-2',
-          roundId: 'round-2',
-          entrantId: 'entrant-1',
-          round: { id: 'round-2', name: 'Round 2', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' },
-        },
+    it('returns all open rounds with sitting status and lazy-registers', async () => {
+      prisma.round.findMany.mockResolvedValue([
+        { id: 'round-1', name: 'Round 1', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' },
+        { id: 'round-2', name: 'Round 2', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' },
       ]);
+      prisma.roundEntrant.upsert.mockResolvedValue({ id: 're-1' });
       // Round 1 has a sitting, Round 2 does not
       prisma.sitting.findFirst
         .mockResolvedValueOnce({ id: 'sitting-1', completedAt: null, startedAt: '2026-09-01T10:00:00.000Z', expiresAt: '2030-01-01T00:00:00.000Z' })
@@ -336,22 +329,24 @@ describe('Students routes', () => {
         { round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' }, sitting: { id: 'sitting-1', completedAt: null, startedAt: '2026-09-01T10:00:00.000Z', expiresAt: '2030-01-01T00:00:00.000Z' } },
         { round: { id: 'round-2', name: 'Round 2', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' }, sitting: null },
       ]);
-      expect(prisma.roundEntrant.findMany).toHaveBeenCalledWith({
-        where: { entrantId: 'entrant-1', round: { state: 'open' } },
-        include: { round: { select: { id: true, name: true, state: true, closeTime: true } } },
-        orderBy: { registeredAt: 'desc' },
+      expect(prisma.round.findMany).toHaveBeenCalledWith({
+        where: { state: 'open' },
+        select: { id: true, name: true, state: true, closeTime: true },
+        orderBy: { openTime: 'desc' },
       });
+      // Lazy registration was called for both rounds
+      expect(prisma.roundEntrant.upsert).toHaveBeenCalledTimes(2);
     });
 
     it('returns an empty list when no open rounds exist', async () => {
-      prisma.roundEntrant.findMany.mockResolvedValue([]);
+      prisma.round.findMany.mockResolvedValue([]);
       const res = await request(app).get('/api/students/me/rounds');
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
     });
 
     it('returns 500 when the database query fails', async () => {
-      prisma.roundEntrant.findMany.mockRejectedValue(new Error('DB down'));
+      prisma.round.findMany.mockRejectedValue(new Error('DB down'));
       const res = await request(app).get('/api/students/me/rounds');
       expect(res.status).toBe(500);
       expect(res.body.error).toBe('Could not fetch rounds');

@@ -44,34 +44,36 @@ router.get('/students/me/sittings', ...requireRole('student'), async (req, res) 
 });
 
 // GET /students/me/rounds
-// Lists open rounds the student is registered for (via RoundEntrant),
-// with an optional sitting record if they've already started the test.
+// Lists all open rounds with sitting status. For each open round, ensures
+// the student has a RoundEntrant record (lazy registration — handles
+// entrants created before the round opened).
 router.get('/students/me/rounds', ...requireRole('student'), async (req, res) => {
   try {
     const entrant = await loadEntrant(req, res);
     if (!entrant) return;
 
-    const registrations = await prisma.roundEntrant.findMany({
-      where: {
-        entrantId: entrant.id,
-        round: { state: 'open' },
-      },
-      include: {
-        round: {
-          select: { id: true, name: true, state: true, closeTime: true },
-        },
-      },
-      orderBy: { registeredAt: 'desc' },
+    // Get all open rounds
+    const openRounds = await prisma.round.findMany({
+      where: { state: 'open' },
+      select: { id: true, name: true, state: true, closeTime: true },
+      orderBy: { openTime: 'desc' },
     });
 
-    // For each open round, check if the student already has a sitting
+    // For each open round, ensure RoundEntrant exists and get sitting status
     const roundsWithStatus = await Promise.all(
-      registrations.map(async (reg) => {
+      openRounds.map(async (round) => {
+        // Lazy registration: create RoundEntrant if it doesn't exist
+        await prisma.roundEntrant.upsert({
+          where: { roundId_entrantId: { roundId: round.id, entrantId: entrant.id } },
+          create: { roundId: round.id, entrantId: entrant.id },
+          update: {},
+        });
+
         const sitting = await prisma.sitting.findFirst({
-          where: { roundId: reg.round.id, entrantId: entrant.id },
+          where: { roundId: round.id, entrantId: entrant.id },
           select: { id: true, completedAt: true, startedAt: true, expiresAt: true },
         });
-        return { round: reg.round, sitting };
+        return { round, sitting };
       })
     );
 
