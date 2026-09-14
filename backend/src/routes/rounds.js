@@ -4,6 +4,14 @@ const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
+const NOTIFICATION_TRIGGER_TYPES = [
+  'before_open',
+  'before_close',
+  'missing_submission',
+  'results_released',
+];
+const NOTIFICATION_RECIPIENT_ROLES = ['educator', 'organiser', 'all'];
+
 router.post('/olympiads', async (req, res) => {
   try {
     const { name, timezone } = req.body;
@@ -282,6 +290,116 @@ router.get('/rounds/:id/standings/schools', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch school standings' });
   }
 });
+
+
+// GET /rounds/:id/notifications
+// Returns all 4 trigger types for this round, whether or not a rule has
+// been explicitly configured — unconfigured types show as enabled by
+// default (matching the scheduler's fallback behavior), with no id.
+router.get('/rounds/:id/notifications', ...requireRole('organiser'), async (req, res) => {
+  try {
+    const roundId = req.params.id;
+
+    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const existingRules = await prisma.notificationRule.findMany({
+      where: { roundId },
+    });
+    const byTriggerType = new Map(existingRules.map((r) => [r.triggerType, r]));
+
+    const rules = NOTIFICATION_TRIGGER_TYPES.map((triggerType) => {
+      const existing = byTriggerType.get(triggerType);
+      return (
+        existing || {
+          id: null,
+          roundId,
+          triggerType,
+          enabled: true,
+          recipientRole: 'educator',
+        }
+      );
+    });
+
+    res.json(rules);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch notification rules' });
+  }
+});
+
+// PUT /rounds/:id/notifications/:triggerType
+// Upserts the rule for this round + trigger type — creates it if this is
+// the first time it's been configured, otherwise updates it. This is the
+// route the config page (#138) calls when an organiser toggles a switch
+// or changes a recipient role.
+router.put(
+  '/rounds/:id/notifications/:triggerType',
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const roundId = req.params.id;
+      const { triggerType } = req.params;
+      const { enabled, recipientRole } = req.body;
+
+      if (!NOTIFICATION_TRIGGER_TYPES.includes(triggerType)) {
+        return res.status(400).json({ error: 'Invalid trigger type' });
+      }
+      if (recipientRole !== undefined && !NOTIFICATION_RECIPIENT_ROLES.includes(recipientRole)) {
+        return res.status(400).json({ error: 'Invalid recipient role' });
+      }
+
+      const round = await prisma.round.findUnique({ where: { id: roundId } });
+      if (!round) {
+        return res.status(404).json({ error: 'Round not found' });
+      }
+
+      const rule = await prisma.notificationRule.upsert({
+        where: { roundId_triggerType: { roundId, triggerType } },
+        create: {
+          roundId,
+          triggerType,
+          enabled: enabled ?? true,
+          recipientRole: recipientRole ?? 'educator',
+        },
+        update: {
+          ...(enabled !== undefined && { enabled }),
+          ...(recipientRole !== undefined && { recipientRole }),
+        },
+      });
+
+      res.json(rule);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to update notification rule' });
+    }
+  }
+);
+
+// DELETE /rounds/:id/notifications/:triggerType
+// Removes any explicit configuration for this trigger type, reverting it
+// to the default (enabled, educator) behavior.
+router.delete(
+  '/rounds/:id/notifications/:triggerType',
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const roundId = req.params.id;
+      const { triggerType } = req.params;
+
+      await prisma.notificationRule.deleteMany({
+        where: { roundId, triggerType },
+      });
+
+      res.status(204).send();
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to delete notification rule' });
+    }
+  }
+);
 
 
 module.exports = router;

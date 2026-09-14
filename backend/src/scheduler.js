@@ -48,6 +48,23 @@ async function getRecipientsForRound(round) {
   return recipientEmails;
 }
 
+// Checks whether a given trigger type is enabled for a round. If no
+// NotificationRule row exists for this (roundId, triggerType) pair, the
+// notification is enabled by default — this preserves the previous
+// always-on behavior for any round that hasn't been explicitly configured.
+//
+// NOTE: recipientRole ('educator' | 'organiser' | 'all') is stored on the
+// rule but not yet used to filter recipients — there's currently no data
+// model relationship identifying which organiser(s) own a given round, so
+// organiser-targeted notifications aren't buildable yet. Every notification
+// still goes to educators only, same as before this change (#136-#137).
+async function isTriggerEnabled(roundId, triggerType) {
+  const rule = await prisma.notificationRule.findUnique({
+    where: { roundId_triggerType: { roundId, triggerType } },
+  });
+  return rule ? rule.enabled : true;
+}
+
 const roundIncludeForNotifications = {
   roundEntrants: {
     include: {
@@ -76,6 +93,8 @@ async function sendBeforeOpenNotifications(now) {
   });
 
   for (const round of upcomingRounds) {
+    if (!(await isTriggerEnabled(round.id, 'before_open'))) continue;
+
     const recipientEmails = await getRecipientsForRound(round);
 
     for (const email of recipientEmails) {
@@ -110,6 +129,8 @@ async function sendBeforeCloseNotifications(now) {
   });
 
   for (const round of closingSoonRounds) {
+    if (!(await isTriggerEnabled(round.id, 'before_close'))) continue;
+
     const recipientEmails = await getRecipientsForRound(round);
     for (const email of recipientEmails) {
       const alreadyNotified = await prisma.notificationLog.findUnique({
@@ -148,6 +169,8 @@ async function sendResultsReleasedNotifications() {
   });
 
   for (const round of roundsWithReleasedResults) {
+    if (!(await isTriggerEnabled(round.id, 'results_released'))) continue;
+
     const recipientEmails = await getRecipientsForRound(round);
     for (const email of recipientEmails) {
       const alreadyNotified = await prisma.notificationLog.findUnique({
@@ -188,6 +211,8 @@ async function sendMissingSubmissionNotifications() {
   });
 
   for (const round of recentlyClosedRounds) {
+    if (!(await isTriggerEnabled(round.id, 'missing_submission'))) continue;
+
     for (const roundEntrant of round.roundEntrants) {
       const entrant = roundEntrant.entrant;
       const hasSubmitted = entrant.submissions.some((s) => s.roundId === round.id);

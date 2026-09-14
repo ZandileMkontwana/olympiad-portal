@@ -36,6 +36,9 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
+    vi.spyOn(prisma.notificationRule, 'findMany');
+    vi.spyOn(prisma.notificationRule, 'upsert');
+    vi.spyOn(prisma.notificationRule, 'deleteMany');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: the Clerk user maps to an educator linked to school-1
     prisma.user.findUnique.mockResolvedValue({
@@ -395,9 +398,6 @@ describe('Rounds routes', () => {
 
     it('excludes submissions with no result', async () => {
       prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
-      // The route filters at the query level (result: { isNot: null }), so a
-      // correctly-implemented query never returns this row — this test just
-      // confirms the response only reflects what came back from Prisma.
       prisma.submission.findMany.mockResolvedValue([
         {
           entrant: { id: 'entrant-1', name: 'Thabo', school: { name: 'Wits High School' } },
@@ -463,14 +463,10 @@ describe('Rounds routes', () => {
 
       expect(res.body[0].rank).toBe(1);
       expect(res.body[1].rank).toBe(1);
-      expect(res.body[2].rank).toBe(3); // skips rank 2, matching standard competition ranking
+      expect(res.body[2].rank).toBe(3);
     });
 
     it('includes both paper-based and online-sitting-based submissions without distinction', async () => {
-      // Both submission types converge on the same Submission -> Result shape
-      // (see sittings.js `POST /sittings/:id/submit` and submissions.js
-      // `POST /rounds/:id/submissions`), so the standings query needs no
-      // special-casing between them (#125).
       prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
       prisma.submission.findMany.mockResolvedValue([
         {
@@ -503,98 +499,262 @@ describe('Rounds routes', () => {
       expect(res.body.error).toMatch(/Failed/);
     });
 
-    // Add this describe block into backend/src/routes/rounds.test.js,
-// right after the closing brace of the GET /api/rounds/:id/standings
-// describe block, still inside the outer describe('Rounds routes', ...).
+    describe('GET /api/rounds/:id/standings/schools', () => {
+      it('returns 404 when the round does not exist', async () => {
+        prisma.round.findUnique.mockResolvedValue(null);
 
-describe('GET /api/rounds/:id/standings/schools', () => {
-  it('returns 404 when the round does not exist', async () => {
-    prisma.round.findUnique.mockResolvedValue(null);
+        const res = await request(app).get('/api/rounds/missing-round/standings/schools');
 
-    const res = await request(app).get('/api/rounds/missing-round/standings/schools');
+        expect(res.status).toBe(404);
+        expect(res.body.error).toMatch(/not found/i);
+      });
 
-    expect(res.status).toBe(404);
-    expect(res.body.error).toMatch(/not found/i);
+      it('returns an empty array when no submissions have a result yet', async () => {
+        prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+        prisma.submission.findMany.mockResolvedValue([]);
+
+        const res = await request(app).get('/api/rounds/round-1/standings/schools');
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual([]);
+      });
+
+      it('sums scores per school and returns entrant counts', async () => {
+        prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+        prisma.submission.findMany.mockResolvedValue([
+          {
+            entrant: { id: 'e1', school: { id: 'school-1', name: 'Wits High School' } },
+            result: { score: 20 },
+          },
+          {
+            entrant: { id: 'e2', school: { id: 'school-1', name: 'Wits High School' } },
+            result: { score: 30 },
+          },
+          {
+            entrant: { id: 'e3', school: { id: 'school-2', name: "St Mary's" } },
+            result: { score: 10 },
+          },
+        ]);
+
+        const res = await request(app).get('/api/rounds/round-1/standings/schools');
+
+        expect(res.status).toBe(200);
+        const wits = res.body.find((s) => s.schoolName === 'Wits High School');
+        expect(wits.totalScore).toBe(50);
+        expect(wits.entrantCount).toBe(2);
+      });
+
+      it('ranks schools by total score, highest first', async () => {
+        prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+        prisma.submission.findMany.mockResolvedValue([
+          {
+            entrant: { id: 'e1', school: { id: 'school-1', name: 'School A' } },
+            result: { score: 30 },
+          },
+          {
+            entrant: { id: 'e2', school: { id: 'school-2', name: 'School B' } },
+            result: { score: 90 },
+          },
+        ]);
+
+        const res = await request(app).get('/api/rounds/round-1/standings/schools');
+
+        expect(res.body[0]).toMatchObject({ rank: 1, schoolName: 'School B', totalScore: 90 });
+        expect(res.body[1]).toMatchObject({ rank: 2, schoolName: 'School A', totalScore: 30 });
+      });
+
+      it('gives tied school totals the same rank, skipping the next rank accordingly', async () => {
+        prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+        prisma.submission.findMany.mockResolvedValue([
+          { entrant: { id: 'e1', school: { id: 'school-1', name: 'School A' } }, result: { score: 50 } },
+          { entrant: { id: 'e2', school: { id: 'school-2', name: 'School B' } }, result: { score: 50 } },
+          { entrant: { id: 'e3', school: { id: 'school-3', name: 'School C' } }, result: { score: 40 } },
+        ]);
+
+        const res = await request(app).get('/api/rounds/round-1/standings/schools');
+
+        expect(res.body[0].rank).toBe(1);
+        expect(res.body[1].rank).toBe(1);
+        expect(res.body[2].rank).toBe(3);
+      });
+
+      it('returns 500 on prisma error', async () => {
+        prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
+        prisma.submission.findMany.mockRejectedValue(new Error('DB error'));
+
+        const res = await request(app).get('/api/rounds/round-1/standings/schools');
+
+        expect(res.status).toBe(500);
+        expect(res.body.error).toMatch(/Failed/);
+      });
+    });
   });
 
-  it('returns an empty array when no submissions have a result yet', async () => {
-    prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
-    prisma.submission.findMany.mockResolvedValue([]);
+  describe('GET /api/rounds/:id/notifications', () => {
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+    });
 
-    const res = await request(app).get('/api/rounds/round-1/standings/schools');
+    it('returns 401 when not authenticated', async () => {
+      const unauthApp = createApp(false);
+      const res = await request(unauthApp).get('/api/rounds/round-1/notifications');
+      expect(res.status).toBe(401);
+    });
 
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual([]);
+    it('returns 403 when user is not an organiser', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'teacher@school.com',
+        role: 'educator',
+        name: 'Teacher One',
+      });
+      const res = await request(app).get('/api/rounds/round-1/notifications');
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 404 when round not found', async () => {
+      prisma.round.findUnique.mockResolvedValue(null);
+      const res = await request(app).get('/api/rounds/round-1/notifications');
+      expect(res.status).toBe(404);
+    });
+
+    it('returns all 4 trigger types with defaults when none are configured', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1' });
+      prisma.notificationRule.findMany.mockResolvedValue([]);
+
+      const res = await request(app).get('/api/rounds/round-1/notifications');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(4);
+      expect(res.body.every((r) => r.enabled === true)).toBe(true);
+      expect(res.body.map((r) => r.triggerType).sort()).toEqual(
+        ['before_close', 'before_open', 'missing_submission', 'results_released'].sort()
+      );
+    });
+
+    it('merges configured rules with defaults for unconfigured trigger types', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1' });
+      prisma.notificationRule.findMany.mockResolvedValue([
+        {
+          id: 'rule-1',
+          roundId: 'round-1',
+          triggerType: 'before_open',
+          enabled: false,
+          recipientRole: 'organiser',
+        },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/notifications');
+
+      const beforeOpen = res.body.find((r) => r.triggerType === 'before_open');
+      const beforeClose = res.body.find((r) => r.triggerType === 'before_close');
+      expect(beforeOpen).toMatchObject({ enabled: false, recipientRole: 'organiser' });
+      expect(beforeClose).toMatchObject({ enabled: true, recipientRole: 'educator', id: null });
+    });
+
+    it('returns 500 on prisma error', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1' });
+      prisma.notificationRule.findMany.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).get('/api/rounds/round-1/notifications');
+      expect(res.status).toBe(500);
+    });
   });
 
-  it('sums scores per school and returns entrant counts', async () => {
-    prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
-    prisma.submission.findMany.mockResolvedValue([
-      {
-        entrant: { id: 'e1', school: { id: 'school-1', name: 'Wits High School' } },
-        result: { score: 20 },
-      },
-      {
-        entrant: { id: 'e2', school: { id: 'school-1', name: 'Wits High School' } },
-        result: { score: 30 },
-      },
-      {
-        entrant: { id: 'e3', school: { id: 'school-2', name: "St Mary's" } },
-        result: { score: 10 },
-      },
-    ]);
+  describe('PUT /api/rounds/:id/notifications/:triggerType', () => {
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+    });
 
-    const res = await request(app).get('/api/rounds/round-1/standings/schools');
+    it('returns 400 for an invalid trigger type', async () => {
+      const res = await request(app)
+        .put('/api/rounds/round-1/notifications/not_a_real_trigger')
+        .send({ enabled: false });
+      expect(res.status).toBe(400);
+    });
 
-    expect(res.status).toBe(200);
-    const wits = res.body.find((s) => s.schoolName === 'Wits High School');
-    expect(wits.totalScore).toBe(50);
-    expect(wits.entrantCount).toBe(2);
+    it('returns 400 for an invalid recipient role', async () => {
+      const res = await request(app)
+        .put('/api/rounds/round-1/notifications/before_open')
+        .send({ recipientRole: 'not_a_real_role' });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 404 when round not found', async () => {
+      prisma.round.findUnique.mockResolvedValue(null);
+      const res = await request(app)
+        .put('/api/rounds/round-1/notifications/before_open')
+        .send({ enabled: false });
+      expect(res.status).toBe(404);
+    });
+
+    it('upserts the rule and returns it', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1' });
+      prisma.notificationRule.upsert.mockResolvedValue({
+        id: 'rule-1',
+        roundId: 'round-1',
+        triggerType: 'before_open',
+        enabled: false,
+        recipientRole: 'educator',
+      });
+
+      const res = await request(app)
+        .put('/api/rounds/round-1/notifications/before_open')
+        .send({ enabled: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body.enabled).toBe(false);
+      expect(prisma.notificationRule.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { roundId_triggerType: { roundId: 'round-1', triggerType: 'before_open' } },
+        })
+      );
+    });
+
+    it('returns 500 on prisma error', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'round-1' });
+      prisma.notificationRule.upsert.mockRejectedValue(new Error('DB error'));
+      const res = await request(app)
+        .put('/api/rounds/round-1/notifications/before_open')
+        .send({ enabled: false });
+      expect(res.status).toBe(500);
+    });
   });
 
-  it('ranks schools by total score, highest first', async () => {
-    prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
-    prisma.submission.findMany.mockResolvedValue([
-      {
-        entrant: { id: 'e1', school: { id: 'school-1', name: 'School A' } },
-        result: { score: 30 },
-      },
-      {
-        entrant: { id: 'e2', school: { id: 'school-2', name: 'School B' } },
-        result: { score: 90 },
-      },
-    ]);
+  describe('DELETE /api/rounds/:id/notifications/:triggerType', () => {
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+    });
 
-    const res = await request(app).get('/api/rounds/round-1/standings/schools');
+    it('deletes the rule and returns 204', async () => {
+      prisma.notificationRule.deleteMany.mockResolvedValue({ count: 1 });
 
-    expect(res.body[0]).toMatchObject({ rank: 1, schoolName: 'School B', totalScore: 90 });
-    expect(res.body[1]).toMatchObject({ rank: 2, schoolName: 'School A', totalScore: 30 });
-  });
+      const res = await request(app).delete('/api/rounds/round-1/notifications/before_open');
 
-  it('gives tied school totals the same rank, skipping the next rank accordingly', async () => {
-    prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
-    prisma.submission.findMany.mockResolvedValue([
-      { entrant: { id: 'e1', school: { id: 'school-1', name: 'School A' } }, result: { score: 50 } },
-      { entrant: { id: 'e2', school: { id: 'school-2', name: 'School B' } }, result: { score: 50 } },
-      { entrant: { id: 'e3', school: { id: 'school-3', name: 'School C' } }, result: { score: 40 } },
-    ]);
+      expect(res.status).toBe(204);
+      expect(prisma.notificationRule.deleteMany).toHaveBeenCalledWith({
+        where: { roundId: 'round-1', triggerType: 'before_open' },
+      });
+    });
 
-    const res = await request(app).get('/api/rounds/round-1/standings/schools');
-
-    expect(res.body[0].rank).toBe(1);
-    expect(res.body[1].rank).toBe(1);
-    expect(res.body[2].rank).toBe(3);
-  });
-
-  it('returns 500 on prisma error', async () => {
-    prisma.round.findUnique.mockResolvedValue({ id: 'round-1', name: 'Round 1' });
-    prisma.submission.findMany.mockRejectedValue(new Error('DB error'));
-
-    const res = await request(app).get('/api/rounds/round-1/standings/schools');
-
-    expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/Failed/);
-  });
-  });
+    it('returns 500 on prisma error', async () => {
+      prisma.notificationRule.deleteMany.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).delete('/api/rounds/round-1/notifications/before_open');
+      expect(res.status).toBe(500);
+    });
   });
 });
