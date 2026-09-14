@@ -1,244 +1,250 @@
-# Sprint 2 Meeting Minutes
+# Sprint 2 Minutes
 
-## Meeting 1
+## Meeting 1 — 26 August 2026
 
-**Date:** 26 August 2026
 **Sprint:** Sprint 2
-**Participants:** Zandile, Ronie, Kutloano, Mlungisi
+**Date:** 25 August 2026
+**Participants:** Zandile, Kutloano, Ronie, Mlungisi
+**Meeting Type:** Sprint Planning
 
-### Meeting Objective
+### Objective
 
-To analyse the Intermediate requirements and plan the implementation of online test sittings, advanced marking, and progression between rounds.
+The team met to begin Sprint 2 and review the Intermediate requirements that needed to be implemented after completion of the Basic functionality.
 
 ### Discussion
 
-* The team reviewed the Intermediate requirements for Sprint 2.
-* The possibility of allowing students to complete papers online was discussed.
-* The team identified the need for each online sitting to have its own timer.
-* The team discussed saving student answers as they are submitted.
-* Connection loss and the ability for students to resume an unfinished sitting were identified as important requirements.
-* The team discussed extending marking beyond multiple-choice questions.
-* Non-MCQ submissions will require a marker queue.
-* Partial credit and moderation were identified as additional marking requirements.
-* The team discussed allowing entrants to request a remark.
-* The team also reviewed the requirement for qualifying entrants to progress automatically to another round.
+The team discussed the Intermediate requirements, with particular attention given to online test-taking, extended marking, progression between rounds, notifications, standings, certificates, student login, school dashboards, and the archive.
 
-### Responsibilities
+The team agreed that the new features needed to build on the existing round, submission, user, and authentication functionality from the previous sprint.
 
-* **Zandile:** Extend the round and data models to support online sittings, sitting states, timers, and progression between rounds.
-* **Mlungisi:** Implement sitting, answer, marking, moderation, and remark-related backend functionality.
-* **Ronie:** Design the organiser interface for configuring online rounds and monitoring sittings.
-* **Kutloano:** Design the student online test interface, timer, answer saving, resume functionality, and educator-facing results.
+The work was divided according to feature complexity and dependencies.
 
 ### Decisions
 
-* Online sittings will be associated with a specific entrant and round.
-* The timer will belong to an individual sitting rather than being shared globally.
-* Answers must be persisted so that students can continue after losing their connection.
-* The team will first implement the online sitting workflow before expanding the marking workflow.
+- Zandile will handle Online Test-Taking (I1) and Archive (B1).
+- Kutloano will handle Extended Marking (I2) and Round Progression (I3).
+- Ronie will handle Standings & Certificates (I6) and Configurable Notifications (I5).
+- Mlungisi will handle Notification Sending (I4) and Student Login & School Dashboard (I7).
+- Features should be integrated rather than developed as isolated components.
+- Testing will be performed throughout the sprint rather than only at the end.
 
 ### Action Items
 
-* **Zandile:** Design the online sitting database structure.
-* **Mlungisi:** Define the sitting and answer API requirements.
-* **Ronie:** Begin organiser-side online round configuration.
-* **Kutloano:** Begin the online test interface and timer design.
+- **Zandile:** Begin Sitting model and online sitting API design.
+- **Kutloano:** Begin MarkingTask and progression requirements.
+- **Ronie:** Begin standings and notification-rule designs.
+- **Mlungisi:** Begin notification engine and student-role design.
 
 ---
 
-## Meeting 2
+## Meeting 2 — 31 August 2026
 
-**Date:** 29 August 2026
 **Sprint:** Sprint 2
-**Participants:** Zandile, Ronie, Kutloano, Mlungisi
+**Date:** 31 August 2026
+**Participants:** Zandile, Kutloano, Ronie, Mlungisi
+**Meeting Type:** Progress Review
 
-### Meeting Objective
+### Objective
 
-To review the online sitting implementation and ensure that the timer and answer-saving functionality support the Intermediate requirements.
+The team reviewed progress on the online test-taking and archive functionality and checked that the new Intermediate features were following the agreed architecture.
 
 ### Discussion
 
-* The team reviewed progress on the online test functionality.
-* Zandile discussed the database structure for individual student sittings.
-* The team discussed how a sitting should record its start time and current state.
-* The timer was discussed to ensure that each student has an independent countdown.
-* Kutloano presented the online test interface and answer-selection workflow.
-* The team discussed automatically saving answers as students work through a paper.
-* Connection interruptions were considered, particularly how saved answers would be restored when the student reconnects.
-* Ronie reviewed how organisers would monitor online rounds.
-* Mlungisi discussed the backend endpoints required to save and retrieve answers.
+Zandile presented the initial design for the Sitting model, including the entrant, round, answers, start time, time limit, and completion time.
+
+The team discussed how answers should be saved while a student is completing a test. The importance of allowing a student to reconnect and continue an existing sitting was also discussed.
+
+The archive functionality was reviewed to ensure previous papers could be accessed without interfering with the restrictions applied to active rounds.
+
+Kutloano also discussed the initial structure for marking tasks and how completed submissions from online sittings would enter the marking workflow.
 
 ### Decisions
 
-* The server will remain the authoritative source for the sitting's timing information.
-* Answers will be saved incrementally rather than only when the student submits the complete paper.
-* Students will be able to retrieve their previous answers when resuming a sitting.
-* A sitting will retain its state while the round remains active.
+- Each online attempt will have its own Sitting.
+- Answers must be persisted rather than relying only on browser state.
+- The timer must remain associated with the sitting.
+- Completed sittings must not be restarted accidentally.
+- Archived papers must remain accessible without allowing inappropriate access to active papers.
 
 ### Action Items
 
-* **Zandile:** Implement sitting state and timing support.
-* **Mlungisi:** Implement save-answer and resume-sitting endpoints.
-* **Ronie:** Continue the organiser monitoring interface.
-* **Kutloano:** Connect the online test interface to the answer-saving endpoints.
+- **Zandile:** Continue sitting API and timed test interface.
+- **Kutloano:** Connect submission data to the marking workflow.
+- **Ronie:** Continue standings and notification-rule implementation.
+- **Mlungisi:** Continue notification and student authentication work.
 
 ---
 
-## Meeting 3
+## Meeting 3 — 4 September 2026
 
-**Date:** 2 September 2026
 **Sprint:** Sprint 2
-**Participants:** Zandile, Ronie, Kutloano, Mlungisi
+**Date:** 4 September 2026
+**Participants:** Zandile, Kutloano, Ronie, Mlungisi
+**Meeting Type:** Testing and Integration
 
-### Meeting Objective
+### Objective
 
-To test online sittings and implement support for students resuming their tests after connection interruptions.
+The team tested the online test-taking workflow and reviewed the interaction between online sittings and submissions.
 
 ### Discussion
 
-* The team tested the creation of online sittings for individual entrants.
-* The timer behaviour was reviewed during active sittings.
-* The team tested answers being saved while a student progressed through the paper.
-* Connection loss scenarios were discussed and tested.
-* The team verified that previously saved answers could be retrieved when the student returned.
-* The team discussed what should happen when a sitting reaches the end of its allotted time.
-* Ronie reviewed the organiser dashboard for visibility of active sittings.
-* Kutloano refined the student interface to make the current question, saved answers, and remaining time clear.
-* Mlungisi tested the backend endpoints responsible for saving and restoring sitting information.
+The team tested the countdown timer, answer auto-saving, sitting retrieval, and reconnect functionality.
+
+Different scenarios were considered, including a student refreshing the page, temporarily losing their connection, returning to the test, and allowing the sitting to reach its time limit.
+
+The team also discussed how completed online sittings should become available to the marking workflow.
+
+The archive page was tested for access to papers from previous rounds.
 
 ### Decisions
 
-* Saved answers must remain associated with the correct sitting.
-* Reconnecting students should continue from their existing sitting instead of starting a new one.
-* The system must prevent a completed or expired sitting from being resumed incorrectly.
-* The timer and sitting state must remain consistent between the frontend and backend.
+- Existing sittings should be restored when a student reconnects.
+- Answers should be saved regularly during the test.
+- A completed or expired sitting should not be reopened as an active attempt.
+- Online submissions must use the same downstream marking process where appropriate.
+- Archive access should be clearly separated from active-round paper access.
 
 ### Action Items
 
-* **Zandile:** Resolve any timing and sitting-state issues discovered during testing.
-* **Mlungisi:** Test resume functionality and endpoint validation.
-* **Ronie:** Improve organiser visibility of online sittings.
-* **Kutloano:** Refine the online test and resume experience.
+- **Zandile:** Fix timer and reconnect issues found during testing.
+- **Kutloano:** Test online submissions entering the marking queue.
+- **Ronie:** Continue testing archive/standings integration.
+- **Mlungisi:** Test student authentication and dashboard access.
 
 ---
 
-## Meeting 4
+## Meeting 4 — 8 September 2026
 
-**Date:** 7 September 2026
 **Sprint:** Sprint 2
-**Participants:** Zandile, Ronie, Kutloano, Mlungisi
+**Date:** 8 September 2026
+**Participants:** Zandile, Kutloano, Ronie, Mlungisi
+**Meeting Type:** Feature Review
 
-### Meeting Objective
+### Objective
 
-To implement marking functionality for questions that cannot be automatically marked.
+The team reviewed the extended marking, notification, and dashboard features and checked their integration with the existing portal.
 
 ### Discussion
 
-* The team reviewed the Intermediate marking requirements.
-* It was agreed that questions which cannot be automatically marked should enter a marker queue.
-* The team discussed how markers would receive and process submissions.
-* Partial credit was identified as necessary for questions where an entrant receives only part of the available marks.
-* The team discussed the moderation process after marking.
-* The remark process for entrants was also discussed.
-* Mlungisi presented the planned marking workflow and backend structures.
-* Kutloano discussed how results and marking statuses could be displayed to educators.
-* Zandile reviewed the relationship between submissions, results, entrants, and rounds.
+Kutloano demonstrated the marking queue and discussed how submissions that could not be automatically marked should be placed into the queue.
+
+The team reviewed partial-credit requirements and the different states of a MarkingTask.
+
+Ronie presented the notification-rule configuration and standings work. The team discussed the different notification triggers and how organisers should configure them for individual rounds.
+
+Mlungisi presented progress on notification delivery and the student and school dashboard structure.
 
 ### Decisions
 
-* Automatically markable questions will continue through the automatic marking process.
-* Non-MCQ questions will be placed into a marker queue.
-* Marker results must support partial marks.
-* A moderation stage will be included before final results are confirmed.
-* A remark request will create a reviewable record associated with the entrant's result.
+- Automatically markable work should continue through the automatic marking process.
+- Work requiring human assessment should enter the marking queue.
+- Partial credit must be stored with the marking result.
+- Marking, moderation, and remark states must remain distinguishable.
+- Notification rules should be configurable per round.
+- Notification delivery should be recorded in NotificationLog.
+- Students should have access to their own results and sittings.
 
 ### Action Items
 
-* **Zandile:** Update relevant data structures for marking and result states.
-* **Mlungisi:** Implement the marker queue, partial-credit logic, moderation workflow, and remark endpoints.
-* **Ronie:** Add organiser views for monitoring marking and moderation.
-* **Kutloano:** Add appropriate educator/result views for marking statuses and final results.
+- **Zandile:** Resolve remaining online sitting issues.
+- **Kutloano:** Complete marking, moderation, and remark workflows.
+- **Ronie:** Complete notification configuration and standings.
+- **Mlungisi:** Complete notification templates and dashboard functionality.
 
 ---
 
-## Meeting 5
+## Meeting 5 — 12 September 2026
 
-**Date:** 11 September 2026
 **Sprint:** Sprint 2
-**Participants:** Zandile, Ronie, Kutloano, Mlungisi
+**Date:** 12 September 2026
+**Participants:** Zandile, Kutloano, Ronie, Mlungisi
+**Meeting Type:** Integration Testing
 
-### Meeting Objective
+### Objective
 
-To integrate online sittings with the marking workflow and begin implementing progression between rounds.
+The team integrated the major Intermediate features and tested the complete workflow from online participation through marking, progression, notifications, and results.
 
 ### Discussion
 
-* The team reviewed the integration between online sittings and the existing submission workflow.
-* Online submissions were tested to ensure they could proceed into the appropriate marking process.
-* The team tested both automatically marked and manually marked question types.
-* Partial-credit results were reviewed.
-* The moderation workflow was tested using sample marked submissions.
-* The team discussed how an entrant's final score would determine whether they qualify for the next round.
-* Zandile presented the planned qualifying threshold structure.
-* The team discussed automatically identifying entrants who meet the required threshold.
-* Ronie reviewed how organisers could configure and view qualifying entrants.
-* Kutloano reviewed how students and educators would see progression information.
+The team tested the relationship between online sittings and the marking pipeline.
+
+Kutloano demonstrated the qualifying-threshold functionality and automatic progression logic. The team checked that entrants meeting the threshold could be registered for the next round without requiring manual data entry.
+
+Ronie tested standings aggregation and notification configuration.
+
+Mlungisi tested notification delivery and confirmed that notification activity could be recorded for auditing. The student and school dashboards were also reviewed.
+
+The team identified several integration issues involving result availability and timing of downstream actions.
 
 ### Decisions
 
-* Final results will be calculated after the appropriate marking and moderation stages.
-* A qualifying threshold will determine which entrants progress.
-* Qualified entrants should be carried into the next round automatically.
-* Organisers should not need to manually rebuild the entrant list for the next round.
+- Progression should occur after the relevant results are finalised.
+- Qualifying entrants should be carried into the next round automatically.
+- Standings should use finalised scores.
+- Notifications should be triggered according to configured rules.
+- Notification activity should be logged.
+- Dashboard information should reflect the latest available results.
 
 ### Action Items
 
-* **Zandile:** Implement qualifying thresholds and automatic entrant progression.
-* **Mlungisi:** Ensure final marked results are available to the progression logic.
-* **Ronie:** Add organiser controls for configuring thresholds and viewing qualifiers.
-* **Kutloano:** Display progression and result information in the educator/student interfaces.
+- **Zandile:** Complete final integration of sittings and archive.
+- **Kutloano:** Fix progression edge cases and finalise marking tests.
+- **Ronie:** Finalise standings, certificates, and notification configuration.
+- **Mlungisi:** Complete notification and dashboard integration.
 
 ---
 
-## Meeting 6
+## Meeting 6 — 15 September 2026
 
+**Sprint:** Sprint 2
 **Date:** 15 September 2026
-**Sprint:** Sprint 2
-**Participants:** Zandile, Ronie, Kutloano, Mlungisi
+**Participants:** Zandile, Kutloano, Ronie, Mlungisi
+**Meeting Type:** Sprint Review and Retrospective
 
-### Meeting Objective
+### Objective
 
-To review Sprint 2 against the Intermediate requirements, test the integrated functionality, and identify outstanding work.
+The final Sprint 2 meeting was used to review the completed Intermediate functionality, test the major workflows, and identify remaining issues before moving towards the Advanced requirements.
 
 ### Discussion
 
-* The team reviewed all Intermediate functionality implemented during Sprint 2.
-* Online student sittings were tested from creation through completion.
-* Individual sitting timers were tested.
-* Answer saving was tested throughout an online paper.
-* Connection-loss and resume functionality were tested.
-* The team reviewed the marker queue for non-MCQ questions.
-* Partial-credit marking was tested.
-* The moderation workflow was reviewed.
-* The remark-request workflow was reviewed.
-* Qualifying thresholds and automatic progression between rounds were tested.
-* The organiser and educator interfaces were reviewed for the new functionality.
-* Remaining defects and improvements were documented for future development.
+The team reviewed the online test-taking workflow, including individual sittings, timers, answer saving, and reconnect functionality.
 
-### Sprint 2 Outcome
+The marking workflow was reviewed from submission through marking, partial credit, moderation, and remark requests.
 
-The team progressed the portal beyond the Basic requirements by implementing the main Intermediate workflows: online test sittings with individual timers, persistent answers and resume support, extended marking with a marker queue and partial credit, moderation and remark functionality, and progression between rounds based on qualifying thresholds. These requirements are specified in the Intermediate section of the project brief.
+The team also reviewed automatic round progression using qualifying thresholds.
+
+Standings, certificates, configurable notifications, notification delivery, student login, and school dashboards were demonstrated and tested.
+
+The archive functionality was also reviewed to confirm that previous-round papers could be accessed appropriately.
+
+### Decisions
+
+- The major Intermediate features are sufficiently integrated for the Sprint 2 outcome.
+- Remaining defects will be prioritised before beginning Advanced requirements.
+- Testing evidence should be retained for the implemented features.
+- Documentation must be updated before the next development phase.
+- The team will use the lessons from Sprint 2 when planning the Advanced requirements.
+
+### Sprint Outcomes
+
+| Feature | Owner | Status |
+|---|---|---|
+| Online Test-Taking (I1) | Zandile | Completed / Final Testing |
+| Archive (B1) | Zandile | Completed |
+| Extended Marking (I2) | Kutloano | Completed / Final Testing |
+| Round Progression (I3) | Kutloano | Completed |
+| Standings & Certificates (I6) | Ronie | Completed / Final Testing |
+| Configurable Notifications (I5) | Ronie | Completed |
+| Notification Sending (I4) | Mlungisi | Completed / Final Testing |
+| Student Login & School Dashboard (I7) | Mlungisi | Completed / Final Testing |
 
 ### Final Action Items
 
-* **Zandile:** Finalise sitting, timing, round progression, and qualifying-threshold functionality.
-* **Mlungisi:** Finalise manual marking, partial credit, moderation, remark handling, and related API documentation.
-* **Ronie:** Finalise organiser controls and perform responsiveness/accessibility checks on the new functionality.
-* **Kutloano:** Finalise the online test, resume, results, and progression interfaces and update the Docusaurus guides.
+- **Zandile:** Finalise Sitting and Archive documentation and resolve outstanding test issues.
+- **Kutloano:** Finalise marking and progression tests and documentation.
+- **Ronie:** Finalise API/testing documentation and certificate/standings testing.
+- **Mlungisi:** Finalise deployment, notification, and student dashboard documentation.
 
 ### Next Steps
 
-* Resolve remaining Sprint 2 defects.
-* Complete testing of the Intermediate workflows.
-* Prepare the system for the Advanced requirements.
-* Ensure documentation reflects the newly implemented functionality.
+The team will address outstanding defects, complete final integration testing, update documentation, and prepare the system for work on the Advanced Requirements.

@@ -72,12 +72,12 @@ function CompleteProfileForm() {
       if (err.status === 409) {
         setErrorMessage(
           'This account already has a profile. Each person can only have one role per account. ' +
-          'If you need a student account, please sign out and create a separate Clerk account for the student.'
+            'If you need a student account, please sign out and create a separate Clerk account for the student.'
         );
       } else if (err.status === 404) {
         setErrorMessage(
           'No student record found matching your name and school. ' +
-          'Your educator must add you to the school before you can create an account.'
+            'Your educator must add you to the school before you can create an account.'
         );
       } else {
         setErrorMessage(err.message || 'Something went wrong.');
@@ -110,8 +110,8 @@ function CompleteProfileForm() {
       </h1>
       <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-4 text-center text-base text-ink-soft">
-        You&apos;re signed in — just need your name and school to finish. Your name and
-        school must match an entrant record your educator already registered.
+        You&apos;re signed in — just need your name and school to finish. Your name and school must
+        match an entrant record your educator already registered.
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-6">

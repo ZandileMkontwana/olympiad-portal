@@ -359,7 +359,6 @@ router.post('/rounds/:id/unrelease-results', ...requireRole('educator'), async (
   }
 });
 
-
 // GET /rounds/:id/notifications
 // Returns all 4 trigger types for this round, whether or not a rule has
 // been explicitly configured — unconfigured types show as enabled by
@@ -479,107 +478,102 @@ router.delete(
 // since the scheduler dedups per (round, trigger, email) — which also means
 // each educator only ever gets ONE missing-submission email per round (for
 // the first missing entrant found).
-router.post(
-  '/rounds/:id/notifications/test',
-  ...requireRole('organiser'),
-  async (req, res) => {
-    try {
-      const roundId = req.params.id;
-      const { triggerType } = req.body;
+router.post('/rounds/:id/notifications/test', ...requireRole('organiser'), async (req, res) => {
+  try {
+    const roundId = req.params.id;
+    const { triggerType } = req.body;
 
-      if (!NOTIFICATION_TRIGGER_TYPES.includes(triggerType)) {
-        return res.status(400).json({ error: 'A valid triggerType is required' });
-      }
-
-      const round = await prisma.round.findUnique({
-        where: { id: roundId },
-        include:
-          triggerType === 'missing_submission'
-            ? roundIncludeForMissingSubmissions
-            : roundIncludeForNotifications,
-      });
-      if (!round) {
-        return res.status(404).json({ error: 'Round not found' });
-      }
-
-      const enabled = await isTriggerEnabled(roundId, triggerType);
-
-      const sentLogs = await prisma.notificationLog.findMany({
-        where: { roundId, triggerType },
-        select: { recipientEmail: true },
-      });
-      const alreadyEmailed = new Set(sentLogs.map((log) => log.recipientEmail));
-
-      const recipients = [];
-      if (triggerType === 'missing_submission') {
-        // Same per-entrant loop (and dedup) as the scheduler: educators are
-        // emailed about the first missing entrant only — later entrants at
-        // the same school are flagged as already notified.
-        const coveredEmails = new Set();
-        for (const roundEntrant of round.roundEntrants) {
-          const entrant = roundEntrant.entrant;
-          const hasSubmitted = entrant.submissions.some((s) => s.roundId === round.id);
-          if (hasSubmitted) continue;
-
-          for (const educator of entrant.school.educators) {
-            const email = educator.user.email;
-            recipients.push({
-              email,
-              entrantId: entrant.id,
-              entrantName: entrant.name,
-              alreadyNotified: alreadyEmailed.has(email) || coveredEmails.has(email),
-            });
-            coveredEmails.add(email);
-          }
-        }
-      } else {
-        for (const email of await getRecipientsForRound(round)) {
-          recipients.push({ email, alreadyNotified: alreadyEmailed.has(email) });
-        }
-      }
-
-      // Preview rendered from the same templates the real sends use.
-      let emailPreview = null;
-      if (triggerType === 'before_open') {
-        emailPreview = buildRoundOpeningMessage({
-          roundName: round.name,
-          opensAt: new Date(round.openTime).toISOString(),
-        });
-      } else if (triggerType === 'before_close') {
-        emailPreview = buildRoundClosingMessage({
-          roundName: round.name,
-          closesAt: new Date(round.closeTime).toISOString(),
-        });
-      } else if (triggerType === 'results_released') {
-        emailPreview = buildResultsReleasedMessage({ roundName: round.name });
-      } else if (recipients.length > 0) {
-        // One email per missing entrant — preview the first that would go out.
-        emailPreview = buildMissingSubmissionMessage({
-          roundName: round.name,
-          entrantName: recipients[0].entrantName,
-        });
-      }
-
-      res.json({
-        dryRun: true,
-        round: {
-          id: round.id,
-          name: round.name,
-          state: round.state,
-          openTime: round.openTime,
-          closeTime: round.closeTime,
-        },
-        triggerType,
-        enabled,
-        recipients,
-        emailPreview,
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Failed to run notification dry-run' });
+    if (!NOTIFICATION_TRIGGER_TYPES.includes(triggerType)) {
+      return res.status(400).json({ error: 'A valid triggerType is required' });
     }
-  }
-);
 
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include:
+        triggerType === 'missing_submission'
+          ? roundIncludeForMissingSubmissions
+          : roundIncludeForNotifications,
+    });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const enabled = await isTriggerEnabled(roundId, triggerType);
+
+    const sentLogs = await prisma.notificationLog.findMany({
+      where: { roundId, triggerType },
+      select: { recipientEmail: true },
+    });
+    const alreadyEmailed = new Set(sentLogs.map((log) => log.recipientEmail));
+
+    const recipients = [];
+    if (triggerType === 'missing_submission') {
+      // Same per-entrant loop (and dedup) as the scheduler: educators are
+      // emailed about the first missing entrant only — later entrants at
+      // the same school are flagged as already notified.
+      const coveredEmails = new Set();
+      for (const roundEntrant of round.roundEntrants) {
+        const entrant = roundEntrant.entrant;
+        const hasSubmitted = entrant.submissions.some((s) => s.roundId === round.id);
+        if (hasSubmitted) continue;
+
+        for (const educator of entrant.school.educators) {
+          const email = educator.user.email;
+          recipients.push({
+            email,
+            entrantId: entrant.id,
+            entrantName: entrant.name,
+            alreadyNotified: alreadyEmailed.has(email) || coveredEmails.has(email),
+          });
+          coveredEmails.add(email);
+        }
+      }
+    } else {
+      for (const email of await getRecipientsForRound(round)) {
+        recipients.push({ email, alreadyNotified: alreadyEmailed.has(email) });
+      }
+    }
+
+    // Preview rendered from the same templates the real sends use.
+    let emailPreview = null;
+    if (triggerType === 'before_open') {
+      emailPreview = buildRoundOpeningMessage({
+        roundName: round.name,
+        opensAt: new Date(round.openTime).toISOString(),
+      });
+    } else if (triggerType === 'before_close') {
+      emailPreview = buildRoundClosingMessage({
+        roundName: round.name,
+        closesAt: new Date(round.closeTime).toISOString(),
+      });
+    } else if (triggerType === 'results_released') {
+      emailPreview = buildResultsReleasedMessage({ roundName: round.name });
+    } else if (recipients.length > 0) {
+      // One email per missing entrant — preview the first that would go out.
+      emailPreview = buildMissingSubmissionMessage({
+        roundName: round.name,
+        entrantName: recipients[0].entrantName,
+      });
+    }
+
+    res.json({
+      dryRun: true,
+      round: {
+        id: round.id,
+        name: round.name,
+        state: round.state,
+        openTime: round.openTime,
+        closeTime: round.closeTime,
+      },
+      triggerType,
+      enabled,
+      recipients,
+      emailPreview,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to run notification dry-run' });
+  }
+});
 
 module.exports = router;

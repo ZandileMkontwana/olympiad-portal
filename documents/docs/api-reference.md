@@ -1,61 +1,98 @@
-# API Reference — Papers, Submissions & Auth
+# API Reference
+
+All endpoints are mounted under the `/api` prefix.
+
+**Production base URL:** `https://olympiad-portal.onrender.com` — e.g. <https://olympiad-portal.onrender.com/api/olympiads>. For local development the backend runs at `http://localhost:5000`.
 
 ## Authentication
 
-All protected endpoints require a JWT in the `Authorization` header:
+Authentication is handled by **Clerk** (`@clerk/express`). Protected endpoints require a valid Clerk session — the frontend uses Clerk's `<SignIn>` / `<SignUp>` components, and the backend validates the session via `requireAuth()` middleware or `clerkMiddleware()` globally.
 
-Get a token via `POST /api/auth/register` or `POST /api/auth/login`.
+There is no `POST /api/auth/login` or `POST /api/auth/register` endpoint. Registration and login are managed entirely through Clerk's hosted UI or embedded components on the frontend.
 
-### POST /api/auth/register
+Organiser accounts are created via the seed script (`node prisma/seed.js`), not self-registration.
 
-Creates a new user account. Role is always `educator` — organiser accounts are created via a seed script, not self-registration.
+### POST /api/educators/complete-profile
+
+Requires auth. Called once after a new educator signs up via Clerk — links the Clerk account to app-specific data (name, school) and creates the educator's database record.
 
 **Body:**
 
 ```json
-{ "email": "string", "password": "string" }
+{ "name": "Jane Doe", "schoolName": "Parktown High" }
 ```
 
 **Response (201):**
 
 ```json
 {
-  "user": { "id": "string", "email": "string", "role": "educator" },
-  "token": "string"
+  "user": {
+    "id": "string",
+    "email": "jane@school.com",
+    "role": "educator",
+    "name": "Jane Doe",
+    "school": { "id": "string", "name": "Parktown High" }
+  }
 }
 ```
 
-**Errors:** `400` missing fields, `409` email already exists.
+**Errors:** `400` missing fields or no email on Clerk account, `409` profile already completed.
 
-### POST /api/auth/login
+### POST /api/students/complete-profile
 
-**Body:**
-
-```json
-{ "email": "string", "password": "string" }
-```
-
-**Response (200):** same shape as register.
-**Errors:** `401` invalid email or password (generic message, doesn't reveal which was wrong).
-
-### POST /api/auth/reset-password
-
-Requires auth. Changes the logged-in user's password.
+Requires auth. Links a Clerk student account to an existing unclaimed `Entrant` record, matched by name + school (case-insensitive). The entrant record must already exist (created by an educator) and must not already be linked to another user.
 
 **Body:**
 
 ```json
-{ "currentPassword": "string", "newPassword": "string" }
+{ "name": "Alice Nkosi", "schoolName": "Parktown High" }
 ```
 
-**Response (200):** `{ "message": "Password updated successfully" }`
-**Errors:** `401` current password incorrect.
+**Response (201):**
+
+```json
+{
+  "user": {
+    "id": "string",
+    "email": "alice@student.com",
+    "role": "student",
+    "name": "Alice Nkosi",
+    "school": { "id": "string", "name": "Parktown High" }
+  }
+}
+```
+
+**Errors:** `400` missing fields, `404` no matching school or unclaimed entrant found, `409` profile already completed.
+
+### GET /api/auth/me
+
+Requires auth. Returns the authenticated user's profile, including linked educator or student/entrant data.
+
+**Response (200):**
+
+```json
+{
+  "user": {
+    "id": "string",
+    "email": "jane@school.com",
+    "role": "educator",
+    "name": "Jane Doe",
+    "school": { "id": "string", "name": "Parktown High" }
+  }
+}
+```
+
+`school` is `null` if the user has no linked educator or entrant record.
+
+**Errors:** `404` user not found in app database.
 
 ### DELETE /api/auth/account
 
-Requires auth. Permanently deletes the logged-in user's own account.
+Requires auth. Permanently deletes the user's account from both the app database and Clerk.
 
 **Response (200):** `{ "message": "Account deleted successfully" }`
+
+**Errors:** `404` user not found.
 
 ---
 
@@ -63,7 +100,7 @@ Requires auth. Permanently deletes the logged-in user's own account.
 
 ### POST /api/rounds/:id/papers
 
-Requires auth, role `organiser`. Uploads a paper and memo for a round.
+Requires auth, role `organiser`. Uploads a paper and memo PDF for a round. Files are stored in **Supabase Storage** (bucket configured via `SUPABASE_BUCKET_NAME` env var) — the file buffer is uploaded directly from memory (no local disk).
 
 **Body:** `multipart/form-data`
 
@@ -77,14 +114,14 @@ Requires auth, role `organiser`. Uploads a paper and memo for a round.
 {
   "id": "string",
   "roundId": "string",
-  "fileUrl": "string",
-  "memoUrl": "string",
+  "fileUrl": "string (Supabase public URL)",
+  "memoUrl": "string (Supabase public URL)",
   "memoAnswers": { "1": "B", "2": "D" },
   "uploadedAt": "ISO date"
 }
 ```
 
-**Errors:** `400` missing files or invalid memoAnswers JSON, `401`/`403` auth, `500` DB error (e.g. round already has a paper — one paper per round).
+**Errors:** `400` missing files or invalid memoAnswers JSON, `401`/`403` auth or not organiser, `500` DB or Supabase upload error.
 
 ### GET /api/rounds/:id/papers
 
@@ -116,7 +153,7 @@ No auth required at the API level (the archive page itself requires sign-in). Re
 ]
 ```
 
-Both `fileUrl` (paper) and `memoUrl` (memo) are direct download links.
+Both `fileUrl` (paper) and `memoUrl` (memo) are direct Supabase Storage download links.
 
 **Errors:** `500` DB error.
 
@@ -126,7 +163,7 @@ Both `fileUrl` (paper) and `memoUrl` (memo) are direct download links.
 
 ### POST /api/rounds/:id/submissions
 
-Requires auth, role `educator`. Submits an entrant's answers for an open round.
+Requires auth, role `educator`. Submits an entrant's answers for an open round. A submission receipt email is sent to the educator via **SendGrid** on success (failures are logged but don't affect the response).
 
 **Body:**
 
@@ -161,10 +198,20 @@ Requires auth, role `educator`. Submits an entrant's answers for an open round.
 
 **Errors:** `400` missing fields, `403` round not open, `404` round not found.
 
---- 
+### GET /api/rounds/:id/submissions
+
+Returns all submissions for a round with their results.
+
+**Response (200):** array of submission objects (same shape as POST response, each including `result`).
+
+**Errors:** `500` DB error.
+
+---
+
 ## Rounds & Olympiads
 
 ### POST /api/olympiads
+
 Creates a new olympiad.
 
 **Body:**
@@ -178,7 +225,7 @@ Creates a new olympiad.
 **Response (201):**
 ```json
 {
-  "id": "8780fd67-e457-4ae5-9d27-ff7fa1ba6085",
+  "id": "string",
   "name": "Wits Maths Olympiad",
   "timezone": "Africa/Johannesburg"
 }
@@ -189,15 +236,19 @@ Creates a new olympiad.
 ---
 
 ### GET /api/olympiads
-Returns all olympiads.
+
+Returns all olympiads, each including its nested rounds ordered by `openTime` ascending.
 
 **Response (200):**
 ```json
 [
   {
-    "id": "8780fd67-e457-4ae5-9d27-ff7fa1ba6085",
+    "id": "string",
     "name": "Wits Maths Olympiad",
-    "timezone": "Africa/Johannesburg"
+    "timezone": "Africa/Johannesburg",
+    "rounds": [
+      { "id": "string", "name": "Round 1", "state": "open", "openTime": "ISO date", "closeTime": "ISO date" }
+    ]
   }
 ]
 ```
@@ -205,12 +256,13 @@ Returns all olympiads.
 ---
 
 ### POST /api/rounds
-Creates a new round under an olympiad. `state` defaults to `"scheduled"` and is managed automatically by the scheduler from there.
+
+Creates a new round under an olympiad. `state` defaults to `"scheduled"` and is managed automatically by the scheduler.
 
 **Body:**
 ```json
 {
-  "olympiadId": "8780fd67-e457-4ae5-9d27-ff7fa1ba6085",
+  "olympiadId": "string",
   "name": "Round 1",
   "openTime": "2026-08-08T20:00:00Z",
   "closeTime": "2026-08-08T21:00:00Z"
@@ -220,8 +272,8 @@ Creates a new round under an olympiad. `state` defaults to `"scheduled"` and is 
 **Response (201):**
 ```json
 {
-  "id": "854cb0b8-2852-461c-a982-3209a70273bb",
-  "olympiadId": "8780fd67-e457-4ae5-9d27-ff7fa1ba6085",
+  "id": "string",
+  "olympiadId": "string",
   "name": "Round 1",
   "openTime": "2026-08-08T20:00:00.000Z",
   "closeTime": "2026-08-08T21:00:00.000Z",
@@ -236,22 +288,23 @@ Creates a new round under an olympiad. `state` defaults to `"scheduled"` and is 
 ---
 
 ### GET /api/rounds
-Returns all rounds across every olympiad.
 
-**Response (200):** array of round objects, same shape as the `POST /api/rounds` response.
+Returns all rounds across every olympiad, ordered by `openTime` ascending. Each round includes its parent olympiad.
+
+**Response (200):** array of round objects with nested `olympiad`.
 
 ---
 
 ### GET /api/rounds/:id
-Returns a single round by ID.
 
-**Response (200):** a single round object.
+Returns a single round by ID.
 
 **Errors:** `404` if no round matches the given ID.
 
 ---
 
 ### GET /api/olympiads/:id/rounds
+
 Returns all rounds belonging to a specific olympiad, ordered by `openTime` ascending.
 
 **Response (200):** array of round objects.
@@ -261,50 +314,53 @@ Returns all rounds belonging to a specific olympiad, ordered by `openTime` ascen
 ## Round Entrants
 
 ### POST /api/rounds/:id/entrants
+
 Requires auth, role `educator`. Registers one of the educator's own entrants to sit a specific round — accepted while the round is `scheduled` or `open`.
 
 **Body:**
 ```json
 {
-  "entrantId": "7ed46f5b-d100-471c-adc8-89a983114e7a"
+  "entrantId": "string"
 }
 ```
 
 **Response (201):**
 ```json
 {
-  "id": "e842f9a3-89ef-41a6-a459-944983bbc5a2",
-  "roundId": "c9343aef-90d8-44e7-a5ac-faf8c3091cd3",
-  "entrantId": "7ed46f5b-d100-471c-adc8-89a983114e7a",
-  "registeredAt": "2026-08-15T..."
+  "id": "string",
+  "roundId": "string",
+  "entrantId": "string",
+  "registeredAt": "ISO date"
 }
 ```
 
-**Errors:** `400` if `entrantId` is missing. `403` if the round is no longer accepting registrations (`closed`/`released`) or the entrant belongs to a different school. `404` if the round or entrant does not exist. `409` if the entrant is already registered for this round.
+**Errors:** `400` if `entrantId` is missing, `403` if the round is no longer accepting registrations (`closed`/`released`), the entrant belongs to a different school, or no educator profile exists, `404` if the round or entrant does not exist, `409` if the entrant is already registered for this round.
 
 ---
 
 ### GET /api/rounds/:id/entrants
-Returns all entrants registered for a specific round — this is what powers the "Submit Results" page, listing only entrants an educator can submit marks for.
+
+Returns all entrants registered for a specific round — powers the "Submit Results" page, listing only entrants an educator can submit marks for.
 
 **Response (200):**
 ```json
 [
   {
-    "id": "7ed46f5b-d100-471c-adc8-89a983114e7a",
-    "schoolId": "b9d2ac33-eee5-4de4-9bd4-929d75551cee",
+    "id": "string",
+    "schoolId": "string",
     "name": "Test Student",
     "grade": "10"
   }
 ]
 ```
+
 ---
 
 ## Entrants
 
 ### POST /api/entrants
 
-Requires auth, role `educator`. Creates an entrant at the authenticated educator's school.
+Requires auth, role `educator`. Creates an entrant (student) at the authenticated educator's school.
 
 **Body:**
 ```json
@@ -317,8 +373,8 @@ Requires auth, role `educator`. Creates an entrant at the authenticated educator
 **Response (201):**
 ```json
 {
-  "id": "7ed46f5b-d100-471c-adc8-89a983114e7a",
-  "schoolId": "b9d2ac33-eee5-4de4-9bd4-929d75551cee",
+  "id": "string",
+  "schoolId": "string",
   "name": "Test Student",
   "grade": "10"
 }
@@ -330,7 +386,7 @@ Requires auth, role `educator`. Creates an entrant at the authenticated educator
 
 ### GET /api/entrants
 
-Requires auth, role `educator`. Lists the entrants registered at the authenticated educator's school, ordered by name ascending.
+Requires auth, role `educator`. Lists the entrants at the authenticated educator's school, ordered by name ascending.
 
 **Response (200):** array of entrant objects, same shape as the `POST /api/entrants` response.
 
@@ -349,11 +405,11 @@ Requires auth. Starts an online sitting for an entrant in an open round. One sit
 **Body:**
 ```json
 {
-  "entrantId": "7ed46f5b-d100-471c-adc8-89a983114e7a"
+  "entrantId": "string"
 }
 ```
 
-**Response (201 for a new sitting, `200` when resuming):**
+**Response (201 for a new sitting, 200 when resuming):**
 ```json
 {
   "sitting": {
@@ -401,7 +457,7 @@ The submission's `idempotencyKey` is derived from the sitting ID, so a retried r
 
 **Body:** none.
 
-**Response (201, or `200` for an idempotent retry):**
+**Response (201, or 200 for an idempotent retry):**
 
 ```json
 {
@@ -428,8 +484,186 @@ The submission's `idempotencyKey` is derived from the sitting ID, so a retried r
 
 ---
 
+## Schools
+
+### GET /api/schools
+
+No auth required. Returns a public list of all schools — used by the student registration dropdown.
+
+**Response (200):**
+```json
+[
+  { "id": "string", "name": "Parktown High" }
+]
+```
+
+---
+
+### GET /api/schools/:id/entrants
+
+Requires auth. Lists all entrants at the specified school. Organisers can view any school; educators can only view their own.
+
+**Response (200):**
+```json
+[
+  { "id": "string", "name": "Alice Nkosi", "grade": "10", "schoolId": "string" }
+]
+```
+
+**Errors:** `403` not authorized to view this school.
+
+---
+
+### GET /api/schools/:id/dashboard
+
+Requires auth. Returns aggregated dashboard statistics for a school: entrant count, total submissions, and per-entrant average scores. Organisers can view any school; educators can only view their own.
+
+**Response (200):**
+```json
+{
+  "school": { "id": "string", "name": "Parktown High" },
+  "entrantCount": 25,
+  "totalSubmissions": 40,
+  "entrants": [
+    {
+      "id": "string",
+      "name": "Alice Nkosi",
+      "grade": "10",
+      "submissionCount": 3,
+      "averageScore": 72.5
+    }
+  ]
+}
+```
+
+**Errors:** `403` not authorized, `404` school not found.
+
+---
+
+## Student
+
+### GET /api/students/me/sittings
+
+Requires auth, role `student`. Lists the authenticated student's own sittings with round names and states, newest first.
+
+**Response (200):**
+```json
+[
+  {
+    "id": "string",
+    "entrantId": "string",
+    "roundId": "string",
+    "answers": { "1": "B" },
+    "startedAt": "ISO date",
+    "expiresAt": "ISO date",
+    "completedAt": null,
+    "round": { "id": "string", "name": "Round 1", "state": "open", "closeTime": "ISO date" }
+  }
+]
+```
+
+**Errors:** `404` no entrant record linked to this account.
+
+---
+
+### GET /api/students/me/results
+
+Requires auth, role `student`. Lists the student's own released results — only results with a non-null `releasedAt` are returned, so unreleased marks stay hidden.
+
+**Response (200):**
+```json
+[
+  {
+    "id": "string",
+    "score": 66.67,
+    "releasedAt": "ISO date",
+    "submittedAt": "ISO date",
+    "round": { "id": "string", "name": "Round 1" }
+  }
+]
+```
+
+**Errors:** `404` no entrant record linked to this account.
+
+---
+
+### GET /api/students/me/results/:resultId
+
+Requires auth, role `student`. Full review of one released result: the student's answer next to the correct answer for every question.
+
+**Response (200):**
+```json
+{
+  "id": "string",
+  "score": 66.67,
+  "submittedAt": "ISO date",
+  "releasedAt": "ISO date",
+  "round": { "id": "string", "name": "Round 1" },
+  "paperFileUrl": "string",
+  "questions": [
+    {
+      "questionId": "1",
+      "correctAnswer": "B",
+      "studentAnswer": "B",
+      "isCorrect": true
+    },
+    {
+      "questionId": "2",
+      "correctAnswer": "D",
+      "studentAnswer": "A",
+      "isCorrect": false
+    }
+  ]
+}
+```
+
+**Errors:** `404` result not found or not released yet, `404` no entrant record linked.
+
+---
+
+## External API Integrations
+
+The backend integrates three external APIs:
+
+### Clerk (Authentication)
+
+**SDK:** `@clerk/express`
+
+Clerk handles all user authentication — sign-up, sign-in, session management, and 2FA. The backend uses:
+
+- `clerkMiddleware()` — registered globally in `index.js`, validates Clerk session tokens on every request
+- `requireAuth()` — guards protected endpoints, extracts `clerkUserId` from the session
+- `clerkClient.users.getUser()` — fetches the user's email from Clerk during profile completion (`POST /educators/complete-profile`, `POST /students/complete-profile`)
+- `clerkClient.users.deleteUser()` — deletes the Clerk account when a user deletes their app account (`DELETE /auth/account`)
+
+### Supabase Storage (File Uploads)
+
+**SDK:** `@supabase/supabase-js`
+
+Paper and memo PDF files are uploaded directly to a Supabase Storage bucket (configured via `SUPABASE_BUCKET_NAME` env var). Files are held in memory via `multer.memoryStorage()` and uploaded as buffers — no local disk storage is used.
+
+- `supabase.storage.from(BUCKET).upload()` — uploads the file buffer
+- `supabase.storage.from(BUCKET).getPublicUrl()` — generates public download URLs stored in the `Paper.fileUrl` and `Paper.memoUrl` database fields
+
+### SendGrid (Email Notifications)
+
+**SDK:** `@sendgrid/mail`
+
+Transactional emails are sent via SendGrid's API. All email functions are defined in `src/lib/email.js` and log their results (success/failure) to the `NotificationLog` database table. Failures are caught and logged but never block the calling operation.
+
+| Function | Trigger | Recipient |
+|---|---|---|
+| `sendSubmissionReceipt` | Educator submits results (`POST /rounds/:id/submissions`) | Submitting educator |
+| `sendRoundOpeningNotification` | Scheduler detects round about to open | All educators at schools with registered entrants |
+| `sendRoundClosingNotification` | Scheduler detects round about to close | All educators at schools with registered entrants |
+| `sendResultsReleasedNotification` | Scheduler detects results newly released | All educators at schools with registered entrants |
+| `sendMissingSubmissionNotification` | Scheduler detects recently closed round with no submission | Educators at schools with registered but unsubmitted entrants |
+
+---
+
 ## Notes
 
 - All timestamps are ISO 8601 strings.
-- File uploads are stored on local disk under `/uploads` (planned migration to Cloudflare R2 for deployment).
-- A submission email receipt is sent to the submitting educator's email on successful submission (via SendGrid). Failures are logged but don't affect the submission response.
+- File uploads are stored in Supabase Storage (not local disk). The `Paper.fileUrl` and `Paper.memoUrl` fields contain public Supabase download URLs.
+- Submission receipt emails are sent via SendGrid on successful submission. Failures are logged to the `NotificationLog` table but don't affect the submission response.
+- The round scheduler runs every 30 seconds and fires all scheduled notification checks (opening, closing, results released, missing submissions).

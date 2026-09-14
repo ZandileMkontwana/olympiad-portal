@@ -260,9 +260,7 @@ async function sendMissingSubmissionNotifications() {
 
       if (hasSubmitted) continue;
 
-      const recipientEmails = new Set(
-        entrant.school.educators.map((e) => e.user.email)
-      );
+      const recipientEmails = new Set(entrant.school.educators.map((e) => e.user.email));
 
       for (const email of recipientEmails) {
         const alreadyNotified = await prisma.notificationLog.findUnique({

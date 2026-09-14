@@ -2,66 +2,78 @@
 sidebar_position: 7
 ---
 
-# Sprint 2 Planning (25 August)
+# Sprint 2 Planning
+
+- **Sprint:** Sprint 2
+- **Dates:** 25 August 2026 – 15 September 2026
+- **Participants:** Zandile, Kutloano, Ronie, Mlungisi
 
 ## Sprint Goal
 
-Finish the basic tier and start the intermediate tier: past papers become downloadable after release, students can sit a paper online (not just on paper), and marking begins to go beyond MCQ automarking.
+The goal of Sprint 2 is to implement the Intermediate Requirements and extend the existing Basic functionality of the Olympiad Portal.
 
-## Dates
+## Sprint Objectives
 
-26 August – 15 September 2026. Sprint board and stories live on Taiga.
+- Implement online test-taking with timed sittings, auto-save and resume functionality.
+- Provide an archive of papers from previous rounds.
+- Implement extended marking, partial credit, moderation and remark requests.
+- Implement qualifying thresholds and automatic progression between rounds.
+- Implement configurable and automated notifications.
+- Provide standings and certificate generation.
+- Add student login and school dashboards.
+- Test and integrate all new functionality.
 
-## Scope
+## Stakeholder Input
 
-**In scope for Sprint 2 (from the [roadmap](../roadmap.md)):**
+Lauren (client) joined the sprint planning session on 25 August. Two pieces of input came out of that discussion:
 
-- Past-paper archive, downloadable once released
-- Organiser console and educator portal UI polish
-- Online sitting: timer, autosave, resume-on-disconnect, submission (stories A2–A5)
-- Marking beyond MCQ: moderation queue, partial credit
-- Qualifying-threshold round advancement
+- **Scope** — the Intermediate requirements for the sprint were walked through with her and confirmed as the direction.
+- **Deployment advice** — with the Railway trial ending, she advised researching Render and Vercel to see which suited us. The team evaluated both: Vercel already hosts the frontend and fits it well, but the backend's round-lifecycle scheduler needs a long-running process, which Vercel's serverless functions don't provide — Render does. Following that advice, the database was moved to Supabase during the sprint and the backend was deployed to Render at sprint close.
 
-**Out of scope:** notifications, standings and certificates, student login (D3 — Clerk-account ↔ entrant linking), concurrency hardening, question banks, appeals — all Sprint 3+.
+## Team Responsibilities
 
-## Team & Task Ownership
+**Zandile — Online Test-Taking & Archive**
+- Develop the Sitting model and online sitting APIs.
+- Implement timed online tests, auto-save and resume functionality.
+- Develop the archive for previous-round papers.
+- Write API and UI tests for online sittings.
+- Maintain Sitting database and timer documentation.
 
-| Person | Owns |
-|---|---|
-| Zandile | Paper archive (merged, PR #71), online sitting A2/A3 (in review), sitting submission A5 |
-| Mlungisi | to be confirmed (Taiga) |
-| Ronie | to be confirmed (Taiga) |
-| Kutloano | to be confirmed (Taiga) |
+**Kutloano — Extended Marking & Progression**
+- Develop the MarkingTask model and marking queue.
+- Implement partial credit, moderation and remark requests.
+- Add qualifying thresholds to rounds.
+- Implement automatic progression to the next round.
+- Write marking and progression tests.
 
-Remaining ownership (moderation queue, partial credit, round advancement, UI polish) to be confirmed against the Taiga stories — update this table once assigned.
+**Ronie — Standings & Notifications**
+- Implement standings and ranking functionality.
+- Generate downloadable certificates.
+- Develop configurable notification rules.
+- Create the organiser notification configuration interface.
+- Maintain API and testing documentation.
 
-## Progress Checkpoint (2 September)
+**Mlungisi — Notification Sending & Dashboards**
+- Implement notification email templates and SendGrid integration.
+- Create notification logs and scheduled notification jobs.
+- Add student authentication and the student role.
+- Develop student and school dashboards.
+- Maintain deployment and third-party integration documentation.
 
-- Paper archive: done and merged (PR #71)
-- Online sitting A2/A3 (start, resume, autosave, expiry enforcement): implemented, PR open
-- Sitting submission (A5): not started — next up
-- Moderation queue / partial credit: not started
-- Qualifying-threshold advancement: not started
-- UI polish: organiser dashboard redesigned (olympiad-first hierarchy); educator portal polish not started
+## Sprint Deliverables
 
-## Definition of Done (per feature)
+By the end of Sprint 2, the team aims to have:
 
-A feature is considered done when:
+- Online test-taking functionality.
+- An archive of previous papers.
+- Extended marking and moderation.
+- Automatic round progression.
+- Configurable and automated notifications.
+- Standings and certificates.
+- Student login.
+- Student and school dashboards.
+- Completed testing and documentation.
 
-- It works end-to-end against the live (not just local) database
-- It's covered by an API reference entry (for backend work) or has been manually tested against a running backend (for frontend work)
-- It's been through a reviewed Pull Request and merged to `main`
-- Any schema or architecture change is reflected in the documentation site
+## Definition of Done
 
-## Sprint 2 Definition of Done (overall)
-
-- Each of the five roadmap items is either delivered or explicitly descoped by team decision
-- The documentation site reflects all new endpoints and any schema changes
-- A version tag is cut at sprint close, per the [git methodology](../git-methodology.md)
-
-## Known Risks / Open Items
-
-- CI runners are still not running (carried over from Sprint 1) — PRs currently rely on approval alone
-- Two roadmap items (marking beyond MCQ, round advancement) are unstarted with roughly two weeks left; descoping decisions should be made early rather than late
-- A5 (sitting submission) is blocked on the A2/A3 PR being reviewed and merged
-- Until D3 lands, any signed-in user can start a sitting for any registered entrant by selecting their name — accepted interim state, noted in code
+A feature is complete when it has been implemented, integrated with the existing system, tested, documented, and reviewed by the team.

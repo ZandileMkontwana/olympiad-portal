@@ -170,7 +170,13 @@ function buildMissingSubmissionMessage({ roundName, entrantName }) {
 }
 
 // Sends a "missing submission" notification and logs the attempt.
-async function sendMissingSubmissionNotification({ toEmail, roundId, roundName, entrantName, entrantId }) {
+async function sendMissingSubmissionNotification({
+  toEmail,
+  roundId,
+  roundName,
+  entrantName,
+  entrantId,
+}) {
   const msg = {
     to: toEmail,
     from: process.env.SENDGRID_FROM_EMAIL,
@@ -180,13 +186,26 @@ async function sendMissingSubmissionNotification({ toEmail, roundId, roundName, 
   try {
     await sgMail.send(msg);
     await prisma.notificationLog.create({
-      data: { roundId, entrantId, triggerType: 'missing_submission', recipientEmail: toEmail, status: 'sent' },
+      data: {
+        roundId,
+        entrantId,
+        triggerType: 'missing_submission',
+        recipientEmail: toEmail,
+        status: 'sent',
+      },
     });
     console.log(`Missing submission notification sent to ${toEmail}`);
   } catch (err) {
     console.error('Failed to send missing submission notification:', err.message);
     await prisma.notificationLog.create({
-      data: { roundId, entrantId, triggerType: 'missing_submission', recipientEmail: toEmail, status: 'failed', error: err.message },
+      data: {
+        roundId,
+        entrantId,
+        triggerType: 'missing_submission',
+        recipientEmail: toEmail,
+        status: 'failed',
+        error: err.message,
+      },
     });
   }
 }
