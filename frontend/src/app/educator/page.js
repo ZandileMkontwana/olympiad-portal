@@ -99,6 +99,9 @@ export default function EducatorDashboard() {
       </p>
 
       <div className="card" style={{ display: 'flex', gap: '12px' }}>
+        <Link href="/educator/school" className="button" style={{ textDecoration: 'none' }}>
+          School Dashboard
+        </Link>
         <button onClick={handleLogout} className="button">
           Log out
         </button>

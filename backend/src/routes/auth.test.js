@@ -11,6 +11,7 @@ vi.spyOn(clerk, 'requireAuth').mockReturnValue((req, res, next) => {
   req.auth = () => ({ userId: 'clerk-user-1' });
   next();
 });
+
 clerk.clerkClient = {
   users: {
     getUser: mockGetUser,
@@ -272,7 +273,7 @@ describe('Auth routes', () => {
         email: 'a@b.com',
         role: 'educator',
         name: 'Test',
-        educator: { school: { name: 'Test School' } },
+        educator: { school: { id: 'school-1', name: 'Test School' } },
       });
       const res = await request(app).get('/api/auth/me');
       expect(res.status).toBe(200);

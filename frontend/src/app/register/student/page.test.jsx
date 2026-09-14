@@ -14,28 +14,23 @@ vi.mock('@clerk/nextjs', () => ({
   SignUp: () => <div data-testid="clerk-signup">Clerk signup</div>,
 }));
 
-// Mock @/lib/api — the page only needs listSchools.
+// Mock @/lib/api — the page needs listSchools and completeStudentProfile.
 vi.mock('@/lib/api', () => ({
   listSchools: vi.fn(),
+  completeStudentProfile: vi.fn(),
 }));
 
 import RegisterStudentPage from './page';
-import { listSchools } from '@/lib/api';
+import { listSchools, completeStudentProfile } from '@/lib/api';
 
 function mockFetchOk(user) {
-  global.fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    status: 201,
-    json: () => Promise.resolve({ user }),
-  });
+  completeStudentProfile.mockResolvedValue({ user });
 }
 
 function mockFetchError(status, error) {
-  global.fetch = vi.fn().mockResolvedValue({
-    ok: false,
-    status,
-    json: () => Promise.resolve({ error }),
-  });
+  const err = new Error(error);
+  err.status = status;
+  completeStudentProfile.mockRejectedValue(err);
 }
 
 describe('RegisterStudentPage', () => {
@@ -101,7 +96,7 @@ describe('RegisterStudentPage', () => {
 
     expect(await screen.findByText('Name is required.')).toBeInTheDocument();
     expect(screen.getByText('School name is required.')).toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(completeStudentProfile).not.toHaveBeenCalled();
   });
 
   it('submits trimmed name and school with the bearer token and shows success', async () => {
@@ -119,15 +114,10 @@ describe('RegisterStudentPage', () => {
     expect(await screen.findByRole('status')).toBeInTheDocument();
     expect(screen.getByText(/account created/i)).toBeInTheDocument();
     expect(screen.getByText(/registered as a student at test school/i)).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledWith(
-      'http://localhost:5000/api/students/complete-profile',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ Authorization: 'Bearer mock-token' }),
-      })
+    expect(completeStudentProfile).toHaveBeenCalledWith(
+      { name: 'Thabo', schoolName: 'Test School' },
+      'mock-token'
     );
-    const [, options] = global.fetch.mock.calls[0];
-    expect(JSON.parse(options.body)).toEqual({ name: 'Thabo', schoolName: 'Test School' });
   });
 
   it('shows the backend error when no unclaimed entrant matches', async () => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { SignUp, useAuth } from '@clerk/nextjs';
-import { listSchools } from '@/lib/api';
+import { listSchools, completeStudentProfile } from '@/lib/api';
 
 function Watermark() {
   return (
@@ -60,22 +60,10 @@ function CompleteProfileForm() {
     setStatus('submitting');
     try {
       const token = await getToken();
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/students/complete-profile`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ name: name.trim(), schoolName: schoolName.trim() }),
-        }
+      const data = await completeStudentProfile(
+        { name: name.trim(), schoolName: schoolName.trim() },
+        token
       );
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Something went wrong.');
-      }
 
       setProfile(data.user);
       setStatus('success');

@@ -37,6 +37,17 @@ app.use('/api', schoolsRouter);
 app.use('/api', studentsRouter);
 app.use('/api', authRouter);
 
+// JSON 404 for unmatched /api routes (prevents Express's default HTML response)
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });
+});
+
+// Global error handler — always returns JSON
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
+});
+
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
