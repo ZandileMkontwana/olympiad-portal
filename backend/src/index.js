@@ -8,6 +8,8 @@ const roundsRouter = require('./routes/rounds');
 const submissionsRouter = require('./routes/submissions');
 const sittingsRouter = require('./routes/sittings');
 const entrantsRouter = require('./routes/entrants');
+const markingRouter = require('./routes/marking');
+const remarkRouter = require('./routes/remark');
 const schoolsRouter = require('./routes/schools');
 const studentsRouter = require('./routes/students');
 const authRouter = require('./routes/auth');
@@ -35,6 +37,8 @@ app.use('/api', roundsRouter);
 app.use('/api', submissionsRouter);
 app.use('/api', sittingsRouter);
 app.use('/api', entrantsRouter);
+app.use('/api', markingRouter);
+app.use('/api', remarkRouter);
 app.use('/api', schoolsRouter);
 app.use('/api', studentsRouter);
 app.use('/api', authRouter);
@@ -51,6 +55,27 @@ app.use('/api', (req, res) => {
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: err.message || 'Internal server error' });
+});
+
+// 404 handler — anything that didn't match a route above
+app.use((req, res) => {
+  res.status(404).json({ error: `No route for ${req.method} ${req.originalUrl}` });
+});
+
+// Global error handler — MUST have 4 args so Express recognizes it as
+// an error handler. Without this, any thrown/next(err) error (e.g. from
+// requireAuth(), Prisma, or anywhere else) falls through to Express's
+// built-in default handler, which returns an HTML page instead of JSON
+// and breaks every frontend res.json() call.
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err);
+
+  // Clerk's requireAuth() throws when there's no valid session/token
+  if (err && (err.clerkError || err.status === 401 || err.name === 'ClerkAPIResponseError')) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
 if (require.main === module) {

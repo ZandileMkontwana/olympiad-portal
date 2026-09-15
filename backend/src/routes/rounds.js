@@ -57,7 +57,7 @@ router.get('/olympiads', async (req, res) => {
 
 router.post('/rounds', async (req, res) => {
   try {
-    const { olympiadId, name, openTime, closeTime } = req.body;
+    const { olympiadId, name, openTime, closeTime, qualifyingThreshold } = req.body;
     if (!olympiadId || !name || !openTime || !closeTime) {
       return res
         .status(400)
@@ -66,8 +66,25 @@ router.post('/rounds', async (req, res) => {
     if (new Date(closeTime) <= new Date(openTime)) {
       return res.status(400).json({ error: 'closeTime must be after openTime' });
     }
+    if (
+      qualifyingThreshold !== undefined &&
+      qualifyingThreshold !== null &&
+      (typeof qualifyingThreshold !== 'number' ||
+        qualifyingThreshold < 0 ||
+        qualifyingThreshold > 100)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'qualifyingThreshold must be a number between 0 and 100' });
+    }
     const round = await prisma.round.create({
-      data: { olympiadId, name, openTime: new Date(openTime), closeTime: new Date(closeTime) },
+      data: {
+        olympiadId,
+        name,
+        openTime: new Date(openTime),
+        closeTime: new Date(closeTime),
+        qualifyingThreshold: qualifyingThreshold ?? null,
+      },
     });
     res.status(201).json(round);
   } catch (err) {
@@ -182,7 +199,7 @@ router.get('/rounds/:id/submissions', async (req, res) => {
   try {
     const submissions = await prisma.submission.findMany({
       where: { roundId: req.params.id },
-      include: { result: true },
+      include: { result: true, entrant: true, remarkRequests: true },
     });
     res.json(submissions);
   } catch (err) {
@@ -191,6 +208,65 @@ router.get('/rounds/:id/submissions', async (req, res) => {
   }
 });
 
+// GET /rounds/:id/progression
+// A read-only preview of who would qualify for the next round based on
+// this round's qualifyingThreshold, without actually registering anyone.
+// Useful for organisers to check before/after a round closes.
+router.get('/rounds/:id/progression', async (req, res) => {
+  try {
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: {
+        roundEntrants: {
+          include: {
+            entrant: {
+              include: {
+                submissions: {
+                  where: { roundId: req.params.id },
+                  include: { result: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    if (round.qualifyingThreshold === null || round.qualifyingThreshold === undefined) {
+      return res.json({
+        roundId: round.id,
+        qualifyingThreshold: null,
+        entrants: [],
+        message: 'This round has no qualifyingThreshold set, so no entrants will be auto-advanced.',
+      });
+    }
+
+    const entrants = round.roundEntrants.map((roundEntrant) => {
+      const entrant = roundEntrant.entrant;
+      const submission = entrant.submissions[0];
+      const score = submission?.result?.score ?? null;
+      return {
+        entrantId: entrant.id,
+        name: entrant.name,
+        score,
+        qualifies: score !== null && score >= round.qualifyingThreshold,
+      };
+    });
+
+    res.json({
+      roundId: round.id,
+      qualifyingThreshold: round.qualifyingThreshold,
+      entrants,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to compute progression preview' });
+  }
+});
 // GET /rounds/:id/standings
 router.get('/rounds/:id/standings', async (req, res) => {
   try {
@@ -470,101 +546,99 @@ router.delete(
 );
 
 // POST /rounds/:id/notifications/test
-router.post(
-  '/rounds/:id/notifications/test',
-  ...requireRole('organiser'),
-  async (req, res) => {
-    try {
-      const roundId = req.params.id;
-      const { triggerType } = req.body;
+router.post('/rounds/:id/notifications/test', ...requireRole('organiser'), async (req, res) => {
+  try {
+    const roundId = req.params.id;
+    const { triggerType } = req.body;
 
-      if (!NOTIFICATION_TRIGGER_TYPES.includes(triggerType)) {
-        return res.status(400).json({ error: 'A valid triggerType is required' });
-      }
-
-      const round = await prisma.round.findUnique({
-        where: { id: roundId },
-        include:
-          triggerType === 'missing_submission'
-            ? roundIncludeForMissingSubmissions
-            : roundIncludeForNotifications,
-      });
-      if (!round) {
-        return res.status(404).json({ error: 'Round not found' });
-      }
-
-      const enabled = await isTriggerEnabled(roundId, triggerType);
-
-      const sentLogs = await prisma.notificationLog.findMany({
-        where: { roundId, triggerType },
-        select: { recipientEmail: true },
-      });
-      const alreadyEmailed = new Set(sentLogs.map((log) => log.recipientEmail));
-
-      const recipients = [];
-      if (triggerType === 'missing_submission') {
-        const coveredEmails = new Set();
-        for (const roundEntrant of round.roundEntrants) {
-          const entrant = roundEntrant.entrant;
-          const hasSubmitted = entrant.submissions.some((s) => s.roundId === round.id);
-          if (hasSubmitted) continue;
-
-          for (const educator of entrant.school.educators) {
-            const email = educator.user.email;
-            recipients.push({
-              email,
-              entrantId: entrant.id,
-              entrantName: entrant.name,
-              alreadyNotified: alreadyEmailed.has(email) || coveredEmails.has(email),
-            });
-            coveredEmails.add(email);
-          }
-        }
-      } else {
-        for (const email of await getRecipientsForRound(round)) {
-          recipients.push({ email, alreadyNotified: alreadyEmailed.has(email) });
-        }
-      }
-
-      let emailPreview = null;
-      if (triggerType === 'before_open') {
-        emailPreview = buildRoundOpeningMessage({
-          roundName: round.name,
-          opensAt: new Date(round.openTime).toISOString(),
-        });
-      } else if (triggerType === 'before_close') {
-        emailPreview = buildRoundClosingMessage({
-          roundName: round.name,
-          closesAt: new Date(round.closeTime).toISOString(),
-        });
-      } else if (triggerType === 'results_released') {
-        emailPreview = buildResultsReleasedMessage({ roundName: round.name });
-      } else if (recipients.length > 0) {
-        emailPreview = buildMissingSubmissionMessage({
-          roundName: round.name,
-          entrantName: recipients[0].entrantName,
-        });
-      }
-
-      res.json({
-        dryRun: true,
-        round: {
-          id: round.id,
-          name: round.name,
-          state: round.state,
-          openTime: round.openTime,
-          closeTime: round.closeTime,
-        },
-        triggerType,
-        enabled,
-        recipients,
-        emailPreview,
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Failed to run notification dry-run' });
+    if (!NOTIFICATION_TRIGGER_TYPES.includes(triggerType)) {
+      return res.status(400).json({ error: 'A valid triggerType is required' });
     }
+
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include:
+        triggerType === 'missing_submission'
+          ? roundIncludeForMissingSubmissions
+          : roundIncludeForNotifications,
+    });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const enabled = await isTriggerEnabled(roundId, triggerType);
+
+    const sentLogs = await prisma.notificationLog.findMany({
+      where: { roundId, triggerType },
+      select: { recipientEmail: true, entrantId: true },
+    });
+    const alreadyEmailed = new Set(
+      sentLogs.map((log) => `${log.recipientEmail}:${log.entrantId ?? ''}`)
+    );
+    const recipients = [];
+    if (triggerType === 'missing_submission') {
+      const coveredEmails = new Set();
+      for (const roundEntrant of round.roundEntrants) {
+        const entrant = roundEntrant.entrant;
+        const hasSubmitted = entrant.submissions.some((s) => s.roundId === round.id);
+        if (hasSubmitted) continue;
+
+        for (const educator of entrant.school.educators) {
+          const email = educator.user.email;
+          recipients.push({
+            email,
+            entrantId: entrant.id,
+            entrantName: entrant.name,
+            alreadyNotified:
+              alreadyEmailed.has(`${email}:${entrant.id}`) || coveredEmails.has(email),
+          });
+          coveredEmails.add(email);
+        }
+      }
+    } else {
+      for (const email of await getRecipientsForRound(round)) {
+        recipients.push({ email, alreadyNotified: alreadyEmailed.has(email) });
+      }
+    }
+
+    let emailPreview = null;
+    if (triggerType === 'before_open') {
+      emailPreview = buildRoundOpeningMessage({
+        roundName: round.name,
+        opensAt: new Date(round.openTime).toISOString(),
+      });
+    } else if (triggerType === 'before_close') {
+      emailPreview = buildRoundClosingMessage({
+        roundName: round.name,
+        closesAt: new Date(round.closeTime).toISOString(),
+      });
+    } else if (triggerType === 'results_released') {
+      emailPreview = buildResultsReleasedMessage({ roundName: round.name });
+    } else if (recipients.length > 0) {
+      emailPreview = buildMissingSubmissionMessage({
+        roundName: round.name,
+        entrantName: recipients[0].entrantName,
+      });
+    }
+
+    res.json({
+      dryRun: true,
+      round: {
+        id: round.id,
+        name: round.name,
+        state: round.state,
+        openTime: round.openTime,
+        closeTime: round.closeTime,
+      },
+      triggerType,
+      enabled,
+      recipients,
+      emailPreview,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to run notification dry-run' });
   }
-);
+});
 
 module.exports = router;

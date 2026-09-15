@@ -141,9 +141,7 @@ describe('Student auth routes', () => {
 
   describe('POST /api/students/set-password', () => {
     it('returns 400 when token or password is missing', async () => {
-      const res = await request(app)
-        .post('/api/students/set-password')
-        .send({ token: 'tok' });
+      const res = await request(app).post('/api/students/set-password').send({ token: 'tok' });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/required/);
     });

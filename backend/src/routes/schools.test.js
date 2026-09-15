@@ -248,9 +248,7 @@ describe('Schools routes', () => {
           id: 'entrant-2',
           name: 'Bob',
           grade: '11',
-          submissions: [
-            { id: 'sub-3', result: { score: 70 } },
-          ],
+          submissions: [{ id: 'sub-3', result: { score: 70 } }],
         },
         {
           id: 'entrant-3',

@@ -208,9 +208,7 @@ describe('Auth routes', () => {
         return Promise.resolve(null);
       });
 
-      const res = await request(app)
-        .get('/api/auth/me')
-        .set('Authorization', `Bearer ${token}`);
+      const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
       expect(res.body.user.role).toBe('student');
@@ -223,9 +221,7 @@ describe('Auth routes', () => {
       const token = jwt.sign({ sub: 'user-gone', role: 'student' }, 'test-secret');
       prisma.user.findUnique.mockResolvedValue(null);
 
-      const res = await request(app)
-        .get('/api/auth/me')
-        .set('Authorization', `Bearer ${token}`);
+      const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(404);
     });

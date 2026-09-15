@@ -160,6 +160,34 @@ describe('api client', () => {
         expect.objectContaining({ method: 'POST' })
       );
     });
+
+    it('defaults qualifyingThreshold to null when not provided', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: '1' }),
+      });
+      await createRound({ olympiadId: '1', name: 'R1', openTime: '2026', closeTime: '2027' });
+      const [, options] = fetchMock.mock.calls[0];
+      expect(JSON.parse(options.body).qualifyingThreshold).toBeNull();
+    });
+
+    it('passes qualifyingThreshold through when provided', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: '1' }),
+      });
+      await createRound({
+        olympiadId: '1',
+        name: 'R1',
+        openTime: '2026',
+        closeTime: '2027',
+        qualifyingThreshold: 70,
+      });
+      const [, options] = fetchMock.mock.calls[0];
+      expect(JSON.parse(options.body).qualifyingThreshold).toBe(70);
+    });
   });
 
   describe('listOlympiadRounds', () => {
@@ -389,7 +417,15 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 201,
-        json: () => Promise.resolve({ id: 'e1', name: 'Alice', grade: '10', email: 'alice@school.com', accountStatus: 'invite_pending', invitationSent: true }),
+        json: () =>
+          Promise.resolve({
+            id: 'e1',
+            name: 'Alice',
+            grade: '10',
+            email: 'alice@school.com',
+            accountStatus: 'invite_pending',
+            invitationSent: true,
+          }),
       });
       const result = await createEntrant(
         { name: 'Alice', email: 'alice@school.com', grade: '10' },
@@ -605,10 +641,11 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({
-          token: 'jwt-token',
-          user: { id: 'user-1', email: 'student@school.com', role: 'student' },
-        }),
+        json: () =>
+          Promise.resolve({
+            token: 'jwt-token',
+            user: { id: 'user-1', email: 'student@school.com', role: 'student' },
+          }),
       });
 
       const result = await studentLogin({ email: 'student@school.com', password: 'secret123' });
@@ -649,10 +686,11 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({
-          token: 'jwt-token',
-          user: { id: 'user-1', email: 'student@school.com', role: 'student' },
-        }),
+        json: () =>
+          Promise.resolve({
+            token: 'jwt-token',
+            user: { id: 'user-1', email: 'student@school.com', role: 'student' },
+          }),
       });
 
       const result = await setStudentPassword({ token: 'invite-token', password: 'newpass123' });
@@ -733,12 +771,15 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({
-          id: 'result-1',
-          score: 80,
-          round: { id: 'round-1', name: 'Round 1' },
-          questions: [{ questionId: 'q1', correctAnswer: 'A', studentAnswer: 'A', isCorrect: true }],
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 'result-1',
+            score: 80,
+            round: { id: 'round-1', name: 'Round 1' },
+            questions: [
+              { questionId: 'q1', correctAnswer: 'A', studentAnswer: 'A', isCorrect: true },
+            ],
+          }),
       });
 
       const result = await fetchMyResult('result-1', 'test-token');
