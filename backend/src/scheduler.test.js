@@ -793,7 +793,7 @@ describe('startScheduler', () => {
       );
     });
 
-    it('queries only closed rounds with released results', async () => {
+    it('queries closed and released rounds with released results', async () => {
       startScheduler();
 
       prisma.round.updateMany.mockResolvedValue({
@@ -806,14 +806,8 @@ describe('startScheduler', () => {
         3,
         expect.objectContaining({
           where: {
-            state: 'closed',
-            submissions: {
-              some: {
-                result: {
-                  releasedAt: { not: null },
-                },
-              },
-            },
+            state: { in: ['closed', 'released'] },
+            submissions: { some: { result: { releasedAt: { not: null } } } },
           },
         })
       );
@@ -921,7 +915,7 @@ describe('startScheduler', () => {
       expect(sgMail.send).not.toHaveBeenCalled();
     });
 
-    it('queries only closed rounds', async () => {
+    it('queries closed and released rounds', async () => {
       startScheduler();
 
       prisma.round.updateMany.mockResolvedValue({
@@ -932,11 +926,7 @@ describe('startScheduler', () => {
 
       expect(prisma.round.findMany).toHaveBeenNthCalledWith(
         4,
-        expect.objectContaining({
-          where: {
-            state: 'closed',
-          },
-        })
+        expect.objectContaining({ where: { state: { in: ['closed', 'released'] } } })
       );
     });
   });
