@@ -207,12 +207,14 @@ async function sendBeforeCloseNotifications(now) {
 }
 
 async function sendResultsReleasedNotifications() {
-  // "Results released" = round is closed AND at least one Result in it
-  // has a non-null releasedAt. We notify once per round, when we first
-  // detect any released result for it.
+  // "Results released" = at least one Result with a non-null releasedAt.
+  // We notify once per round, when we first detect any released result for
+  // it. Both 'closed' and 'released' states are matched: the release-results
+  // route flips the round to 'released', while older rounds may still carry
+  // releasedAt stamps from before that state existed.
   const roundsWithReleasedResults = await prisma.round.findMany({
     where: {
-      state: 'closed',
+      state: { in: ['closed', 'released'] },
       submissions: {
         some: { result: { releasedAt: { not: null } } },
       },
@@ -246,8 +248,11 @@ async function sendResultsReleasedNotifications() {
 }
 
 async function sendMissingSubmissionNotifications() {
+  // Both 'closed' and 'released' rounds are scanned: a round whose results
+  // were released quickly after closing still owes its missing-submission
+  // emails, and the release state change must not skip them.
   const recentlyClosedRounds = await prisma.round.findMany({
-    where: { state: 'closed' },
+    where: { state: { in: ['closed', 'released'] } },
     include: roundIncludeForMissingSubmissions,
   });
 

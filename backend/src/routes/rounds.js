@@ -313,6 +313,16 @@ router.post('/rounds/:id/release-results', ...requireRole('educator'), async (re
       data: { releasedAt: now },
     });
 
+    // Flipping the round to 'released' is the only path past 'closed' in the
+    // state machine — without it, certificates and released-round paper
+    // downloads stay locked forever even though results carry releasedAt.
+    // This runs even when nothing new was stamped, so rounds whose results
+    // were released before the state flip existed still converge.
+    await prisma.round.update({
+      where: { id: round.id },
+      data: { state: 'released' },
+    });
+
     res.json({ releasedCount: updated.count, releasedAt: now });
   } catch (err) {
     console.error(err);
@@ -335,6 +345,15 @@ router.post('/rounds/:id/unrelease-results', ...requireRole('educator'), async (
       },
       data: { releasedAt: null },
     });
+
+    // A released round drops back to 'closed' once its results are hidden
+    // again. Rounds in any other state are left untouched.
+    if (round.state === 'released') {
+      await prisma.round.update({
+        where: { id: round.id },
+        data: { state: 'closed' },
+      });
+    }
 
     res.json({ unreleasedCount: updated.count });
   } catch (err) {

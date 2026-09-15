@@ -214,7 +214,11 @@ export default function OrganiserDashboard() {
                     let href = `/educator/round_view?id=${round.id}`;
                     if (round.state === 'open' || round.state === 'scheduled') {
                       href = `/rounds/${round.id}/papers`;
-                    } else if (round.state === 'closed') {
+                    } else if (round.state === 'closed' || round.state === 'released') {
+                      // The educator round view gates certificates on the
+                      // educator role and would fail for organisers — the
+                      // closed-round info page is the safe target for both
+                      // terminal states.
                       href = `/rounds/${round.id}/closed_round`;
                     }
 

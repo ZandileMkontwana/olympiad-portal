@@ -30,6 +30,7 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.round, 'create');
     vi.spyOn(prisma.round, 'findMany');
     vi.spyOn(prisma.round, 'findUnique');
+    vi.spyOn(prisma.round, 'update').mockResolvedValue({ id: 'r1', state: 'released' });
     vi.spyOn(prisma.roundEntrant, 'findMany');
     vi.spyOn(prisma.roundEntrant, 'findUnique');
     vi.spyOn(prisma.roundEntrant, 'create');
@@ -1171,6 +1172,23 @@ describe('Rounds routes', () => {
         where: { releasedAt: null, submission: { roundId: 'r1' } },
         data: expect.objectContaining({ releasedAt: expect.any(Date) }),
       });
+      expect(prisma.round.update).toHaveBeenCalledWith({
+        where: { id: 'r1' },
+        data: { state: 'released' },
+      });
+    });
+
+    it('flips the round to released even when no results were pending', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'closed' });
+      prisma.result.updateMany.mockResolvedValue({ count: 0 });
+
+      const res = await request(app).post('/api/rounds/r1/release-results');
+      expect(res.status).toBe(200);
+      expect(res.body.releasedCount).toBe(0);
+      expect(prisma.round.update).toHaveBeenCalledWith({
+        where: { id: 'r1' },
+        data: { state: 'released' },
+      });
     });
 
     it('returns 404 when round does not exist', async () => {
@@ -1195,6 +1213,16 @@ describe('Rounds routes', () => {
       expect(res.status).toBe(500);
       expect(res.body.error).toMatch(/Could not release/);
     });
+
+    it('returns 500 when the round state update fails', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'closed' });
+      prisma.result.updateMany.mockResolvedValue({ count: 5 });
+      prisma.round.update.mockRejectedValue(new Error('DB error'));
+
+      const res = await request(app).post('/api/rounds/r1/release-results');
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Could not release/);
+    });
   });
 
   describe('POST /api/rounds/:id/unrelease-results', () => {
@@ -1208,6 +1236,19 @@ describe('Rounds routes', () => {
       expect(prisma.result.updateMany).toHaveBeenCalledWith({
         where: { releasedAt: { not: null }, submission: { roundId: 'r1' } },
         data: { releasedAt: null },
+      });
+      expect(prisma.round.update).not.toHaveBeenCalled();
+    });
+
+    it('reverts a released round back to closed', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'released' });
+      prisma.result.updateMany.mockResolvedValue({ count: 3 });
+
+      const res = await request(app).post('/api/rounds/r1/unrelease-results');
+      expect(res.status).toBe(200);
+      expect(prisma.round.update).toHaveBeenCalledWith({
+        where: { id: 'r1' },
+        data: { state: 'closed' },
       });
     });
 
