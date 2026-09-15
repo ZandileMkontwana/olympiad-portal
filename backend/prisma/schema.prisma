@@ -16,19 +16,20 @@ model Olympiad {
 }
 
 model Round {
-  id                 String            @id @default(uuid())
-  olympiadId         String
-  name               String
-  openTime           DateTime
-  closeTime          DateTime
-  state              String            @default("scheduled")
-  qualifyingThreshold Float?
-  paper              Paper?
-  olympiad           Olympiad          @relation(fields: [olympiadId], references: [id])
-  roundEntrants      RoundEntrant[]
-  submissions        Submission[]
-  sittings           Sitting[]
-  notificationLogs   NotificationLog[]
+  id                   String            @id @default(uuid())
+  olympiadId           String
+  name                 String
+  openTime             DateTime
+  closeTime            DateTime
+  state                String            @default("scheduled")
+  qualifyingThreshold  Float?
+  autoAdvanceProcessedAt DateTime?
+  paper                Paper?
+  olympiad             Olympiad          @relation(fields: [olympiadId], references: [id])
+  roundEntrants        RoundEntrant[]
+  submissions          Submission[]
+  sittings             Sitting[]
+  notificationLogs     NotificationLog[]
 }
 
 model User {
