@@ -316,12 +316,19 @@ router.post('/rounds/:id/release-results', ...requireRole('educator'), async (re
     // Flipping the round to 'released' is the only path past 'closed' in the
     // state machine — without it, certificates and released-round paper
     // downloads stay locked forever even though results carry releasedAt.
-    // This runs even when nothing new was stamped, so rounds whose results
-    // were released before the state flip existed still converge.
-    await prisma.round.update({
-      where: { id: round.id },
+    // The state filter keeps the closed -> released transition atomic: if a
+    // concurrent request already moved the round on, nothing is written.
+    // Legacy closed rounds with pre-existing releasedAt stamps still
+    // converge — they remain 'closed', so the filter matches them.
+    const flipped = await prisma.round.updateMany({
+      where: { id: round.id, state: 'closed' },
       data: { state: 'released' },
     });
+    if (flipped.count === 0) {
+      return res.status(409).json({
+        error: 'Round state changed while releasing results - it is no longer closed',
+      });
+    }
 
     res.json({ releasedCount: updated.count, releasedAt: now });
   } catch (err) {

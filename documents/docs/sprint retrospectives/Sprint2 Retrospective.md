@@ -40,3 +40,26 @@
 - **Unauthenticated `GET /api/papers/archive` endpoint** — flagged to the team as possibly deliberate but needs an explicit decision before production use.
 - **Moderation queue and partial credit marking** — within Sprint 2 scope per the planning doc but not started; likely descoped to Sprint 3 by team decision.
 - **Qualifying-threshold round advancement** — not started; same status as moderation queue.
+
+## Ronie  (Standings, Certificates & Notification Rules — C1-C5)
+ 
+## What went well
+ 
+- **Delivered the full C1-C5 epic set: #124-#142**, spanning individual and per-school standings, PDF certificate generation, configurable notification rules, and a dry-run preview for those rules — five distinct features, each shipped with a working backend route, frontend page/component, and a real passing test suite.
+- **#125 ("merge online and paper results") turned out to already be solved by the data model** — rather than building unnecessary merge logic, traced the actual `Submission`/`Result` schema and confirmed both online sittings and paper-based entries converge on the same table, so the standings query needed no special-casing. Verified this directly against a real test entrant's data rather than assuming.
+- **Caught and fixed a genuine route-collision bug before it shipped.** Two separately-built certificate routes (one pasted into `rounds.js`, one in a proper standalone `certificates.js`) both matched the same path, with Express silently routing every request to the broken one — which called a function name (`generateCertificatePdf`) that didn't even exist in the shared lib file at the time. Found by tracing the actual router mount order in `index.js`, not by guessing.
+- **Caught a deeper, non-obvious functional gap in the certificate flow.** `certificates.js` correctly gated downloads on `round.state === 'released'`, but nothing anywhere in the codebase ever set a round to that state — the scheduler only ever produced `scheduled`/`open`/`closed`. Existing tests passed because they mocked the `'released'` state directly, masking that no real code path could ever reach it. Fixed by adding the state transition to `POST /rounds/:id/release-results` (and the reverse on `unrelease-results`), with test coverage that actually asserts the transition happens rather than just checking the response body.
+- **Worked independently and in parallel effectively** — built the dry-run route, its frontend "Test Rules" button, and its full test suite (#140-#142) unprompted while other work was in progress, including a thoughtful architectural choice to export reusable building blocks from `scheduler.js` (`getRecipientsForRound`, `isTriggerEnabled`, the include shapes) rather than duplicating scheduler logic in the route.
+- **Reused real email templates for the notification dry-run preview**, refactoring `email.js` to separate template-building from sending, so the "Test Rules" preview shows organisers the actual email content rather than just a recipient list.
+## What was harder than expected
+ 
+- **Two genuinely separate bugs hid behind passing tests.** Both the certificate route collision and the unreachable `'released'` state were invisible from the test suite alone — the tests were well-written and passed correctly, but neither one exercised the real integration path (actual router mount order; an actual state-transition trail through the scheduler). Confirming correctness required reading the running system's wiring, not just running `npm test`.
+- **A `qualifyingThreshold` column referenced during an earlier database drift incident turned out not to exist at all** once checked directly against the schema — a good reminder not to assume something is real just because it was mentioned once, even by tooling output.
+## What I'd do differently
+ 
+- **Check for route collisions explicitly whenever two people might plausibly build the same endpoint independently** — a quick `grep` across all route files for a given path would have caught the certificate duplication immediately, rather than discovering it while reviewing.
+- **Treat "the test mocks this state" as a prompt to verify the state is reachable in production code**, not just that the test's assertions are internally consistent.
+## Carried into next sprint
+ 
+- Confirm with the team whether `recipientRole: 'organiser'` on a `NotificationRule` should ever actually route email to organisers — the current implementation stores the value but has no code path to resolve "which organiser owns this round," since that relationship doesn't exist in the schema yet.
+- Consider surfacing the "already notified" dry-run flag more prominently in the notifications config UI, since it's currently only visible via the API response.
