@@ -544,10 +544,11 @@ router.post('/rounds/:id/notifications/test', ...requireRole('organiser'), async
 
     const sentLogs = await prisma.notificationLog.findMany({
       where: { roundId, triggerType },
-      select: { recipientEmail: true },
+      select: { recipientEmail: true, entrantId: true },
     });
-    const alreadyEmailed = new Set(sentLogs.map((log) => log.recipientEmail));
-
+    const alreadyEmailed = new Set(
+      sentLogs.map((log) => `${log.recipientEmail}:${log.entrantId ?? ''}`)
+    );
     const recipients = [];
     if (triggerType === 'missing_submission') {
       const coveredEmails = new Set();
@@ -562,7 +563,8 @@ router.post('/rounds/:id/notifications/test', ...requireRole('organiser'), async
             email,
             entrantId: entrant.id,
             entrantName: entrant.name,
-            alreadyNotified: alreadyEmailed.has(email) || coveredEmails.has(email),
+            alreadyNotified:
+              alreadyEmailed.has(`${email}:${entrant.id}`) || coveredEmails.has(email),
           });
           coveredEmails.add(email);
         }
