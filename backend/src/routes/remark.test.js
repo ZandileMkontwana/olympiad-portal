@@ -148,3 +148,86 @@ describe('PATCH /api/remark/:id/review', () => {
     expect(res.status).toBe(500);
   });
 });
+
+describe('GET /api/remark/queue', () => {
+  let app;
+
+  beforeEach(() => {
+    vi.spyOn(prisma.remarkRequest, 'findMany');
+    vi.spyOn(prisma.user, 'findUnique');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'organiser-1',
+      email: 'organiser@school.com',
+      role: 'organiser',
+      name: 'Organiser One',
+    });
+
+    app = createApp();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns 401 when not authenticated', async () => {
+    const unauthApp = createApp(false);
+    const res = await request(unauthApp).get('/api/remark/queue');
+    expect(res.status).toBe(401);
+  });
+
+  it('defaults to pending requests only', async () => {
+    prisma.remarkRequest.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/remark/queue');
+    expect(res.status).toBe(200);
+    expect(prisma.remarkRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'pending' } })
+    );
+  });
+
+  it('returns all requests when status=all is passed', async () => {
+    prisma.remarkRequest.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/remark/queue?status=all');
+    expect(res.status).toBe(200);
+    expect(prisma.remarkRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: {} })
+    );
+  });
+
+  it('filters by an explicit status', async () => {
+    prisma.remarkRequest.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/remark/queue?status=approved');
+    expect(res.status).toBe(200);
+    expect(prisma.remarkRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'approved' } })
+    );
+  });
+
+  it('returns the queue with nested submission/entrant/round info', async () => {
+    prisma.remarkRequest.findMany.mockResolvedValue([
+      {
+        id: 'remark-1',
+        status: 'pending',
+        reason: 'Question 3 was marked wrong',
+        submission: {
+          entrant: { name: 'Alice' },
+          round: { name: 'Round 1' },
+          result: { score: 60 },
+        },
+        requestedBy: { name: 'Teacher One' },
+      },
+    ]);
+
+    const res = await request(app).get('/api/remark/queue');
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].submission.entrant.name).toBe('Alice');
+  });
+
+  it('returns 500 on unexpected error', async () => {
+    prisma.remarkRequest.findMany.mockRejectedValue(new Error('DB error'));
+    const res = await request(app).get('/api/remark/queue');
+    expect(res.status).toBe(500);
+  });
+});

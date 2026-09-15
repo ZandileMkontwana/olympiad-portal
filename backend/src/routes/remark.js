@@ -59,6 +59,39 @@ router.post('/submissions/:id/remark', ...requireRole('educator'), async (req, r
   }
 });
 
+// GET /api/remark/queue
+// Lists remark requests for organisers to review. Defaults to showing only
+// pending requests; pass ?status=all to see everything, or
+// ?status=approved / ?status=rejected to filter.
+router.get('/remark/queue', ...requireRole('organiser'), async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where =
+      !status || status === 'pending' ? { status: 'pending' } : status === 'all' ? {} : { status };
+
+    const remarkRequests = await prisma.remarkRequest.findMany({
+      where,
+      include: {
+        submission: {
+          include: {
+            entrant: true,
+            round: true,
+            result: true,
+          },
+        },
+        requestedBy: { select: { id: true, name: true, email: true } },
+        reviewedBy: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    res.json(remarkRequests);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch remark queue' });
+  }
+});
+
 // PATCH /api/remark/:id/review
 // An organiser approves or rejects a pending remark request.
 router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res) => {

@@ -16,61 +16,39 @@ model Olympiad {
 }
 
 model Round {
-  id                   String            @id @default(uuid())
-  olympiadId           String
-  name                 String
-  openTime             DateTime
-  closeTime            DateTime
-  state                String            @default("scheduled")
-  qualifyingThreshold  Float?
-  autoAdvanceProcessedAt DateTime?
-  paper                Paper?
-  olympiad             Olympiad          @relation(fields: [olympiadId], references: [id])
-  roundEntrants        RoundEntrant[]
-  submissions          Submission[]
-  sittings             Sitting[]
-  notificationLogs     NotificationLog[]
-}
-
-model User {
-  id                     String          @id @default(uuid())
-  clerkUserId            String          @unique
-  email                  String          @unique
-  role                   String
-  createdAt              DateTime        @default(now())
+  id                     String              @id @default(uuid())
+  olympiadId             String
   name                   String
-  educator               Educator?
-  assignedMarkingTasks   MarkingTask[]   @relation("AssignedMarkingTasks")
-  moderatedMarkingTasks  MarkingTask[]   @relation("ModeratedMarkingTasks")
-  requestedRemarks       RemarkRequest[] @relation("RequestedRemarks")
-  reviewedRemarks        RemarkRequest[] @relation("ReviewedRemarks")
-  id               String            @id @default(uuid())
-  olympiadId       String
-  name             String
-  openTime         DateTime
-  closeTime        DateTime
-  state            String            @default("scheduled")
-  paper            Paper?
-  olympiad         Olympiad          @relation(fields: [olympiadId], references: [id])
-  roundEntrants    RoundEntrant[]
-  submissions      Submission[]
-  sittings         Sitting[]
-  notificationLogs NotificationLog[]
-  notificationRules NotificationRule[]
+  openTime               DateTime
+  closeTime              DateTime
+  state                  String              @default("scheduled")
+  qualifyingThreshold    Float?
+  autoAdvanceProcessedAt DateTime?
+  paper                  Paper?
+  olympiad               Olympiad            @relation(fields: [olympiadId], references: [id])
+  roundEntrants          RoundEntrant[]
+  submissions            Submission[]
+  sittings               Sitting[]
+  notificationLogs       NotificationLog[]
+  notificationRules      NotificationRule[]
 }
 
 model User {
-  id                   String    @id @default(uuid())
-  clerkUserId          String?   @unique
-  email                String    @unique
-  role                 String
-  createdAt            DateTime  @default(now())
-  name                 String
-  passwordHash         String?
-  invitationToken      String?   @unique
-  invitationExpiresAt  DateTime?
-  educator             Educator?
-  entrant              Entrant?
+  id                    String          @id @default(uuid())
+  clerkUserId           String?         @unique
+  email                 String          @unique
+  role                  String
+  createdAt             DateTime        @default(now())
+  name                  String
+  passwordHash          String?
+  invitationToken       String?         @unique
+  invitationExpiresAt   DateTime?
+  educator              Educator?
+  entrant               Entrant?
+  assignedMarkingTasks  MarkingTask[]   @relation("AssignedMarkingTasks")
+  moderatedMarkingTasks MarkingTask[]   @relation("ModeratedMarkingTasks")
+  requestedRemarks      RemarkRequest[] @relation("RequestedRemarks")
+  reviewedRemarks       RemarkRequest[] @relation("ReviewedRemarks")
 }
 
 model School {
