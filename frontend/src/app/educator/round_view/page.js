@@ -232,6 +232,10 @@ function RoundViewContent() {
 
         <p className="description">This round is currently {round.state}.</p>
 
+        <Link href={`/rounds/${roundId}/standings`} className="button">
+          View Standings
+        </Link>
+
         {round.state === 'open' && (
           <>
             <button className="button" onClick={handleDownload}>

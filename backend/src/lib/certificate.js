@@ -1,122 +1,85 @@
 const PDFDocument = require('pdfkit');
 
 /**
- * Generates a certificate PDF buffer for an entrant's round completion.
+ * Generates a certificate of participation as a PDF, returned as a Buffer.
+ * A certificate is only issued for an entrant with a scored Result for the
+ * round — that eligibility check happens at the route level (#133), not
+ * here; this function just renders whatever data it's given.
  *
  * @param {{
  *   entrantName: string,
+ *   schoolName: string,
  *   roundName: string,
  *   olympiadName: string,
- *   schoolName: string,
- *   score: number|null,
- *   issuedDate: string,
+ *   score: number,
  * }} data
  * @returns {Promise<Buffer>}
  */
-function generateCertificate({
-  entrantName,
-  roundName,
-  olympiadName,
-  schoolName,
-  score,
-  issuedDate,
-}) {
+function generateCertificatePdf({ entrantName, schoolName, roundName, olympiadName, score }) {
   return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({ size: 'A4', landscape: true, margin: 0 });
-      const chunks = [];
+    const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 50 });
+    const chunks = [];
 
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
 
-      const { width, height } = doc.page;
+    const pageWidth = doc.page.width;
 
-      // ── Background ──────────────────────────────────────────────────
-      doc.rect(0, 0, width, height).fill('#fdfcff');
+    // Decorative border
+    doc
+      .rect(20, 20, pageWidth - 40, doc.page.height - 40)
+      .lineWidth(2)
+      .strokeColor('#4C3F82')
+      .stroke();
 
-      // ── Outer border ────────────────────────────────────────────────
-      doc.rect(24, 24, width - 48, height - 48).stroke('#7c3aed');
+    doc
+      .fontSize(12)
+      .fillColor('#6B6480')
+      .font('Helvetica')
+      .text(olympiadName.toUpperCase(), 0, 90, { align: 'center', characterSpacing: 2 });
 
-      // ── Inner border (thinner) ──────────────────────────────────────
-      doc.lineWidth(0.5);
-      doc.rect(34, 34, width - 68, height - 68).stroke('#a78bfa');
+    doc
+      .fontSize(32)
+      .fillColor('#211B33')
+      .font('Helvetica-Bold')
+      .text('Certificate of Participation', 0, 120, { align: 'center' });
 
-      // ── Olympiad name ───────────────────────────────────────────────
-      doc
-        .fontSize(14)
-        .fillColor('#6b7280')
-        .text(olympiadName.toUpperCase(), 0, 70, { width, align: 'center' });
+    doc
+      .fontSize(14)
+      .fillColor('#6B6480')
+      .font('Helvetica')
+      .text('This certifies that', 0, 190, { align: 'center' });
 
-      // ── "Certificate of Achievement" ────────────────────────────────
-      doc
-        .fontSize(36)
-        .fillColor('#7c3aed')
-        .text('Certificate of Achievement', 0, 110, { width, align: 'center' });
+    doc
+      .fontSize(26)
+      .fillColor('#211B33')
+      .font('Helvetica-Bold')
+      .text(entrantName, 0, 220, { align: 'center' });
 
-      // ── Divider line ────────────────────────────────────────────────
-      const lineY = 165;
-      doc
-        .moveTo(width * 0.3, lineY)
-        .lineTo(width * 0.7, lineY)
-        .strokeColor('#a78bfa')
-        .lineWidth(1)
-        .stroke();
+    doc
+      .fontSize(14)
+      .fillColor('#6B6480')
+      .font('Helvetica')
+      .text(`of ${schoolName}`, 0, 260, { align: 'center' });
 
-      // ── "This is presented to" ──────────────────────────────────────
-      doc.fontSize(14).fillColor('#6b7280').text('This is presented to', 0, 185, {
-        width,
+    doc
+      .fontSize(14)
+      .fillColor('#211B33')
+      .font('Helvetica')
+      .text(`participated in ${roundName}, scoring ${score.toFixed(2)}%.`, 0, 300, {
         align: 'center',
       });
 
-      // ── Entrant name ────────────────────────────────────────────────
-      doc.fontSize(32).fillColor('#1f2937').text(entrantName, 0, 215, {
-        width,
+    doc
+      .fontSize(10)
+      .fillColor('#6B6480')
+      .text(`Issued ${new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })}`, 0, 360, {
         align: 'center',
       });
 
-      // ── Underline beneath name ──────────────────────────────────────
-      const nameLineY = 260;
-      doc
-        .moveTo(width * 0.25, nameLineY)
-        .lineTo(width * 0.75, nameLineY)
-        .strokeColor('#d1d5db')
-        .lineWidth(0.5)
-        .stroke();
-
-      // ── School ──────────────────────────────────────────────────────
-      doc.fontSize(12).fillColor('#6b7280').text(schoolName, 0, 275, {
-        width,
-        align: 'center',
-      });
-
-      // ── Achievement description ─────────────────────────────────────
-      const description = `for successfully completing ${roundName}`;
-      doc.fontSize(14).fillColor('#374151').text(description, 0, 310, {
-        width,
-        align: 'center',
-      });
-
-      // ── Score (if available) ────────────────────────────────────────
-      if (score !== null && score !== undefined) {
-        doc.fontSize(18).fillColor('#7c3aed').text(`Score: ${score}`, 0, 345, {
-          width,
-          align: 'center',
-        });
-      }
-
-      // ── Date issued ─────────────────────────────────────────────────
-      const dateY = score !== null && score !== undefined ? 385 : 355;
-      doc.fontSize(10).fillColor('#9ca3af').text(`Issued: ${issuedDate}`, 0, dateY, {
-        width,
-        align: 'center',
-      });
-
-      doc.end();
-    } catch (err) {
-      reject(err);
-    }
+    doc.end();
   });
 }
 
-module.exports = { generateCertificate };
+module.exports = { generateCertificatePdf };
