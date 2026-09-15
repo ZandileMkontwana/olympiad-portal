@@ -206,8 +206,15 @@ export default function OrganiserDashboard() {
       <p className="description">
         Logged in as <strong>{user.email}</strong> ({user.role})
       </p>
-
       <div className="card" style={{ display: 'flex', gap: '12px' }}>
+        <Link href="/organiser/marking" className="button">
+          Marking
+        </Link>
+
+        <Link href="/organiser/remarks" className="button">
+          Remarks
+        </Link>
+
         <button onClick={handleLogout} className="button">
           Log out
         </button>

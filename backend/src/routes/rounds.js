@@ -314,7 +314,7 @@ router.post(
 
 router.post('/rounds', async (req, res) => {
   try {
-    const { olympiadId, name, openTime, closeTime } = req.body;
+    const { olympiadId, name, openTime, closeTime, qualifyingThreshold } = req.body;
     if (!olympiadId || !name || !openTime || !closeTime) {
       return res
         .status(400)
@@ -323,8 +323,25 @@ router.post('/rounds', async (req, res) => {
     if (new Date(closeTime) <= new Date(openTime)) {
       return res.status(400).json({ error: 'closeTime must be after openTime' });
     }
+    if (
+      qualifyingThreshold !== undefined &&
+      qualifyingThreshold !== null &&
+      (typeof qualifyingThreshold !== 'number' ||
+        qualifyingThreshold < 0 ||
+        qualifyingThreshold > 100)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'qualifyingThreshold must be a number between 0 and 100' });
+    }
     const round = await prisma.round.create({
-      data: { olympiadId, name, openTime: new Date(openTime), closeTime: new Date(closeTime) },
+      data: {
+        olympiadId,
+        name,
+        openTime: new Date(openTime),
+        closeTime: new Date(closeTime),
+        qualifyingThreshold: qualifyingThreshold ?? null,
+      },
     });
     res.status(201).json(round);
   } catch (err) {
@@ -456,7 +473,7 @@ router.get('/rounds/:id/submissions', async (req, res) => {
   try {
     const submissions = await prisma.submission.findMany({
       where: { roundId: req.params.id },
-      include: { result: true },
+      include: { result: true, entrant: true, remarkRequests: true },
     });
     res.json(submissions);
   } catch (err) {
@@ -465,6 +482,65 @@ router.get('/rounds/:id/submissions', async (req, res) => {
   }
 });
 
+// GET /rounds/:id/progression
+// A read-only preview of who would qualify for the next round based on
+// this round's qualifyingThreshold, without actually registering anyone.
+// Useful for organisers to check before/after a round closes.
+router.get('/rounds/:id/progression', async (req, res) => {
+  try {
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: {
+        roundEntrants: {
+          include: {
+            entrant: {
+              include: {
+                submissions: {
+                  where: { roundId: req.params.id },
+                  include: { result: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    if (round.qualifyingThreshold === null || round.qualifyingThreshold === undefined) {
+      return res.json({
+        roundId: round.id,
+        qualifyingThreshold: null,
+        entrants: [],
+        message: 'This round has no qualifyingThreshold set, so no entrants will be auto-advanced.',
+      });
+    }
+
+    const entrants = round.roundEntrants.map((roundEntrant) => {
+      const entrant = roundEntrant.entrant;
+      const submission = entrant.submissions[0];
+      const score = submission?.result?.score ?? null;
+      return {
+        entrantId: entrant.id,
+        name: entrant.name,
+        score,
+        qualifies: score !== null && score >= round.qualifyingThreshold,
+      };
+    });
+
+    res.json({
+      roundId: round.id,
+      qualifyingThreshold: round.qualifyingThreshold,
+      entrants,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to compute progression preview' });
+  }
+});
 // GET /rounds/:id/standings
 router.get('/rounds/:id/standings', async (req, res) => {
   try {
@@ -768,10 +844,13 @@ router.post('/rounds/:id/notifications/test', ...requireRole('organiser'), async
 
     const sentLogs = await prisma.notificationLog.findMany({
       where: { roundId, triggerType },
-      select: { recipientEmail: true },
+      select: { recipientEmail: true, entrantId: true },
     });
-    const alreadyEmailed = new Set(sentLogs.map((log) => log.recipientEmail));
-
+    const alreadyEmailed = new Set(
+      sentLogs.map((log) =>
+        log.entrantId ? `${log.recipientEmail}:${log.entrantId}` : log.recipientEmail
+      )
+    );
     const recipients = [];
     if (triggerType === 'missing_submission') {
       const coveredEmails = new Set();
@@ -786,7 +865,8 @@ router.post('/rounds/:id/notifications/test', ...requireRole('organiser'), async
             email,
             entrantId: entrant.id,
             entrantName: entrant.name,
-            alreadyNotified: alreadyEmailed.has(email) || coveredEmails.has(email),
+            alreadyNotified:
+              alreadyEmailed.has(`${email}:${entrant.id}`) || coveredEmails.has(email),
           });
           coveredEmails.add(email);
         }

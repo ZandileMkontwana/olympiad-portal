@@ -360,6 +360,34 @@ describe('api client', () => {
         expect.objectContaining({ method: 'POST' })
       );
     });
+
+    it('defaults qualifyingThreshold to null when not provided', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: '1' }),
+      });
+      await createRound({ olympiadId: '1', name: 'R1', openTime: '2026', closeTime: '2027' });
+      const [, options] = fetchMock.mock.calls[0];
+      expect(JSON.parse(options.body).qualifyingThreshold).toBeNull();
+    });
+
+    it('passes qualifyingThreshold through when provided', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: '1' }),
+      });
+      await createRound({
+        olympiadId: '1',
+        name: 'R1',
+        openTime: '2026',
+        closeTime: '2027',
+        qualifyingThreshold: 70,
+      });
+      const [, options] = fetchMock.mock.calls[0];
+      expect(JSON.parse(options.body).qualifyingThreshold).toBe(70);
+    });
   });
 
   describe('listOlympiadRounds', () => {

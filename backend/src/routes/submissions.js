@@ -34,8 +34,10 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
       data: { roundId, entrantId, answers, idempotencyKey },
     });
 
-    // Automark immediately if this round's paper has a memo answer key
+    // Automark immediately if this round's paper has a memo answer key.
+    // Otherwise, queue it for manual marking.
     let result = null;
+    let markingTask = null;
 
     if (round.paper && round.paper.memoAnswers) {
       const memo = round.paper.memoAnswers;
@@ -56,9 +58,15 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
           score,
         },
       });
+    } else {
+      markingTask = await prisma.markingTask.create({
+        data: {
+          submissionId: submission.id,
+        },
+      });
     }
 
-    res.status(201).json({ submission, result });
+    res.status(201).json({ submission, result, markingTask });
 
     // requireRole() already loaded the requester's DB record onto req.user
     const requester = req.user;
@@ -81,12 +89,46 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
     ) {
       const existing = await prisma.submission.findUnique({
         where: { idempotencyKey },
-        include: { result: true },
+        include: { result: true, markingTask: true },
       });
-      return res.status(200).json({ submission: existing, result: existing.result });
+      return res
+        .status(200)
+        .json({ submission: existing, result: existing.result, markingTask: existing.markingTask });
     }
     console.error(err);
     res.status(500).json({ error: 'Could not save submission' });
+  }
+});
+
+// POST /submissions/:id/remark
+// An educator requests a remark on a submission that's already been marked
+// (automarked or manually marked), explaining why in `reason`.
+router.post('/submissions/:id/remark', ...requireRole('educator'), async (req, res) => {
+  const submissionId = req.params.id;
+  const { reason } = req.body;
+
+  if (!reason) {
+    return res.status(400).json({ error: 'reason is required' });
+  }
+
+  try {
+    const submission = await prisma.submission.findUnique({ where: { id: submissionId } });
+    if (!submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    const remarkRequest = await prisma.remarkRequest.create({
+      data: {
+        submissionId,
+        requestedById: req.user.id,
+        reason,
+      },
+    });
+
+    res.status(201).json(remarkRequest);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not create remark request' });
   }
 });
 

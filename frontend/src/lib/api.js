@@ -147,10 +147,16 @@ export function declineAccessRequest(requestId, token) {
   });
 }
 
-export function createRound({ olympiadId, name, openTime, closeTime }) {
+export function createRound({ olympiadId, name, openTime, closeTime, qualifyingThreshold }) {
   return requestJson('/api/rounds', {
     method: 'POST',
-    body: JSON.stringify({ olympiadId, name, openTime, closeTime }),
+    body: JSON.stringify({
+      olympiadId,
+      name,
+      openTime,
+      closeTime,
+      qualifyingThreshold: qualifyingThreshold ?? null,
+    }),
   });
 }
 
@@ -622,5 +628,121 @@ export function testNotificationTrigger(roundId, triggerType, token) {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ triggerType }),
+  });
+}
+
+/**
+ * Lists marking tasks for organisers to work through.
+ * Wired to GET /api/marking/queue (backend/src/routes/marking.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @param {string} [status] - 'unassigned' (default), 'assigned', 'marked', 'moderated', or 'all'
+ */
+export function listMarkingQueue(token, status) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return requestJson(`/api/marking/queue${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Assigns a marking task to an organiser (defaults to the requester).
+ * Wired to PATCH /api/marking/:id/assign (backend/src/routes/marking.js).
+ *
+ * @param {string} taskId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @param {string} [assignedToId] - defaults to the requester on the backend
+ */
+export function assignMarkingTask(taskId, token, assignedToId) {
+  return requestJson(`/api/marking/${taskId}/assign`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(assignedToId ? { assignedToId } : {}),
+  });
+}
+
+/**
+ * Records a marker's score (with optional per-question breakdown) for a task.
+ * Wired to PATCH /api/marking/:id (backend/src/routes/marking.js).
+ *
+ * @param {string} taskId
+ * @param {{score: number, breakdown?: Record<string, number>}} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function submitMarking(taskId, { score, breakdown }, token) {
+  return requestJson(`/api/marking/${taskId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ score, breakdown }),
+  });
+}
+
+/**
+ * Records a moderator's reviewed score for an already-marked task.
+ * Wired to PATCH /api/marking/:id/moderate (backend/src/routes/marking.js).
+ *
+ * @param {string} taskId
+ * @param {number} moderatedScore
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function moderateMarkingTask(taskId, moderatedScore, token) {
+  return requestJson(`/api/marking/${taskId}/moderate`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ moderatedScore }),
+  });
+}
+
+/**
+ * Lists submissions for a round, with result and remark request info.
+ * Wired to GET /api/rounds/:id/submissions (backend/src/routes/rounds.js).
+ */
+export function listRoundSubmissions(roundId) {
+  return requestJson(`/api/rounds/${roundId}/submissions`);
+}
+
+/**
+ * Requests a remark on a submission, explaining why in `reason`.
+ * Wired to POST /api/submissions/:id/remark (backend/src/routes/submissions.js).
+ *
+ * @param {string} submissionId
+ * @param {string} reason
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function requestRemark(submissionId, reason, token) {
+  return requestJson(`/api/submissions/${submissionId}/remark`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/**
+ * Lists remark requests for organisers to review.
+ * Wired to GET /api/remark/queue (backend/src/routes/remark.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @param {string} [status] - 'pending' (default), 'approved', 'rejected', or 'all'
+ */
+export function listRemarkQueue(token, status) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return requestJson(`/api/remark/queue${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Approves or rejects a pending remark request. Approving requires newScore.
+ * Wired to PATCH /api/remark/:id/review (backend/src/routes/remark.js).
+ *
+ * @param {string} remarkRequestId
+ * @param {{status: 'approved'|'rejected', newScore?: number, reviewNotes?: string}} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function reviewRemarkRequest(remarkRequestId, { status, newScore, reviewNotes }, token) {
+  return requestJson(`/api/remark/${remarkRequestId}/review`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status, newScore, reviewNotes }),
   });
 }

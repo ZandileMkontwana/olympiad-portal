@@ -21,33 +21,39 @@ model Olympiad {
 }
 
 model Round {
-  id               String            @id @default(uuid())
-  olympiadId       String
-  name             String
-  openTime         DateTime
-  closeTime        DateTime
-  state            String            @default("scheduled")
-  paper            Paper?
-  olympiad         Olympiad          @relation(fields: [olympiadId], references: [id])
-  roundEntrants    RoundEntrant[]
-  submissions      Submission[]
-  sittings         Sitting[]
-  notificationLogs NotificationLog[]
-  notificationRules NotificationRule[]
+  id                     String              @id @default(uuid())
+  olympiadId             String
+  name                   String
+  openTime               DateTime
+  closeTime              DateTime
+  state                  String              @default("scheduled")
+  qualifyingThreshold    Float?
+  autoAdvanceProcessedAt DateTime?
+  paper                  Paper?
+  olympiad               Olympiad            @relation(fields: [olympiadId], references: [id])
+  roundEntrants          RoundEntrant[]
+  submissions            Submission[]
+  sittings               Sitting[]
+  notificationLogs       NotificationLog[]
+  notificationRules      NotificationRule[]
 }
 
 model User {
-  id                   String    @id @default(uuid())
-  clerkUserId          String?   @unique
-  email                String    @unique
-  role                 String
-  createdAt            DateTime  @default(now())
-  name                 String
-  passwordHash         String?
-  invitationToken      String?   @unique
-  invitationExpiresAt  DateTime?
-  educator             Educator?
-  entrant              Entrant?
+  id                    String          @id @default(uuid())
+  clerkUserId           String?         @unique
+  email                 String          @unique
+  role                  String
+  createdAt             DateTime        @default(now())
+  name                  String
+  passwordHash          String?
+  invitationToken       String?         @unique
+  invitationExpiresAt   DateTime?
+  educator              Educator?
+  entrant               Entrant?
+  assignedMarkingTasks  MarkingTask[]   @relation("AssignedMarkingTasks")
+  moderatedMarkingTasks MarkingTask[]   @relation("ModeratedMarkingTasks")
+  requestedRemarks      RemarkRequest[] @relation("RequestedRemarks")
+  reviewedRemarks       RemarkRequest[] @relation("ReviewedRemarks")
 }
 
 model School {
@@ -111,15 +117,34 @@ model Paper {
 }
 
 model Submission {
-  id             String   @id @default(uuid())
+  id             String          @id @default(uuid())
   roundId        String
   entrantId      String
   answers        Json
-  idempotencyKey String   @unique
-  submittedAt    DateTime @default(now())
+  idempotencyKey String          @unique
+  submittedAt    DateTime        @default(now())
   result         Result?
-  entrant        Entrant  @relation(fields: [entrantId], references: [id])
-  round          Round    @relation(fields: [roundId], references: [id])
+  markingTask    MarkingTask?
+  remarkRequests RemarkRequest[]
+  entrant        Entrant         @relation(fields: [entrantId], references: [id])
+  round          Round           @relation(fields: [roundId], references: [id])
+}
+
+model MarkingTask {
+  id             String     @id @default(uuid())
+  submissionId   String     @unique
+  status         String     @default("unassigned") // 'unassigned' | 'assigned' | 'marked' | 'moderated'
+  assignedToId   String?
+  score          Float?
+  breakdown      Json?      // per-question partial credit, e.g. { "q1": 3, "q2": 5 }
+  markedAt       DateTime?
+  moderatedById  String?
+  moderatedScore Float?
+  moderatedAt    DateTime?
+  createdAt      DateTime   @default(now())
+  submission     Submission @relation(fields: [submissionId], references: [id])
+  assignedTo     User?      @relation("AssignedMarkingTasks", fields: [assignedToId], references: [id])
+  moderatedBy    User?      @relation("ModeratedMarkingTasks", fields: [moderatedById], references: [id])
 }
 
 model Result {
@@ -128,6 +153,22 @@ model Result {
   score        Float
   releasedAt   DateTime?
   submission   Submission @relation(fields: [submissionId], references: [id])
+}
+
+model RemarkRequest {
+  id            String     @id @default(uuid())
+  submissionId  String
+  requestedById String
+  reason        String
+  status        String     @default("pending") // 'pending' | 'approved' | 'rejected'
+  newScore      Float?     // updated score, set when approved
+  reviewedById  String?
+  reviewNotes   String?
+  createdAt     DateTime   @default(now())
+  reviewedAt    DateTime?
+  submission    Submission @relation(fields: [submissionId], references: [id])
+  requestedBy   User       @relation("RequestedRemarks", fields: [requestedById], references: [id])
+  reviewedBy    User?      @relation("ReviewedRemarks", fields: [reviewedById], references: [id])
 }
 
 model RoundEntrant {

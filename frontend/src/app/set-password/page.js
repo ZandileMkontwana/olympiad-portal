@@ -71,8 +71,8 @@ function SetPasswordContent() {
       </h1>
       <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-4 text-center text-base text-ink-soft">
-        Your educator registered you for the Olympiad Portal. Choose a password to
-        activate your account — you&apos;ll use it with your student email to sign in.
+        Your educator registered you for the Olympiad Portal. Choose a password to activate your
+        account — you&apos;ll use it with your student email to sign in.
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
@@ -133,9 +133,7 @@ export default function SetPasswordPage() {
   return (
     <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
       <Watermark />
-      <Suspense
-        fallback={<p className="text-center text-base text-ink-soft">Loading…</p>}
-      >
+      <Suspense fallback={<p className="text-center text-base text-ink-soft">Loading…</p>}>
         <SetPasswordContent />
       </Suspense>
     </main>

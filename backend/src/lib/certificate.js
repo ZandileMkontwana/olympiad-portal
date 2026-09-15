@@ -74,9 +74,14 @@ function generateCertificatePdf({ entrantName, schoolName, roundName, olympiadNa
     doc
       .fontSize(10)
       .fillColor('#6B6480')
-      .text(`Issued ${new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })}`, 0, 360, {
-        align: 'center',
-      });
+      .text(
+        `Issued ${new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+        0,
+        360,
+        {
+          align: 'center',
+        }
+      );
 
     doc.end();
   });
