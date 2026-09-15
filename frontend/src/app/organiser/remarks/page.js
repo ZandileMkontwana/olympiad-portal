@@ -148,6 +148,47 @@ export default function RemarksPage() {
             &ldquo;{selected.reason}&rdquo;
           </p>
 
+          {selected.submission?.answers && (
+            <div style={{ marginBottom: '16px' }}>
+              <p style={{ fontWeight: 600, marginBottom: '6px' }}>Submitted answers</p>
+              <ul
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  paddingLeft: 0,
+                  listStyle: 'none',
+                }}
+              >
+                {Object.entries(selected.submission.answers).map(([qId, answer]) => {
+                  const breakdown = selected.submission?.markingTask?.breakdown;
+                  const questionMark = breakdown?.[qId];
+                  return (
+                    <li
+                      key={qId}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        fontSize: '0.9em',
+                        borderBottom: '1px solid #eee',
+                        paddingBottom: '4px',
+                      }}
+                    >
+                      <span style={{ minWidth: '80px', fontWeight: 500 }}>Q{qId}</span>
+                      <span style={{ flex: 1 }}>{String(answer)}</span>
+                      {questionMark !== undefined && (
+                        <span className="description" style={{ whiteSpace: 'nowrap' }}>
+                          originally: {questionMark}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '16px', margin: '12px 0' }}>
             <label>
               <input
