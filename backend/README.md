@@ -89,7 +89,9 @@ backend/
 │       └── auth.js         # register/login/etc.
 ```
 
-link to Olympiad Portal documentation: https://olympiad-portal-docs.netlify.app/
+## Documentation
+
+Full project documentation is deployed at <https://olympiad-portal-docs.netlify.app>.
 
 ## Database
 Uses PostgreSQL (hosted on Supabase) via Prisma. Run migrations with:
