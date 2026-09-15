@@ -9,6 +9,30 @@ export class ApiError extends Error {
     this.status = status;
   }
 }
+export function releaseResults(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/release-results`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+export function unreleaseResults(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/unrelease-results`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+export function fetchSchoolDashboard(schoolId, token) {
+  return requestJson(`/api/schools/${schoolId}/dashboard`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+export function resendEntrantInvite(entrantId, token, body = {}) {
+  return requestJson(`/api/entrants/${entrantId}/resend-invite`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+}
 
 /**
  * Shared JSON request helper — handles network failures, non-JSON error
