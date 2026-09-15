@@ -1,10 +1,9 @@
 ---
 sidebar_position: 1
 ---
-
 # Getting Started — Backend
 
-The backend is deployed at <https://olympiad-portal.onrender.com> — everything below is only needed for local development.
+The backend is deployed at `https://olympiad-portal.onrender.com` — everything below is only needed for local development.
 
 ## Prerequisites
 - **Node.js 20 (LTS)** — newer versions (22+) have caused compatibility issues with our dependencies. Use [nvm-windows](https://github.com/coreybutler/nvm-windows) to manage versions if needed:
