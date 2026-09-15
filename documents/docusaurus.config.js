@@ -24,7 +24,7 @@ const config = {
   },
 
   // Set the production url of your site here
-  url: 'https://loquacious-fairy-d08618.netlify.app',
+  url: 'https://olympiad-portal-docs.netlify.app',
   // Set the /<baseUrl>/ pathname under which your site is served
   baseUrl: '/',
 

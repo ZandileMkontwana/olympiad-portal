@@ -2,6 +2,8 @@
 
 This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
 
+**Live site:** <https://olympiad-portal-docs.netlify.app>
+
 ## Installation
 
 ```bash
@@ -28,16 +30,11 @@ This command generates static content into the `build` directory and can be serv
 
 ## Deployment
 
-Using SSH:
+Docs deploy automatically to Netlify: every push to `main` runs [`../.gitea/workflows/deploy-docs.yml`](../.gitea/workflows/deploy-docs.yml), which builds this folder and publishes the `build/` directory. There is nothing to run manually — merge or push to `main` and the site updates a few minutes later.
+
+Manual fallback (needs the Netlify CLI linked to the site in `documents/.netlify/state.json`):
 
 ```bash
-USE_SSH=true npm run deploy
+npm run build
+npx netlify deploy --prod --dir=build
 ```
-
-Not using SSH:
-
-```bash
-GIT_USER=<Your GitHub username> npm run deploy
-```
-
-If you are using GitHub Pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.

@@ -113,7 +113,9 @@ backend/
 │       └── auth.js         # register/login/etc.
 ```
 
-link to Olympiad Portal documentation: https://olympiad-portal-docs.netlify.app/
+## Documentation
+
+Full project documentation (getting started, API reference, database schema, sprint records) is deployed at <https://olympiad-portal-docs.netlify.app> and lives in [`documents/docs/`](./documents/docs/).
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
