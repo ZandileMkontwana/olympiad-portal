@@ -1,31 +1,23 @@
 'use client';
 
 // Student test-taking page (Story A2: Start an online sitting).
-// Loads an open round's paper and lets a registered entrant answer
-// questions directly in the browser.
+// Uses the student JWT session (email + password login) and starts the
+// sitting directly — no name dropdown needed.
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@clerk/nextjs';
-import {
-  createSitting,
-  saveSittingAnswers,
-  submitSitting,
-  fetchRoundEntrants,
-  ApiError,
-} from '@/lib/api';
+import { useStudentAuth } from '@/hooks/useStudentAuth';
+import { createSitting, saveSittingAnswers, submitSitting, ApiError } from '@/lib/api';
 
 function SitContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const roundId = searchParams.get('id');
 
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { user, checking, getToken } = useStudentAuth();
 
-  const [entrants, setEntrants] = useState([]);
-  const [selectedEntrantId, setSelectedEntrantId] = useState('');
-  const [phase, setPhase] = useState('picking'); // 'picking' | 'sitting'
+  const [phase, setPhase] = useState('loading'); // 'loading' | 'sitting' | 'error'
   const [sittingData, setSittingData] = useState(null);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(false);
@@ -36,12 +28,12 @@ function SitContent() {
   const [submitted, setSubmitted] = useState(false);
   const dirtyRef = useRef(false);
 
-  // Require sign-in
+  // Require a student session
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
+    if (!checking && !user) {
       router.replace('/login');
     }
-  }, [isLoaded, isSignedIn, router]);
+  }, [checking, user, router]);
 
   // Live countdown to the sitting's expiry (round close time)
   useEffect(() => {
@@ -49,26 +41,52 @@ function SitContent() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load the round's entrants so the student can pick who they are.
-  // (Until D3 links Clerk accounts to entrant records, the student
-  // identifies themselves by name.)
+  // Start the sitting directly for the signed-in student's entrant record.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || !roundId) return;
+    if (checking || !user || !roundId) return;
 
     let cancelled = false;
-    fetchRoundEntrants(roundId)
-      .then((data) => {
-        if (cancelled) return;
-        setEntrants(data);
-      })
-      .catch(() => {
-        if (!cancelled) setError('Could not load entrants for this round.');
-      });
+
+    async function start() {
+      try {
+        const token = await getToken();
+
+        if (!user.entrantId) {
+          if (!cancelled) {
+            setError(
+              'Your account is not linked to a student record. Please contact your educator.'
+            );
+            setPhase('error');
+          }
+          return;
+        }
+
+        // Try to create (or resume) the sitting directly
+        const data = await createSitting(roundId, user.entrantId, token);
+        if (!cancelled) {
+          setSittingData(data);
+          setAnswers(data.sitting.answers || {});
+          setPhase('sitting');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Sit page error:', err);
+          const message =
+            err instanceof ApiError
+              ? err.message
+              : err?.message || 'Could not start the test. Please contact your educator.';
+          setError(message);
+          setPhase('error');
+        }
+      }
+    }
+
+    start();
 
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, roundId]);
+  }, [checking, user, roundId, getToken]);
 
   const questions = useMemo(
     () => (sittingData ? sittingData.paper.questions.sort((a, b) => Number(a) - Number(b)) : []),
@@ -106,25 +124,6 @@ function SitContent() {
     return () => clearTimeout(timer);
   }, [answers, phase, sittingData, getToken]);
 
-  async function handleStartSitting() {
-    if (!selectedEntrantId) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const token = await getToken();
-      const data = await createSitting(roundId, selectedEntrantId, token);
-      setSittingData(data);
-      setAnswers(data.sitting.answers || {});
-      setPhase('sitting');
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not start the sitting.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function updateAnswer(questionId, value) {
     dirtyRef.current = true;
     setSaveState('idle');
@@ -132,8 +131,16 @@ function SitContent() {
   }
 
   // Submit (Story A5): flush any unsaved answers first so the server marks
-  // what the student sees on screen, then submit the sitting for marking.
+  // what the student sees on screen, then submit the test for marking.
   async function handleSubmitSitting() {
+    if (
+      !window.confirm(
+        `Submit your answers? You answered ${answeredCount} of ${questions.length} questions. This can't be undone.`
+      )
+    ) {
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -149,7 +156,7 @@ function SitContent() {
       setSubmitted(true);
     } catch (err) {
       dirtyRef.current = true;
-      setError(err instanceof ApiError ? err.message : 'Could not submit the sitting.');
+      setError(err instanceof ApiError ? err.message : 'Could not submit the test.');
     } finally {
       setSubmitting(false);
     }
@@ -157,7 +164,7 @@ function SitContent() {
 
   const answeredCount = questions.filter((q) => answers[q]).length;
 
-  if (!isLoaded || !isSignedIn) {
+  if (checking || !user) {
     return (
       <main className="round-page">
         <p>Loading...</p>
@@ -173,60 +180,55 @@ function SitContent() {
     );
   }
 
+  if (phase === 'loading') {
+    return (
+      <main className="round-page">
+        <h1>Take a Test</h1>
+        <p className="description" style={{ fontSize: '1.1rem' }}>
+          Loading your test…
+        </p>
+      </main>
+    );
+  }
+
+  if (phase === 'error') {
+    return (
+      <main className="round-page">
+        <h1>Take a Test</h1>
+        <div
+          role="alert"
+          className="message"
+          style={{
+            border: '1px solid rgba(224,97,95,0.3)',
+            borderRadius: '8px',
+            padding: '16px',
+            background: 'rgba(224,97,95,0.05)',
+            color: '#e0615f',
+          }}
+        >
+          {error}
+        </div>
+        <p style={{ marginTop: '24px' }}>
+          <Link href="/student" className="button">
+            &larr; Back to dashboard
+          </Link>
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="round-page">
-      <h1>{phase === 'sitting' && sittingData ? sittingData.round.name : 'Take a Test'}</h1>
+      <h1>{sittingData ? sittingData.round.name : 'Take a Test'}</h1>
 
       {error && <p className="message">{error}</p>}
 
-      {phase === 'picking' && (
+      {sittingData && !submitted && (
         <>
-          <p className="description">
-            Select your name to start. You must be registered for this round, and the round must be
-            open.
-          </p>
-
-          {entrants.length === 0 && !error && (
-            <p className="description">
-              No entrants registered for this round yet. Ask your educator to register you.
-            </p>
-          )}
-
-          {entrants.length > 0 && (
-            <div className="card" style={{ padding: '16px' }}>
-              <label htmlFor="entrant-select" style={{ display: 'block', marginBottom: '8px' }}>
-                Who are you?
-              </label>
-              <select
-                id="entrant-select"
-                value={selectedEntrantId}
-                onChange={(e) => setSelectedEntrantId(e.target.value)}
-                style={{ width: '100%', padding: '8px', marginBottom: '12px' }}
-              >
-                <option value="">— Select your name —</option>
-                {entrants.map((entrant) => (
-                  <option key={entrant.id} value={entrant.id}>
-                    {entrant.name} (Grade {entrant.grade})
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={handleStartSitting}
-                disabled={!selectedEntrantId || loading}
-                className="button"
-              >
-                {loading ? 'Starting…' : 'Start sitting'}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      {phase === 'sitting' && sittingData && !submitted && (
-        <>
-          <p className="description" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <p
+            className="description"
+            style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '1.1rem' }}
+          >
             <span>
               Time remaining:{' '}
               <strong style={{ color: timeRemaining === 'expired' ? '#dc2626' : undefined }}>
@@ -247,7 +249,7 @@ function SitContent() {
 
           {timeRemaining === 'expired' && (
             <p className="message">
-              This sitting has expired — the round has closed. Your saved answers remain on record.
+              This test has expired — the round has closed. Your saved answers remain on record.
             </p>
           )}
 
@@ -256,19 +258,19 @@ function SitContent() {
               No answerable questions found for this paper yet. You can still view the paper below.
             </p>
           ) : (
-            <div className="card" style={{ padding: '16px' }}>
+            <div className="card" style={{ padding: '24px' }}>
               {questions.map((q) => (
                 <div
                   key={q}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
-                    padding: '10px 0',
+                    gap: '16px',
+                    padding: '14px 0',
                     borderBottom: '1px solid rgba(139, 92, 246, 0.15)',
                   }}
                 >
-                  <strong style={{ minWidth: '40px' }}>Q{q}</strong>
+                  <strong style={{ minWidth: '56px', fontSize: '1.15rem' }}>Q{q}</strong>
                   <input
                     type="text"
                     maxLength={1}
@@ -277,9 +279,10 @@ function SitContent() {
                     onChange={(e) => updateAnswer(q, e.target.value)}
                     disabled={timeRemaining === 'expired'}
                     style={{
-                      width: '48px',
+                      width: '60px',
                       textAlign: 'center',
-                      padding: '8px',
+                      padding: '10px',
+                      fontSize: '1.15rem',
                     }}
                     aria-label={`Answer for question ${q}`}
                   />
@@ -311,14 +314,14 @@ function SitContent() {
             onClick={handleSubmitSitting}
             disabled={submitting || timeRemaining === 'expired'}
             className="button"
-            style={{ marginTop: '8px' }}
+            style={{ marginTop: '8px', fontSize: '17px' }}
           >
-            {submitting ? 'Submitting…' : 'Submit sitting'}
+            {submitting ? 'Submitting…' : 'Submit test'}
           </button>
         </>
       )}
 
-      {phase === 'sitting' && sittingData && submitted && (
+      {sittingData && submitted && (
         <div className="card" style={{ padding: '24px' }}>
           <h2 style={{ marginTop: 0 }}>Submission received</h2>
           <p className="description">
@@ -335,8 +338,8 @@ function SitContent() {
       )}
 
       <p style={{ marginTop: '24px' }}>
-        <Link href={`/educator/round_view?id=${roundId}`} className="button">
-          ← Back to round
+        <Link href="/student" className="button">
+          &larr; Back to dashboard
         </Link>
       </p>
     </main>

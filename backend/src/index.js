@@ -10,7 +10,11 @@ const sittingsRouter = require('./routes/sittings');
 const entrantsRouter = require('./routes/entrants');
 const markingRouter = require('./routes/marking');
 const remarkRouter = require('./routes/remark');
+const schoolsRouter = require('./routes/schools');
+const studentsRouter = require('./routes/students');
 const authRouter = require('./routes/auth');
+const studentAuthRouter = require('./routes/studentAuth');
+const certificatesRouter = require('./routes/certificates');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
 
@@ -35,7 +39,23 @@ app.use('/api', sittingsRouter);
 app.use('/api', entrantsRouter);
 app.use('/api', markingRouter);
 app.use('/api', remarkRouter);
+app.use('/api', schoolsRouter);
+app.use('/api', studentsRouter);
 app.use('/api', authRouter);
+app.use('/api', studentAuthRouter);
+app.use('/api', certificatesRouter);
+
+// JSON 404 for unmatched /api routes (prevents Express's default HTML response)
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });
+});
+
+// Global error handler — always returns JSON
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: err.message || 'Internal server error' });
+});
 
 // 404 handler — anything that didn't match a route above
 app.use((req, res) => {

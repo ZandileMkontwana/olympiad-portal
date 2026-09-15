@@ -1,10 +1,22 @@
+require('dotenv').config();
 const prisma = require('../src/lib/prisma');
 const { clerkClient } = require('@clerk/express');
 
+// Creates an organiser account: a Clerk user (for sign-in) plus our database
+// record with role 'organiser'. Safe to re-run — skips anything that exists.
+//
+// Usage (run from backend/):
+//   node prisma/seed.js
+//   node prisma/seed.js --email you@example.com --password S3cret!23 --name "Your Name"
+function argValue(flag) {
+  const index = process.argv.indexOf(flag);
+  return index !== -1 && process.argv[index + 1] ? process.argv[index + 1] : null;
+}
+
 async function main() {
-  const email = 'shaunmlungisi4@gmail.com';
-  const password = 'FirstOrganiser1234!!';
-  const name = 'Portal Organiser';
+  const email = argValue('--email') || 'zsikelelwa7@gmail.com';
+  const password = argValue('--password') || 'Codecrafters@2026';
+  const name = argValue('--name') || 'Portal Organiser';
 
   // Check if this email already has a Clerk account
   const existingUsers = await clerkClient.users.getUserList({ emailAddress: [email] });

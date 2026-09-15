@@ -219,7 +219,10 @@ export default function OrganiserDashboard() {
                     }
 
                     return (
-                      <li key={round.id}>
+                      <li
+                        key={round.id}
+                        style={{ display: 'flex', alignItems: 'stretch', gap: '6px' }}
+                      >
                         <Link
                           href={href}
                           style={{
@@ -230,12 +233,28 @@ export default function OrganiserDashboard() {
                             border: '1px solid rgba(139, 92, 246, 0.2)',
                             textDecoration: 'none',
                             fontSize: '0.9em',
+                            flex: 1,
                           }}
                         >
                           <span>{round.name}</span>
                           <span style={{ textTransform: 'capitalize', opacity: 0.7 }}>
                             {round.state}
                           </span>
+                        </Link>
+                        <Link
+                          href={`/rounds/${round.id}/notifications`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(139, 92, 246, 0.2)',
+                            textDecoration: 'none',
+                            fontSize: '0.85em',
+                            color: 'rgba(139, 92, 246, 0.9)',
+                          }}
+                        >
+                          Notifications
                         </Link>
                       </li>
                     );

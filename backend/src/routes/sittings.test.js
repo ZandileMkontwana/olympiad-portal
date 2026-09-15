@@ -41,6 +41,8 @@ describe('Sittings routes', () => {
   beforeEach(() => {
     vi.spyOn(prisma.round, 'findUnique');
     vi.spyOn(prisma.roundEntrant, 'findUnique');
+    vi.spyOn(prisma.roundEntrant, 'upsert');
+    vi.spyOn(prisma.sitting, 'upsert');
     vi.spyOn(prisma.sitting, 'findUnique');
     vi.spyOn(prisma.sitting, 'create');
     vi.spyOn(prisma.sitting, 'update');
@@ -52,10 +54,11 @@ describe('Sittings routes', () => {
     // no existing sitting.
     prisma.round.findUnique.mockResolvedValue(openRound);
     prisma.roundEntrant.findUnique.mockResolvedValue({ id: 're-1' });
+    prisma.roundEntrant.upsert.mockResolvedValue({ id: 're-1' });
     prisma.sitting.findUnique.mockResolvedValue(null);
     prisma.submission.findUnique.mockResolvedValue(null);
     prisma.submission.create.mockResolvedValue(null);
-    prisma.sitting.create.mockResolvedValue({
+    prisma.sitting.upsert.mockResolvedValue({
       id: 'sitting-1',
       entrantId: 'entrant-1',
       roundId: 'round-1',
@@ -81,12 +84,12 @@ describe('Sittings routes', () => {
   });
 
   describe('POST /api/rounds/:id/sittings', () => {
-    it('creates a sitting and returns 201 with questions (no answer key)', async () => {
+    it('creates a sitting and returns 200 with questions (no answer key)', async () => {
       const res = await request(app)
         .post('/api/rounds/round-1/sittings')
         .send({ entrantId: 'entrant-1' });
 
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(200);
       expect(res.body.sitting.id).toBe('sitting-1');
       expect(res.body.round.name).toBe('Round 1');
       expect(res.body.paper.fileUrl).toBe(openRound.paper.fileUrl);
@@ -96,8 +99,10 @@ describe('Sittings routes', () => {
       expect(JSON.stringify(res.body)).not.toContain('memoAnswers');
       // expiresAt is the round's close time (the time limit)
       expect(res.body.sitting.expiresAt).toBe(openRound.closeTime.toISOString());
-      expect(prisma.sitting.create).toHaveBeenCalledWith({
-        data: { roundId: 'round-1', entrantId: 'entrant-1', expiresAt: openRound.closeTime },
+      expect(prisma.sitting.upsert).toHaveBeenCalledWith({
+        where: { roundId_entrantId: { roundId: 'round-1', entrantId: 'entrant-1' } },
+        create: { roundId: 'round-1', entrantId: 'entrant-1', expiresAt: openRound.closeTime },
+        update: {},
       });
     });
 
@@ -134,17 +139,21 @@ describe('Sittings routes', () => {
       expect(res.body.error).toMatch(/No paper uploaded/);
     });
 
-    it('returns 403 when entrant is not registered for the round', async () => {
-      prisma.roundEntrant.findUnique.mockResolvedValue(null);
+    it('auto-registers the entrant when not already registered for the round', async () => {
+      prisma.roundEntrant.upsert.mockResolvedValue({ id: 're-new' });
       const res = await request(app)
         .post('/api/rounds/round-1/sittings')
         .send({ entrantId: 'entrant-1' });
-      expect(res.status).toBe(403);
-      expect(res.body.error).toMatch(/not registered/);
+      expect(res.status).toBe(200);
+      expect(prisma.roundEntrant.upsert).toHaveBeenCalledWith({
+        where: { roundId_entrantId: { roundId: 'round-1', entrantId: 'entrant-1' } },
+        create: { roundId: 'round-1', entrantId: 'entrant-1' },
+        update: {},
+      });
     });
 
     it('returns 403 when the entrant already completed a sitting', async () => {
-      prisma.sitting.findUnique.mockResolvedValue({
+      prisma.sitting.upsert.mockResolvedValue({
         id: 'sitting-old',
         entrantId: 'entrant-1',
         roundId: 'round-1',
@@ -160,11 +169,10 @@ describe('Sittings routes', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error).toMatch(/already completed/);
-      expect(prisma.sitting.create).not.toHaveBeenCalled();
     });
 
     it('resumes an in-progress sitting with 200 instead of creating a new one', async () => {
-      prisma.sitting.findUnique.mockResolvedValue({
+      prisma.sitting.upsert.mockResolvedValue({
         id: 'sitting-existing',
         entrantId: 'entrant-1',
         roundId: 'round-1',
@@ -182,11 +190,10 @@ describe('Sittings routes', () => {
       expect(res.body.sitting.id).toBe('sitting-existing');
       // Saved answers are restored for resume (Story A4)
       expect(res.body.sitting.answers).toEqual({ 1: 'B' });
-      expect(prisma.sitting.create).not.toHaveBeenCalled();
     });
 
     it('returns 403 when resuming a sitting past its expiry', async () => {
-      prisma.sitting.findUnique.mockResolvedValue({
+      prisma.sitting.upsert.mockResolvedValue({
         id: 'sitting-existing',
         entrantId: 'entrant-1',
         roundId: 'round-1',
@@ -202,7 +209,6 @@ describe('Sittings routes', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error).toMatch(/expired/);
-      expect(prisma.sitting.create).not.toHaveBeenCalled();
     });
 
     it('returns 401 when not authenticated', async () => {
@@ -224,7 +230,7 @@ describe('Sittings routes', () => {
         .post('/api/rounds/round-1/sittings')
         .send({ entrantId: 'entrant-1' });
       expect(res.status).toBe(500);
-      expect(res.body.error).toMatch(/Could not start sitting/);
+      expect(res.body.error).toMatch(/Could not start the test/);
     });
   });
 
@@ -287,7 +293,7 @@ describe('Sittings routes', () => {
         .send({ answers: { 1: 'A' } });
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Sitting not found');
+      expect(res.body.error).toBe('Test not found');
     });
 
     it('returns 403 when the sitting is already completed', async () => {
@@ -301,7 +307,7 @@ describe('Sittings routes', () => {
         .send({ answers: { 1: 'A' } });
 
       expect(res.status).toBe(403);
-      expect(res.body.error).toBe('Sitting already completed');
+      expect(res.body.error).toBe('Test already completed');
       expect(prisma.sitting.update).not.toHaveBeenCalled();
     });
 
@@ -423,7 +429,7 @@ describe('Sittings routes', () => {
       const res = await request(app).post('/api/sittings/nope/submit');
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Sitting not found');
+      expect(res.body.error).toBe('Test not found');
     });
 
     it('returns 403 when already completed and no submission exists', async () => {
@@ -435,7 +441,7 @@ describe('Sittings routes', () => {
       const res = await request(app).post('/api/sittings/sitting-1/submit');
 
       expect(res.status).toBe(403);
-      expect(res.body.error).toBe('Sitting already completed');
+      expect(res.body.error).toBe('Test already completed');
       expect(prisma.submission.create).not.toHaveBeenCalled();
     });
 
@@ -474,7 +480,7 @@ describe('Sittings routes', () => {
       const res = await request(app).post('/api/sittings/sitting-1/submit');
 
       expect(res.status).toBe(500);
-      expect(res.body.error).toMatch(/Could not submit sitting/);
+      expect(res.body.error).toMatch(/Could not submit the test/);
     });
   });
 });

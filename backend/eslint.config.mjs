@@ -13,6 +13,8 @@ export default defineConfig([
       globals: globals.node,
     },
     rules: {
+      // Intentionally-unused args are marked with a leading underscore,
+      // e.g. the `_next` Express requires in 4-arg error handlers.
       "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },

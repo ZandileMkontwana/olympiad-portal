@@ -25,9 +25,9 @@ We use **Husky** and **lint-staged**, configured at the repo root, to automatica
 - If linting fails, the commit is blocked until the issues are fixed (or auto-fixed by `--fix`/`--write`).
 ### Continuous integration
  
-A Gitea Actions workflow (`.gitea/workflows/lint.yml`) runs ESLint against both `backend/` and `frontend/` on every push and on pull requests targeting `main`.
+A Gitea Actions workflow (`.gitea/workflows/lint.yml`, named "Lint and Test") runs ESLint against both `backend/` and `frontend/` on every push and on pull requests targeting `main`. The same workflow also runs both Vitest test suites, so lint or test failures both block a PR.
  
-> **Status**: this workflow is written and committed, but cannot execute yet — the Wits Gitea instance does not currently have a runner registered. It will start running automatically once a runner is available.
+> **Status**: runs automatically
  
 ### Commit conventions
  

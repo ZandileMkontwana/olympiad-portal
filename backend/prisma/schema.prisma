@@ -44,6 +44,33 @@ model User {
   moderatedMarkingTasks  MarkingTask[]   @relation("ModeratedMarkingTasks")
   requestedRemarks       RemarkRequest[] @relation("RequestedRemarks")
   reviewedRemarks        RemarkRequest[] @relation("ReviewedRemarks")
+  id               String            @id @default(uuid())
+  olympiadId       String
+  name             String
+  openTime         DateTime
+  closeTime        DateTime
+  state            String            @default("scheduled")
+  paper            Paper?
+  olympiad         Olympiad          @relation(fields: [olympiadId], references: [id])
+  roundEntrants    RoundEntrant[]
+  submissions      Submission[]
+  sittings         Sitting[]
+  notificationLogs NotificationLog[]
+  notificationRules NotificationRule[]
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  clerkUserId          String?   @unique
+  email                String    @unique
+  role                 String
+  createdAt            DateTime  @default(now())
+  name                 String
+  passwordHash         String?
+  invitationToken      String?   @unique
+  invitationExpiresAt  DateTime?
+  educator             Educator?
+  entrant              Entrant?
 }
 
 model School {
@@ -68,7 +95,9 @@ model Entrant {
   schoolId         String
   name             String
   grade            String
+  userId           String?           @unique
   school           School            @relation(fields: [schoolId], references: [id])
+  user             User?             @relation(fields: [userId], references: [id])
   roundEntrants    RoundEntrant[]
   submissions      Submission[]
   sittings         Sitting[]
@@ -181,4 +210,17 @@ model NotificationLog {
   entrant        Entrant? @relation(fields: [entrantId], references: [id])
 
   @@unique([roundId, triggerType, recipientEmail])
+}
+
+model NotificationRule {
+  id            String   @id @default(uuid())
+  roundId       String
+  triggerType   String // 'before_open' | 'before_close' | 'missing_submission' | 'results_released'
+  enabled       Boolean  @default(true)
+  recipientRole String   @default("educator") // 'educator' | 'organiser' | 'all'
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  round         Round    @relation(fields: [roundId], references: [id])
+
+  @@unique([roundId, triggerType])
 }

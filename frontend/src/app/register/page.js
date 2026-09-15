@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SignUp, useAuth } from '@clerk/nextjs';
+import { fetchCurrentUser, dashboardPathForRole } from '@/lib/api';
 
 function Watermark() {
   return (
@@ -86,11 +88,11 @@ function CompleteProfileForm() {
   return (
     <div className="relative">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
-        Finish setting up your account
+        Educator setup
       </h1>
       <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-4 text-center text-sm text-ink-soft">
-        You&apos;re signed in — just need your name and school to finish.
+        Enter your name and school to finish setting up your educator account.
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
@@ -156,22 +158,71 @@ function CompleteProfileForm() {
 }
 
 export default function RegisterPage() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
 
-  if (!isLoaded) {
+  // Educator registration only — students are registered by their educator
+  // and activate their account via an emailed invitation link.
+
+  // Check if the signed-in user already has a completed profile.
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    async function check() {
+      const token = await getToken();
+      const user = await fetchCurrentUser(token);
+      if (user) {
+        // Profile already completed — go to their dashboard
+        router.replace(dashboardPathForRole(user.role));
+      } else {
+        setChecking(false);
+      }
+    }
+    check();
+  }, [isLoaded, isSignedIn, getToken, router]);
+
+  if (!isLoaded || (isSignedIn && checking)) {
     return <main className="mx-auto max-w-md px-8 py-24 text-center">Loading…</main>;
   }
 
+  // Signed in with no profile — show the educator form directly
+  if (isSignedIn && !checking) {
+    return (
+      <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
+        <Watermark />
+        <CompleteProfileForm />
+      </main>
+    );
+  }
+
+  // Not signed in — Clerk sign up, plus a note for students
   return (
     <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
       <Watermark />
-      {isSignedIn ? (
-        <CompleteProfileForm />
-      ) : (
-        <div className="relative flex justify-center">
+      <div className="relative">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink text-center">
+          Educator sign up
+        </h1>
+        <div className="mx-auto mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
+        <p className="mt-4 text-center text-sm text-ink-soft">
+          Create your account to manage students and rounds for your school.
+        </p>
+        <div className="mt-6 flex justify-center">
           <SignUp routing="hash" signInUrl="/login" fallbackRedirectUrl="/register" />
         </div>
-      )}
+        <div className="mt-6 rounded-md border border-lavender/25 bg-lavender/5 p-4 text-sm text-ink-soft">
+          <p className="font-semibold text-ink">Are you a student?</p>
+          <p className="mt-1">
+            You don&apos;t need to create an account — your educator registers you and emails you a
+            link to set your password. Then just{' '}
+            <a href="/login" className="font-medium text-lavender-deep hover:underline">
+              sign in
+            </a>{' '}
+            with your student email.
+          </p>
+        </div>
+      </div>
     </main>
   );
 }

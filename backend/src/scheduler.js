@@ -10,6 +10,41 @@ const {
 const NOTIFY_BEFORE_OPEN_MS = 60 * 60 * 1000; // 1 hour
 const NOTIFY_BEFORE_CLOSE_MS = 60 * 60 * 1000; // 1 hour
 
+/**
+ * When a round transitions from 'scheduled' to 'open', register all existing
+ * entrants for it. This handles entrants that were created before the round
+ * opened (the per-entrant auto-registration in entrants.js only fires at
+ * creation time, so previously created entrants would be missed).
+ */
+async function registerEntrantsForNewlyOpenRounds() {
+  const openRounds = await prisma.round.findMany({
+    where: { state: 'open' },
+    select: { id: true },
+  });
+  if (openRounds.length === 0) return;
+
+  const entrants = await prisma.entrant.findMany({ select: { id: true } });
+  if (entrants.length === 0) return;
+
+  for (const round of openRounds) {
+    const existing = await prisma.roundEntrant.findMany({
+      where: { roundId: round.id },
+      select: { entrantId: true },
+    });
+    const existingIds = new Set(existing.map((re) => re.entrantId));
+    const toCreate = entrants
+      .filter((e) => !existingIds.has(e.id))
+      .map((e) => ({ roundId: round.id, entrantId: e.id }));
+
+    if (toCreate.length > 0) {
+      await prisma.roundEntrant.createMany({
+        data: toCreate,
+        skipDuplicates: true,
+      });
+    }
+  }
+}
+
 function startScheduler() {
   cron.schedule('*/30 * * * * *', async () => {
     const now = new Date();
@@ -20,6 +55,8 @@ function startScheduler() {
     });
     if (opened.count > 0) {
       console.log(`Opened ${opened.count} round(s) at ${now.toISOString()}`);
+      // Register all existing entrants for newly opened rounds
+      await registerEntrantsForNewlyOpenRounds();
     }
 
     const closed = await prisma.round.updateMany({
@@ -122,6 +159,23 @@ async function getRecipientsForRound(round) {
   return recipientEmails;
 }
 
+// Checks whether a given trigger type is enabled for a round. If no
+// NotificationRule row exists for this (roundId, triggerType) pair, the
+// notification is enabled by default — this preserves the previous
+// always-on behavior for any round that hasn't been explicitly configured.
+//
+// NOTE: recipientRole ('educator' | 'organiser' | 'all') is stored on the
+// rule but not yet used to filter recipients — there's currently no data
+// model relationship identifying which organiser(s) own a given round, so
+// organiser-targeted notifications aren't buildable yet. Every notification
+// still goes to educators only, same as before this change (#136-#137).
+async function isTriggerEnabled(roundId, triggerType) {
+  const rule = await prisma.notificationRule.findUnique({
+    where: { roundId_triggerType: { roundId, triggerType } },
+  });
+  return rule ? rule.enabled : true;
+}
+
 const roundIncludeForNotifications = {
   roundEntrants: {
     include: {
@@ -132,6 +186,21 @@ const roundIncludeForNotifications = {
               educators: { include: { user: true } },
             },
           },
+        },
+      },
+    },
+  },
+};
+
+// Same as roundIncludeForNotifications, plus each entrant's submissions —
+// needed to spot which entrants haven't submitted yet.
+const roundIncludeForMissingSubmissions = {
+  roundEntrants: {
+    include: {
+      entrant: {
+        include: {
+          school: { include: { educators: { include: { user: true } } } },
+          submissions: true,
         },
       },
     },
@@ -150,6 +219,8 @@ async function sendBeforeOpenNotifications(now) {
   });
 
   for (const round of upcomingRounds) {
+    if (!(await isTriggerEnabled(round.id, 'before_open'))) continue;
+
     const recipientEmails = await getRecipientsForRound(round);
 
     for (const email of recipientEmails) {
@@ -184,6 +255,8 @@ async function sendBeforeCloseNotifications(now) {
   });
 
   for (const round of closingSoonRounds) {
+    if (!(await isTriggerEnabled(round.id, 'before_close'))) continue;
+
     const recipientEmails = await getRecipientsForRound(round);
     for (const email of recipientEmails) {
       const alreadyNotified = await prisma.notificationLog.findUnique({
@@ -222,6 +295,8 @@ async function sendResultsReleasedNotifications() {
   });
 
   for (const round of roundsWithReleasedResults) {
+    if (!(await isTriggerEnabled(round.id, 'results_released'))) continue;
+
     const recipientEmails = await getRecipientsForRound(round);
     for (const email of recipientEmails) {
       const alreadyNotified = await prisma.notificationLog.findUnique({
@@ -247,21 +322,12 @@ async function sendResultsReleasedNotifications() {
 async function sendMissingSubmissionNotifications() {
   const recentlyClosedRounds = await prisma.round.findMany({
     where: { state: 'closed' },
-    include: {
-      roundEntrants: {
-        include: {
-          entrant: {
-            include: {
-              school: { include: { educators: { include: { user: true } } } },
-              submissions: true,
-            },
-          },
-        },
-      },
-    },
+    include: roundIncludeForMissingSubmissions,
   });
 
   for (const round of recentlyClosedRounds) {
+    if (!(await isTriggerEnabled(round.id, 'missing_submission'))) continue;
+
     for (const roundEntrant of round.roundEntrants) {
       const entrant = roundEntrant.entrant;
       const hasSubmitted = entrant.submissions.some((s) => s.roundId === round.id);
@@ -295,4 +361,13 @@ async function sendMissingSubmissionNotifications() {
   }
 }
 
-module.exports = { startScheduler };
+// getRecipientsForRound, isTriggerEnabled and the include shapes are exported
+// so the notification dry-run route (routes/rounds.js) can reuse the exact
+// same recipient + enablement logic the scheduler runs on.
+module.exports = {
+  startScheduler,
+  getRecipientsForRound,
+  isTriggerEnabled,
+  roundIncludeForNotifications,
+  roundIncludeForMissingSubmissions,
+};
