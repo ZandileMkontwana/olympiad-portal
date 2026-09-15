@@ -100,4 +100,36 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
   }
 });
 
+// POST /submissions/:id/remark
+// An educator requests a remark on a submission that's already been marked
+// (automarked or manually marked), explaining why in `reason`.
+router.post('/submissions/:id/remark', ...requireRole('educator'), async (req, res) => {
+  const submissionId = req.params.id;
+  const { reason } = req.body;
+
+  if (!reason) {
+    return res.status(400).json({ error: 'reason is required' });
+  }
+
+  try {
+    const submission = await prisma.submission.findUnique({ where: { id: submissionId } });
+    if (!submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    const remarkRequest = await prisma.remarkRequest.create({
+      data: {
+        submissionId,
+        requestedById: req.user.id,
+        reason,
+      },
+    });
+
+    res.status(201).json(remarkRequest);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not create remark request' });
+  }
+});
+
 module.exports = router;

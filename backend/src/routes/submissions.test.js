@@ -31,6 +31,7 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.submission, 'findUnique');
     vi.spyOn(prisma.result, 'create');
     vi.spyOn(prisma.markingTask, 'create');
+    vi.spyOn(prisma.remarkRequest, 'create');
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -301,6 +302,66 @@ describe('Submissions routes', () => {
           text: expect.stringContaining('Unknown entrant'),
         })
       );
+    });
+  });
+
+  describe('POST /submissions/:id/remark', () => {
+    it('returns 401 when not authenticated', async () => {
+      const unauthApp = createApp(false);
+      const res = await request(unauthApp)
+        .post('/api/submissions/sub-1/remark')
+        .send({ reason: 'Question 3 was marked wrong' });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 400 when reason is missing', async () => {
+      const res = await request(app).post('/api/submissions/sub-1/remark').send({});
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/reason/);
+    });
+
+    it('returns 404 when submission does not exist', async () => {
+      prisma.submission.findUnique.mockResolvedValue(null);
+      const res = await request(app)
+        .post('/api/submissions/sub-1/remark')
+        .send({ reason: 'Question 3 was marked wrong' });
+      expect(res.status).toBe(404);
+    });
+
+    it('creates a remark request tied to the requesting educator', async () => {
+      prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1' });
+      prisma.remarkRequest.create.mockResolvedValue({
+        id: 'remark-1',
+        submissionId: 'sub-1',
+        requestedById: 'user-1',
+        reason: 'Question 3 was marked wrong',
+        status: 'pending',
+      });
+
+      const res = await request(app)
+        .post('/api/submissions/sub-1/remark')
+        .send({ reason: 'Question 3 was marked wrong' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('pending');
+      expect(prisma.remarkRequest.create).toHaveBeenCalledWith({
+        data: {
+          submissionId: 'sub-1',
+          requestedById: 'user-1',
+          reason: 'Question 3 was marked wrong',
+        },
+      });
+    });
+
+    it('returns 500 on unexpected error', async () => {
+      prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1' });
+      prisma.remarkRequest.create.mockRejectedValue(new Error('Unexpected'));
+
+      const res = await request(app)
+        .post('/api/submissions/sub-1/remark')
+        .send({ reason: 'Question 3 was marked wrong' });
+
+      expect(res.status).toBe(500);
     });
   });
 });
