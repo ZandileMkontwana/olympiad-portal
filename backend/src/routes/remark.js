@@ -77,6 +77,7 @@ router.get('/remark/queue', ...requireRole('organiser'), async (req, res) => {
             entrant: true,
             round: true,
             result: true,
+            markingTask: true,
           },
         },
         requestedBy: { select: { id: true, name: true, email: true } },
