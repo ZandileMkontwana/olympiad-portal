@@ -9,10 +9,15 @@ datasource db {
 }
 
 model Olympiad {
-  id       String  @id @default(uuid())
-  name     String
-  timezone String
-  rounds   Round[]
+  id          String           @id @default(uuid())
+  name        String
+  timezone    String
+  description String? // organiser-written blurb shown to educators requesting access
+  grades      String? // target learner grades, e.g. "Grade 8-12"
+  startDate   DateTime? // olympiad run dates, organiser-set
+  endDate     DateTime?
+  rounds      Round[]
+  schoolAccess SchoolOlympiad[]
 }
 
 model Round {
@@ -52,12 +57,31 @@ model User {
 }
 
 model School {
-  id        String     @id @default(uuid())
-  name      String
-  timezone  String
-  createdAt DateTime   @default(now())
-  educators Educator[]
-  entrants  Entrant[]
+  id              String           @id @default(uuid())
+  name            String
+  timezone        String
+  createdAt       DateTime         @default(now())
+  educators       Educator[]
+  entrants        Entrant[]
+  schoolOlympiads SchoolOlympiad[]
+}
+
+// A school's participation in an olympiad. Created as 'pending' when an
+// educator requests access and flipped to 'approved'/'declined' by the
+// organiser; only approved schools can register entrants into the
+// olympiad's rounds.
+model SchoolOlympiad {
+  id            String    @id @default(uuid())
+  schoolId      String
+  olympiadId    String
+  status        String    @default("pending") // 'pending' | 'approved' | 'declined'
+  requestedById String? // User.id of the educator who requested
+  requestedAt   DateTime  @default(now())
+  decidedAt     DateTime?
+  school        School    @relation(fields: [schoolId], references: [id])
+  olympiad      Olympiad  @relation(fields: [olympiadId], references: [id])
+
+  @@unique([schoolId, olympiadId])
 }
 
 model Educator {

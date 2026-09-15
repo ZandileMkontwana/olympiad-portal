@@ -26,11 +26,23 @@ const NOTIFICATION_RECIPIENT_ROLES = ['educator', 'organiser', 'all'];
 
 router.post('/olympiads', async (req, res) => {
   try {
-    const { name, timezone } = req.body;
+    const { name, timezone, description, grades, startDate, endDate } = req.body;
     if (!name || !timezone) {
       return res.status(400).json({ error: 'name and timezone are required' });
     }
-    const olympiad = await prisma.olympiad.create({ data: { name, timezone } });
+    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+      return res.status(400).json({ error: 'endDate must be on or after startDate' });
+    }
+    const olympiad = await prisma.olympiad.create({
+      data: {
+        name,
+        timezone,
+        description: description || null,
+        grades: grades || null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+      },
+    });
     res.status(201).json(olympiad);
   } catch (err) {
     console.error(err);
@@ -48,12 +60,257 @@ router.get('/olympiads', async (req, res) => {
       },
       orderBy: { name: 'asc' },
     });
-    res.json(olympiads);
+
+    // Public listing: anonymous callers (and organisers) get the plain
+    // list. When the Clerk token identifies an educator, enrich each
+    // olympiad with the educator's school's access state and the number of
+    // distinct entrants per school, so the dashboard can show an info card
+    // for olympiads the school isn't part of yet.
+    const auth = req.auth && req.auth();
+    if (!auth || !auth.userId) {
+      return res.json(olympiads);
+    }
+
+    const user = await prisma.user.findUnique({ where: { clerkUserId: auth.userId } });
+    if (!user || user.role !== 'educator') {
+      return res.json(olympiads);
+    }
+
+    const educator = await prisma.educator.findUnique({ where: { userId: user.id } });
+    if (!educator) {
+      return res.json(olympiads);
+    }
+
+    const [accessRows, registrations] = await Promise.all([
+      prisma.schoolOlympiad.findMany({ where: { schoolId: educator.schoolId } }),
+      prisma.roundEntrant.findMany({
+        select: {
+          entrantId: true,
+          entrant: { select: { schoolId: true, school: { select: { name: true } } } },
+          round: { select: { olympiadId: true } },
+        },
+      }),
+    ]);
+
+    const accessByOlympiad = new Map(accessRows.map((row) => [row.olympiadId, row.status]));
+
+    // Count each entrant once per olympiad (they may sit several rounds),
+    // grouped by school.
+    const seen = new Set();
+    const countsByOlympiad = new Map();
+    for (const registration of registrations) {
+      const key = `${registration.round.olympiadId}:${registration.entrantId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const bySchool = countsByOlympiad.get(registration.round.olympiadId) || new Map();
+      countsByOlympiad.set(registration.round.olympiadId, bySchool);
+
+      const schoolId = registration.entrant.schoolId;
+      const entry = bySchool.get(schoolId) || {
+        schoolName: registration.entrant.school
+          ? registration.entrant.school.name
+          : 'Unknown school',
+        entrantCount: 0,
+      };
+      entry.entrantCount += 1;
+      bySchool.set(schoolId, entry);
+    }
+
+    res.json(
+      olympiads.map((olympiad) => ({
+        ...olympiad,
+        schoolAccess: accessByOlympiad.get(olympiad.id) || 'none',
+        schoolEntrantCounts: Array.from(countsByOlympiad.get(olympiad.id) || new Map())
+          .map(([, entry]) => entry)
+          .sort(
+            (a, b) => b.entrantCount - a.entrantCount || a.schoolName.localeCompare(b.schoolName)
+          ),
+      }))
+    );
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch olympiads' });
   }
 });
+
+// PUT /olympiads/:id
+// Edits an olympiad's details and organiser-set info fields (description,
+// grades, run dates) that are shown to educators on the info card.
+router.put('/olympiads/:id', ...requireRole('organiser'), async (req, res) => {
+  try {
+    const { name, timezone, description, grades, startDate, endDate } = req.body;
+
+    const existing = await prisma.olympiad.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Olympiad not found' });
+    }
+
+    if (name !== undefined && !name) {
+      return res.status(400).json({ error: 'name cannot be empty' });
+    }
+    if (timezone !== undefined && !timezone) {
+      return res.status(400).json({ error: 'timezone cannot be empty' });
+    }
+
+    const nextStartDate =
+      startDate !== undefined ? (startDate ? new Date(startDate) : null) : existing.startDate;
+    const nextEndDate =
+      endDate !== undefined ? (endDate ? new Date(endDate) : null) : existing.endDate;
+    if (nextStartDate && nextEndDate && nextEndDate < nextStartDate) {
+      return res.status(400).json({ error: 'endDate must be on or after startDate' });
+    }
+
+    const updated = await prisma.olympiad.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(timezone !== undefined && { timezone }),
+        ...(description !== undefined && { description: description || null }),
+        ...(grades !== undefined && { grades: grades || null }),
+        ...(startDate !== undefined && { startDate: nextStartDate }),
+        ...(endDate !== undefined && { endDate: nextEndDate }),
+      },
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update olympiad' });
+  }
+});
+
+// POST /olympiads/:id/request-access
+// An educator asks for their school to join the olympiad. Re-requesting
+// after a decline is allowed; pending and approved states are rejected.
+router.post('/olympiads/:id/request-access', ...requireRole('educator'), async (req, res) => {
+  try {
+    const olympiad = await prisma.olympiad.findUnique({ where: { id: req.params.id } });
+    if (!olympiad) {
+      return res.status(404).json({ error: 'Olympiad not found' });
+    }
+
+    const educator = await prisma.educator.findUnique({ where: { userId: req.user.id } });
+    if (!educator) {
+      return res.status(403).json({ error: 'No school linked to this account' });
+    }
+
+    const existing = await prisma.schoolOlympiad.findUnique({
+      where: {
+        schoolId_olympiadId: { schoolId: educator.schoolId, olympiadId: olympiad.id },
+      },
+    });
+    if (existing && existing.status !== 'declined') {
+      return res.status(409).json({
+        error:
+          existing.status === 'approved'
+            ? 'Your school already has access to this olympiad'
+            : 'An access request for this olympiad is already pending',
+      });
+    }
+
+    const access = await prisma.schoolOlympiad.upsert({
+      where: {
+        schoolId_olympiadId: { schoolId: educator.schoolId, olympiadId: olympiad.id },
+      },
+      create: {
+        schoolId: educator.schoolId,
+        olympiadId: olympiad.id,
+        requestedById: req.user.id,
+      },
+      update: {
+        status: 'pending',
+        requestedById: req.user.id,
+        requestedAt: new Date(),
+        decidedAt: null,
+      },
+    });
+    res.status(201).json({ status: access.status });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not request access' });
+  }
+});
+
+// GET /olympiads/access-requests
+// Pending school access requests for the organiser console, with the
+// school, olympiad and requesting educator's details.
+router.get('/olympiads/access-requests', ...requireRole('organiser'), async (req, res) => {
+  try {
+    const requests = await prisma.schoolOlympiad.findMany({
+      where: { status: 'pending' },
+      include: {
+        school: { select: { id: true, name: true } },
+        olympiad: { select: { id: true, name: true } },
+      },
+      orderBy: { requestedAt: 'asc' },
+    });
+
+    const requesterIds = [...new Set(requests.map((r) => r.requestedById).filter(Boolean))];
+    const requesters = requesterIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: requesterIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+    const requesterById = new Map(requesters.map((user) => [user.id, user]));
+
+    res.json(
+      requests.map((request) => ({
+        id: request.id,
+        school: request.school,
+        olympiad: request.olympiad,
+        requestedBy: request.requestedById
+          ? requesterById.get(request.requestedById) || null
+          : null,
+        requestedAt: request.requestedAt,
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch access requests' });
+  }
+});
+
+// POST /olympiads/access-requests/:id/approve and /decline
+// The organiser's decision on a school's access request.
+async function decideAccessRequest(req, res, status) {
+  const existing = await prisma.schoolOlympiad.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    return res.status(404).json({ error: 'Access request not found' });
+  }
+
+  const updated = await prisma.schoolOlympiad.update({
+    where: { id: req.params.id },
+    data: { status, decidedAt: new Date() },
+  });
+  res.json({ id: updated.id, status: updated.status });
+}
+
+router.post(
+  '/olympiads/access-requests/:id/approve',
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      await decideAccessRequest(req, res, 'approved');
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not approve access request' });
+    }
+  }
+);
+
+router.post(
+  '/olympiads/access-requests/:id/decline',
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      await decideAccessRequest(req, res, 'declined');
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not decline access request' });
+    }
+  }
+);
 
 router.post('/rounds', async (req, res) => {
   try {
@@ -154,6 +411,23 @@ router.post('/rounds/:id/entrants', ...requireRole('educator'), async (req, res)
     });
     if (!educator) {
       return res.status(403).json({ error: 'No school linked to this account' });
+    }
+
+    // The school must have approved access to the olympiad before its
+    // educators can register entrants into the olympiad's rounds.
+    const access = await prisma.schoolOlympiad.findUnique({
+      where: {
+        schoolId_olympiadId: {
+          schoolId: educator.schoolId,
+          olympiadId: round.olympiadId,
+        },
+      },
+    });
+    if (!access || access.status !== 'approved') {
+      return res.status(403).json({
+        error:
+          "Your school doesn't have access to this olympiad yet — request access from the organiser.",
+      });
     }
 
     const entrant = await prisma.entrant.findUnique({ where: { id: entrantId } });
@@ -573,7 +847,9 @@ router.post('/rounds/:id/notifications/test', ...requireRole('organiser'), async
       select: { recipientEmail: true, entrantId: true },
     });
     const alreadyEmailed = new Set(
-      sentLogs.map((log) => `${log.recipientEmail}:${log.entrantId ?? ''}`)
+      sentLogs.map((log) =>
+        log.entrantId ? `${log.recipientEmail}:${log.entrantId}` : log.recipientEmail
+      )
     );
     const recipients = [];
     if (triggerType === 'missing_submission') {

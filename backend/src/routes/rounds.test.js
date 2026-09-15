@@ -27,6 +27,8 @@ describe('Rounds routes', () => {
   beforeEach(() => {
     vi.spyOn(prisma.olympiad, 'create');
     vi.spyOn(prisma.olympiad, 'findMany');
+    vi.spyOn(prisma.olympiad, 'findUnique');
+    vi.spyOn(prisma.olympiad, 'update');
     vi.spyOn(prisma.round, 'create');
     vi.spyOn(prisma.round, 'findMany');
     vi.spyOn(prisma.round, 'findUnique');
@@ -35,6 +37,11 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.roundEntrant, 'findMany');
     vi.spyOn(prisma.roundEntrant, 'findUnique');
     vi.spyOn(prisma.roundEntrant, 'create');
+    vi.spyOn(prisma.schoolOlympiad, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.schoolOlympiad, 'findUnique').mockResolvedValue({ status: 'approved' });
+    vi.spyOn(prisma.schoolOlympiad, 'upsert');
+    vi.spyOn(prisma.schoolOlympiad, 'update');
+    vi.spyOn(prisma.user, 'findMany');
     vi.spyOn(prisma.submission, 'findMany');
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
@@ -44,6 +51,9 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.notificationRule, 'deleteMany');
     vi.spyOn(prisma.result, 'updateMany');
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Default: no registrations anywhere (GET /olympiads enrichment counts
+    // them) — schools have approved access (POST /rounds/:id/entrants gate).
+    prisma.roundEntrant.findMany.mockResolvedValue([]);
     // Default: the Clerk user maps to an educator linked to school-1
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
@@ -83,21 +93,136 @@ describe('Rounds routes', () => {
       expect(res.status).toBe(500);
       expect(res.body.error).toMatch(/Failed/);
     });
+
+    it('stores the optional info fields when provided', async () => {
+      prisma.olympiad.create.mockResolvedValue({ id: '1', name: 'Test', timezone: 'UTC' });
+      const res = await request(app).post('/api/olympiads').send({
+        name: 'Test',
+        timezone: 'UTC',
+        description: 'A maths olympiad',
+        grades: 'Grade 8–12',
+        startDate: '2026-02-01T00:00:00Z',
+        endDate: '2026-03-01T00:00:00Z',
+      });
+      expect(res.status).toBe(201);
+      expect(prisma.olympiad.create).toHaveBeenCalledWith({
+        data: {
+          name: 'Test',
+          timezone: 'UTC',
+          description: 'A maths olympiad',
+          grades: 'Grade 8–12',
+          startDate: new Date('2026-02-01T00:00:00Z'),
+          endDate: new Date('2026-03-01T00:00:00Z'),
+        },
+      });
+    });
+
+    it('stores nulls when the optional info fields are missing', async () => {
+      prisma.olympiad.create.mockResolvedValue({ id: '1', name: 'Test', timezone: 'UTC' });
+      const res = await request(app).post('/api/olympiads').send({ name: 'Test', timezone: 'UTC' });
+      expect(res.status).toBe(201);
+      expect(prisma.olympiad.create).toHaveBeenCalledWith({
+        data: {
+          name: 'Test',
+          timezone: 'UTC',
+          description: null,
+          grades: null,
+          startDate: null,
+          endDate: null,
+        },
+      });
+    });
+
+    it('returns 400 when endDate is before startDate', async () => {
+      const res = await request(app).post('/api/olympiads').send({
+        name: 'Test',
+        timezone: 'UTC',
+        startDate: '2026-03-01T00:00:00Z',
+        endDate: '2026-02-01T00:00:00Z',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/endDate must be on or after startDate/);
+      expect(prisma.olympiad.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('GET /api/olympiads', () => {
-    it('returns list of olympiads with nested rounds, sorted by name', async () => {
+    it('enriches the list with access state and entrant counts for educators', async () => {
       prisma.olympiad.findMany.mockResolvedValue([
         { id: '1', name: 'A', rounds: [] },
         { id: '2', name: 'B', rounds: [] },
       ]);
+      prisma.schoolOlympiad.findMany.mockResolvedValue([
+        { olympiadId: '1', status: 'approved' },
+        { olympiadId: '2', status: 'pending' },
+      ]);
+      prisma.roundEntrant.findMany.mockResolvedValue([
+        {
+          entrantId: 'e1',
+          entrant: { schoolId: 'school-1', school: { name: 'School One' } },
+          round: { olympiadId: '1' },
+        },
+        // Same entrant in another round of the same olympiad counts once.
+        {
+          entrantId: 'e1',
+          entrant: { schoolId: 'school-1', school: { name: 'School One' } },
+          round: { olympiadId: '1' },
+        },
+        {
+          entrantId: 'e2',
+          entrant: { schoolId: 'school-1', school: { name: 'School One' } },
+          round: { olympiadId: '1' },
+        },
+        {
+          entrantId: 'e3',
+          entrant: { schoolId: 'school-2', school: { name: 'School Two' } },
+          round: { olympiadId: '1' },
+        },
+      ]);
+
       const res = await request(app).get('/api/olympiads');
+
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(2);
       expect(prisma.olympiad.findMany).toHaveBeenCalledWith({
         include: { rounds: { orderBy: { openTime: 'asc' } } },
         orderBy: { name: 'asc' },
       });
+      expect(res.body[0]).toMatchObject({ id: '1', schoolAccess: 'approved' });
+      expect(res.body[0].schoolEntrantCounts).toEqual([
+        { schoolName: 'School One', entrantCount: 2 },
+        { schoolName: 'School Two', entrantCount: 1 },
+      ]);
+      expect(res.body[1]).toMatchObject({ id: '2', schoolAccess: 'pending' });
+      expect(res.body[1].schoolEntrantCounts).toEqual([]);
+    });
+
+    it('returns the plain list for anonymous callers', async () => {
+      prisma.olympiad.findMany.mockResolvedValue([{ id: '1', name: 'A', rounds: [] }]);
+      const unauthApp = createApp(false);
+
+      const res = await request(unauthApp).get('/api/olympiads');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0]).not.toHaveProperty('schoolAccess');
+      expect(res.body[0]).not.toHaveProperty('schoolEntrantCounts');
+      expect(prisma.schoolOlympiad.findMany).not.toHaveBeenCalled();
+    });
+
+    it('returns the plain list for organisers', async () => {
+      prisma.olympiad.findMany.mockResolvedValue([{ id: '1', name: 'A', rounds: [] }]);
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+
+      const res = await request(app).get('/api/olympiads');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0]).not.toHaveProperty('schoolAccess');
+      expect(res.body[0]).not.toHaveProperty('schoolEntrantCounts');
+      expect(prisma.schoolOlympiad.findMany).not.toHaveBeenCalled();
     });
 
     it('returns 500 on error', async () => {
@@ -250,6 +375,418 @@ describe('Rounds routes', () => {
     });
   });
 
+  describe('PUT /api/olympiads/:id', () => {
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+    });
+
+    it('returns 401 when not authenticated', async () => {
+      const unauthApp = createApp(false);
+      const res = await request(unauthApp).put('/api/olympiads/olympiad-1').send({});
+      expect(res.status).toBe(401);
+      expect(prisma.olympiad.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when user is not an organiser', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'teacher@school.com',
+        role: 'educator',
+        name: 'Teacher One',
+      });
+      const res = await request(app).put('/api/olympiads/olympiad-1').send({ name: 'New' });
+      expect(res.status).toBe(403);
+      expect(prisma.olympiad.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the olympiad does not exist', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue(null);
+      const res = await request(app).put('/api/olympiads/olympiad-1').send({ name: 'New' });
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/Olympiad not found/);
+    });
+
+    it('updates the info fields and returns the olympiad', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({
+        id: 'olympiad-1',
+        name: 'Old',
+        timezone: 'UTC',
+        startDate: null,
+        endDate: null,
+      });
+      prisma.olympiad.update.mockResolvedValue({ id: 'olympiad-1', name: 'New' });
+
+      const res = await request(app).put('/api/olympiads/olympiad-1').send({
+        name: 'New',
+        timezone: 'Africa/Johannesburg',
+        description: 'A maths olympiad',
+        grades: 'Grade 8–12',
+        startDate: '2026-02-01',
+        endDate: '2026-03-01',
+      });
+
+      expect(res.status).toBe(200);
+      expect(prisma.olympiad.update).toHaveBeenCalledWith({
+        where: { id: 'olympiad-1' },
+        data: {
+          name: 'New',
+          timezone: 'Africa/Johannesburg',
+          description: 'A maths olympiad',
+          grades: 'Grade 8–12',
+          startDate: new Date('2026-02-01'),
+          endDate: new Date('2026-03-01'),
+        },
+      });
+    });
+
+    it('clears optional fields sent as empty strings', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({
+        id: 'olympiad-1',
+        name: 'Old',
+        timezone: 'UTC',
+        startDate: '2026-01-01T00:00:00.000Z',
+        endDate: '2026-02-01T00:00:00.000Z',
+      });
+      prisma.olympiad.update.mockResolvedValue({ id: 'olympiad-1' });
+
+      const res = await request(app)
+        .put('/api/olympiads/olympiad-1')
+        .send({ description: '', grades: '', startDate: '', endDate: '' });
+
+      expect(res.status).toBe(200);
+      expect(prisma.olympiad.update).toHaveBeenCalledWith({
+        where: { id: 'olympiad-1' },
+        data: { description: null, grades: null, startDate: null, endDate: null },
+      });
+    });
+
+    it('returns 400 when name or timezone is cleared', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({
+        id: 'olympiad-1',
+        name: 'Old',
+        timezone: 'UTC',
+      });
+      const res = await request(app).put('/api/olympiads/olympiad-1').send({ name: '' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/name cannot be empty/);
+      expect(prisma.olympiad.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when endDate would end up before startDate', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({
+        id: 'olympiad-1',
+        name: 'Old',
+        timezone: 'UTC',
+        startDate: null,
+        endDate: null,
+      });
+      const res = await request(app)
+        .put('/api/olympiads/olympiad-1')
+        .send({ startDate: '2026-03-01', endDate: '2026-02-01' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/endDate must be on or after startDate/);
+      expect(prisma.olympiad.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 on prisma error', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({
+        id: 'olympiad-1',
+        name: 'Old',
+        timezone: 'UTC',
+      });
+      prisma.olympiad.update.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).put('/api/olympiads/olympiad-1').send({ name: 'New' });
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Failed to update olympiad/);
+    });
+  });
+
+  describe('POST /api/olympiads/:id/request-access', () => {
+    beforeEach(() => {
+      prisma.olympiad.findUnique.mockResolvedValue({ id: 'olympiad-1', name: 'Maths Olympiad' });
+      prisma.schoolOlympiad.findUnique.mockResolvedValue(null);
+    });
+
+    it('returns 401 when not authenticated', async () => {
+      const unauthApp = createApp(false);
+      const res = await request(unauthApp).post('/api/olympiads/olympiad-1/request-access');
+      expect(res.status).toBe(401);
+      expect(prisma.schoolOlympiad.upsert).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when user is not an educator', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+      const res = await request(app).post('/api/olympiads/olympiad-1/request-access');
+      expect(res.status).toBe(403);
+      expect(prisma.schoolOlympiad.upsert).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the olympiad does not exist', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue(null);
+      const res = await request(app).post('/api/olympiads/olympiad-1/request-access');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/Olympiad not found/);
+      expect(prisma.schoolOlympiad.upsert).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the educator has no school linked', async () => {
+      prisma.educator.findUnique.mockResolvedValue(null);
+      const res = await request(app).post('/api/olympiads/olympiad-1/request-access');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/No school linked/);
+      expect(prisma.schoolOlympiad.upsert).not.toHaveBeenCalled();
+    });
+
+    it('creates a pending request and returns 201', async () => {
+      prisma.schoolOlympiad.upsert.mockResolvedValue({
+        id: 'so-1',
+        status: 'pending',
+        schoolId: 'school-1',
+        olympiadId: 'olympiad-1',
+      });
+
+      const res = await request(app).post('/api/olympiads/olympiad-1/request-access');
+
+      expect(res.status).toBe(201);
+      expect(res.body).toEqual({ status: 'pending' });
+      expect(prisma.schoolOlympiad.upsert).toHaveBeenCalledWith({
+        where: { schoolId_olympiadId: { schoolId: 'school-1', olympiadId: 'olympiad-1' } },
+        create: {
+          schoolId: 'school-1',
+          olympiadId: 'olympiad-1',
+          requestedById: 'user-1',
+        },
+        update: {
+          status: 'pending',
+          requestedById: 'user-1',
+          requestedAt: expect.any(Date),
+          decidedAt: null,
+        },
+      });
+    });
+
+    it('returns 409 when the school already has access', async () => {
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({ status: 'approved' });
+      const res = await request(app).post('/api/olympiads/olympiad-1/request-access');
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/already has access/);
+      expect(prisma.schoolOlympiad.upsert).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when a request is already pending', async () => {
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({ status: 'pending' });
+      const res = await request(app).post('/api/olympiads/olympiad-1/request-access');
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/already pending/);
+      expect(prisma.schoolOlympiad.upsert).not.toHaveBeenCalled();
+    });
+
+    it('re-requests after a decline', async () => {
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({ status: 'declined' });
+      prisma.schoolOlympiad.upsert.mockResolvedValue({ id: 'so-1', status: 'pending' });
+
+      const res = await request(app).post('/api/olympiads/olympiad-1/request-access');
+
+      expect(res.status).toBe(201);
+      expect(prisma.schoolOlympiad.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({ status: 'pending', decidedAt: null }),
+        })
+      );
+    });
+
+    it('returns 500 on prisma error', async () => {
+      prisma.schoolOlympiad.upsert.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).post('/api/olympiads/olympiad-1/request-access');
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Could not request access/);
+    });
+  });
+
+  describe('GET /api/olympiads/access-requests', () => {
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+    });
+
+    it('returns 401 when not authenticated', async () => {
+      const unauthApp = createApp(false);
+      const res = await request(unauthApp).get('/api/olympiads/access-requests');
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 403 when user is not an organiser', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'teacher@school.com',
+        role: 'educator',
+        name: 'Teacher One',
+      });
+      const res = await request(app).get('/api/olympiads/access-requests');
+      expect(res.status).toBe(403);
+      expect(prisma.schoolOlympiad.findMany).not.toHaveBeenCalled();
+    });
+
+    it('lists pending requests with school, olympiad and requester details', async () => {
+      prisma.schoolOlympiad.findMany.mockResolvedValue([
+        {
+          id: 'so-1',
+          status: 'pending',
+          requestedById: 'user-1',
+          requestedAt: new Date('2026-02-01T10:00:00Z'),
+          school: { id: 'school-1', name: 'Test School' },
+          olympiad: { id: 'olympiad-1', name: 'Maths Olympiad' },
+        },
+      ]);
+      prisma.user.findMany.mockResolvedValue([
+        { id: 'user-1', name: 'Teacher One', email: 'teacher@school.com' },
+      ]);
+
+      const res = await request(app).get('/api/olympiads/access-requests');
+
+      expect(res.status).toBe(200);
+      expect(prisma.schoolOlympiad.findMany).toHaveBeenCalledWith({
+        where: { status: 'pending' },
+        include: {
+          school: { select: { id: true, name: true } },
+          olympiad: { select: { id: true, name: true } },
+        },
+        orderBy: { requestedAt: 'asc' },
+      });
+      expect(res.body).toEqual([
+        {
+          id: 'so-1',
+          school: { id: 'school-1', name: 'Test School' },
+          olympiad: { id: 'olympiad-1', name: 'Maths Olympiad' },
+          requestedBy: { id: 'user-1', name: 'Teacher One', email: 'teacher@school.com' },
+          requestedAt: '2026-02-01T10:00:00.000Z',
+        },
+      ]);
+    });
+
+    it('returns an empty array when nothing is pending', async () => {
+      prisma.schoolOlympiad.findMany.mockResolvedValue([]);
+      const res = await request(app).get('/api/olympiads/access-requests');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([]);
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+    });
+
+    it('falls back to a null requester when the requesting user is gone', async () => {
+      prisma.schoolOlympiad.findMany.mockResolvedValue([
+        {
+          id: 'so-1',
+          status: 'pending',
+          requestedById: 'user-gone',
+          requestedAt: new Date('2026-02-01T10:00:00Z'),
+          school: { id: 'school-1', name: 'Test School' },
+          olympiad: { id: 'olympiad-1', name: 'Maths Olympiad' },
+        },
+      ]);
+      prisma.user.findMany.mockResolvedValue([]);
+
+      const res = await request(app).get('/api/olympiads/access-requests');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].requestedBy).toBeNull();
+    });
+
+    it('returns 500 on prisma error', async () => {
+      prisma.schoolOlympiad.findMany.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).get('/api/olympiads/access-requests');
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Failed to fetch access requests/);
+    });
+  });
+
+  describe('POST /api/olympiads/access-requests/:id/approve and /decline', () => {
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+    });
+
+    it('returns 401 when not authenticated', async () => {
+      const unauthApp = createApp(false);
+      const approve = await request(unauthApp).post('/api/olympiads/access-requests/so-1/approve');
+      expect(approve.status).toBe(401);
+      expect(prisma.schoolOlympiad.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when user is not an organiser', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'teacher@school.com',
+        role: 'educator',
+        name: 'Teacher One',
+      });
+      const res = await request(app).post('/api/olympiads/access-requests/so-1/approve');
+      expect(res.status).toBe(403);
+      expect(prisma.schoolOlympiad.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when the request does not exist', async () => {
+      prisma.schoolOlympiad.findUnique.mockResolvedValue(null);
+      const res = await request(app).post('/api/olympiads/access-requests/so-1/approve');
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/Access request not found/);
+      expect(prisma.schoolOlympiad.update).not.toHaveBeenCalled();
+    });
+
+    it('approves the request and stamps decidedAt', async () => {
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({ id: 'so-1', status: 'pending' });
+      prisma.schoolOlympiad.update.mockResolvedValue({ id: 'so-1', status: 'approved' });
+
+      const res = await request(app).post('/api/olympiads/access-requests/so-1/approve');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ id: 'so-1', status: 'approved' });
+      expect(prisma.schoolOlympiad.update).toHaveBeenCalledWith({
+        where: { id: 'so-1' },
+        data: { status: 'approved', decidedAt: expect.any(Date) },
+      });
+    });
+
+    it('declines the request and stamps decidedAt', async () => {
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({ id: 'so-1', status: 'pending' });
+      prisma.schoolOlympiad.update.mockResolvedValue({ id: 'so-1', status: 'declined' });
+
+      const res = await request(app).post('/api/olympiads/access-requests/so-1/decline');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ id: 'so-1', status: 'declined' });
+      expect(prisma.schoolOlympiad.update).toHaveBeenCalledWith({
+        where: { id: 'so-1' },
+        data: { status: 'declined', decidedAt: expect.any(Date) },
+      });
+    });
+
+    it('returns 500 on prisma error', async () => {
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({ id: 'so-1', status: 'pending' });
+      prisma.schoolOlympiad.update.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).post('/api/olympiads/access-requests/so-1/approve');
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/Could not approve access request/);
+    });
+  });
+
   describe('GET /api/rounds/:id/entrants', () => {
     it('returns entrants for a round', async () => {
       prisma.roundEntrant.findMany.mockResolvedValue([
@@ -309,6 +846,32 @@ describe('Rounds routes', () => {
       expect(res.body.error).toMatch(/closed/);
     });
 
+    it("returns 403 when the school doesn't have approved access to the olympiad", async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: '1',
+        state: 'open',
+        olympiadId: 'olympiad-1',
+      });
+      prisma.schoolOlympiad.findUnique.mockResolvedValue(null);
+      const res = await request(app).post('/api/rounds/1/entrants').send({ entrantId: 'e1' });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/request access from the organiser/);
+      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the access request is still pending', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: '1',
+        state: 'open',
+        olympiadId: 'olympiad-1',
+      });
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({ status: 'pending' });
+      const res = await request(app).post('/api/rounds/1/entrants').send({ entrantId: 'e1' });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/request access from the organiser/);
+      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+    });
+
     it('returns 404 when entrant not found', async () => {
       prisma.round.findUnique.mockResolvedValue({ id: '1', state: 'open' });
       prisma.entrant.findUnique.mockResolvedValue(null);
@@ -347,7 +910,11 @@ describe('Rounds routes', () => {
     });
 
     it('registers entrant and returns 201', async () => {
-      prisma.round.findUnique.mockResolvedValue({ id: '1', state: 'open' });
+      prisma.round.findUnique.mockResolvedValue({
+        id: '1',
+        state: 'open',
+        olympiadId: 'olympiad-1',
+      });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
         schoolId: 'school-1',
@@ -365,6 +932,11 @@ describe('Rounds routes', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.entrantId).toBe('e1');
+      expect(prisma.schoolOlympiad.findUnique).toHaveBeenCalledWith({
+        where: {
+          schoolId_olympiadId: { schoolId: 'school-1', olympiadId: 'olympiad-1' },
+        },
+      });
       expect(prisma.roundEntrant.create).toHaveBeenCalledWith({
         data: { roundId: '1', entrantId: 'e1' },
       });

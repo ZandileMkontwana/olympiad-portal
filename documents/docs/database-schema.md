@@ -26,11 +26,18 @@ erDiagram
   ROUND ||--o{ NOTIFICATIONRULE : has
   ROUND ||--o{ NOTIFICATIONLOG : has
   ENTRANT |o--o{ NOTIFICATIONLOG : concerns
+  OLYMPIAD ||--o{ SCHOOLOLYMPIAD : "is joined by"
+  SCHOOL ||--o{ SCHOOLOLYMPIAD : "joins"
+  USER |o--o{ SCHOOLOLYMPIAD : "requested by"
 
   OLYMPIAD {
     string id PK
     string name
     string timezone
+    string description "optional"
+    string grades "optional"
+    datetime startDate "optional"
+    datetime endDate "optional"
   }
   ROUND {
     string id PK
@@ -44,6 +51,15 @@ erDiagram
     string id PK
     string name
     string timezone
+  }
+  SCHOOLOLYMPIAD {
+    string id PK
+    string schoolId FK
+    string olympiadId FK
+    string status
+    string requestedById FK "optional"
+    datetime requestedAt
+    datetime decidedAt "optional"
   }
   USER {
     string id PK
@@ -123,13 +139,16 @@ erDiagram
 ## Tables
 
 ### Olympiad
-Top-level competition. Has many rounds, each on its own schedule.
+Top-level competition. Has many rounds, each on its own schedule. The optional `description`, `grades`, `startDate` and `endDate` fields are organiser-set info, shown to educators on the olympiad info card before their school joins.
 
 ### Round
 The core state machine: `scheduled → open → closed → released`, driven by a scheduler comparing the current time against `openTime`/`closeTime`. Everything else in the system depends on this table's state.
 
 ### School
 A registered school competing in the olympiad. Has many educators and entrants.
+
+### SchoolOlympiad
+A school's participation in an olympiad, gated by organiser approval — the school is "part of" an olympiad exactly when its row here has `status: 'approved'`, which is what unlocks registering entrants into that olympiad's rounds. `status` moves `pending → approved | declined`, and a declined school can re-request (the upsert flips the row back to `pending`). A unique constraint on `(schoolId, olympiadId)` keeps one row per school per olympiad, and `requestedById` records which educator asked. The migration that introduced this table backfilled every existing participation to `approved`, so schools that were already competing kept their access.
 
 ### User
 Login account for anyone — organiser, educator, or student. `name` is the user's display name, required at registration. Password handling goes through our auth library, not custom code. Public registration only ever creates `educator` accounts - organiser accounts are provisioned directly by the team.

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 // Mutable state — individual tests override before rendering.
@@ -46,29 +47,29 @@ describe('EducatorSidebar', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders links to rounds, the school dashboard and the paper archive', () => {
+  it('renders links to olympiads, the school dashboard and the archive', () => {
     render(<EducatorSidebar />);
 
-    expect(screen.getByText('Rounds').closest('a')).toHaveAttribute('href', '/educator');
+    expect(screen.getByText('Olympiads').closest('a')).toHaveAttribute('href', '/educator');
     expect(screen.getByText('School Dashboard').closest('a')).toHaveAttribute(
       'href',
       '/educator/school'
     );
-    expect(screen.getByText('Paper Archive').closest('a')).toHaveAttribute('href', '/archive');
+    expect(screen.getByText('Archive').closest('a')).toHaveAttribute('href', '/educator/archive');
   });
 
-  it('marks Rounds as the current page on the rounds board', () => {
+  it('marks Olympiads as the current page on the olympiads board', () => {
     render(<EducatorSidebar />);
 
-    expect(screen.getByText('Rounds').closest('a')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByText('Olympiads').closest('a')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText('School Dashboard').closest('a')).not.toHaveAttribute('aria-current');
   });
 
-  it('keeps Rounds highlighted on round detail and submission pages', () => {
+  it('keeps Olympiads highlighted on round detail and submission pages', () => {
     pathState.pathname = '/educator/round_view?id=round-1';
     render(<EducatorSidebar />);
 
-    expect(screen.getByText('Rounds').closest('a')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByText('Olympiads').closest('a')).toHaveAttribute('aria-current', 'page');
   });
 
   it('marks School Dashboard as the current page on the school dashboard', () => {
@@ -79,14 +80,36 @@ describe('EducatorSidebar', () => {
       'aria-current',
       'page'
     );
-    expect(screen.getByText('Rounds').closest('a')).not.toHaveAttribute('aria-current');
+    expect(screen.getByText('Olympiads').closest('a')).not.toHaveAttribute('aria-current');
   });
 
-  it('marks Paper Archive as the current page on the archive', () => {
-    pathState.pathname = '/archive';
+  it('marks Archive as the current page on the educator archive', () => {
+    pathState.pathname = '/educator/archive';
     render(<EducatorSidebar />);
 
-    expect(screen.getByText('Paper Archive').closest('a')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByText('Archive').closest('a')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByText('Olympiads').closest('a')).not.toHaveAttribute('aria-current');
+  });
+
+  it('hides the labels when collapsed and brings them back on expand', () => {
+    function SidebarShell() {
+      const [collapsed, setCollapsed] = useState(false);
+      return <EducatorSidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />;
+    }
+    render(<SidebarShell />);
+
+    expect(screen.getByText('Olympiads')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+    expect(screen.queryByText('Olympiads')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Olympiads')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /expand sidebar/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /expand sidebar/i }));
+    expect(screen.getByText('Olympiads')).toBeInTheDocument();
   });
 
   it('falls back to the email address when the account has no name', () => {

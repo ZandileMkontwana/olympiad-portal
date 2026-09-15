@@ -97,3 +97,76 @@
 * Run the complete test suite after merging major feature branches.
 * Validate Docusaurus documentation locally before pushing changes that trigger deployment.
 * Clarify feature requirements with the team before implementation, especially where different user roles have different responsibilities.
+
+---
+
+## Mlungisi (Notifications Engine & Student/School Dashboards)
+
+### What went well
+
+- Delivered the full notification pipeline end to end: NotificationLog model,
+  SendGrid templates for all four trigger types (before_open, before_close,
+  missing_submission, results_released), scheduler jobs wired into the
+  existing round lifecycle scheduler, and dedup logic using the log table's
+  unique constraint so the same notification never sends twice.
+- Extended the schema cleanly to support students - added a nullable,
+  unique `userId` on Entrant rather than a separate Student model, so a
+  student account "claims" an existing entrant record an educator already
+  registered, reusing all the existing Submission/Sitting/Result
+  relationships without duplicating data.
+- Built the student registration flow, the `/students/complete-profile`
+  endpoint, and the school dashboard backend (`/schools/:id/dashboard`,
+  `/schools/:id/entrants`) with a proper authorization check - organisers
+  can view any school, educators only their own - closing a gap similar to
+  one flagged in last sprint's retrospective.
+- Iterated significantly on the frontend - the school dashboard, student
+  dashboard, educator portal, archive page, and login page all went
+  through multiple rounds of design feedback and came out the other side
+  genuinely feature-rich: live search and filtering, sortable views, a
+  performance trend chart, achievement badges, a "next up" round spotlight,
+  and consistent lavender branding throughout.
+- Caught and fixed a real layout bug (the brand panel on the login page
+  shifting when switching tabs) by identifying the actual cause - unpinned
+  positioning combined with variable content height - rather than just
+  patching the symptom.
+
+### What was challenging
+
+- A migration for a new table unexpectedly triggered a full reset of the
+  shared database because Prisma detected drift from migration files it
+  didn't have locally. It happened fast, mid-command, and needed immediate,
+  transparent communication with the team rather than a quiet fix.
+- Coordinating the missing_submission trigger required different logic
+  from the time-window-based triggers - it's a per-entrant check against
+  every currently-closed round rather than a scheduled window - which took
+  a bit more design thought before implementation.
+- Getting frontend pages to feel "finished" rather than functional took
+  several genuine redesign passes per page - first drafts were correct but
+  visually flat, and it took explicit feedback each time to identify what
+  was actually missing (density, visual hierarchy, real data
+  visualization) rather than just cosmetic tweaks.
+
+### What I'd do differently
+
+- Pause before confirming any migration prompt that mentions data loss or
+  a schema reset, and check with the team first - even when I'm confident
+  the change itself is safe, the prompt is describing something bigger
+  than the change I intended.
+- Build the richer, more "real-world" version of a UI page from the start
+  rather than a minimal version first - the redesign passes were
+  productive, but starting with more polish would have saved iteration
+  time.
+
+### What I learned
+
+- How to design a notification system that's idempotent by construction -
+  using a database unique constraint (roundId + triggerType +
+  recipientEmail) as the source of truth for "was this already sent"
+  rather than trying to track it separately in application logic.
+- A clearer sense of how to extend an existing schema thoughtfully -
+  linking a new concept (student accounts) to an existing model (Entrant)
+  instead of introducing a parallel, duplicate one.
+- That visual polish is iterative and specific - "make it better" needs a
+  concrete next step each time (add real data density, fix a structural
+  layout issue, introduce genuine interactivity) rather than one pass
+  being expected to get it right.

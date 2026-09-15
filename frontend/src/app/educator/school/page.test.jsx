@@ -24,6 +24,10 @@ const mockDashboard = {
       averageScore: 85,
       email: 'alice@school.com',
       accountStatus: 'active',
+      olympiads: [
+        { id: 'oly-1', name: 'Maths Olympiad' },
+        { id: 'oly-2', name: 'Science Olympiad' },
+      ],
     },
     {
       id: 'e2',
@@ -33,6 +37,7 @@ const mockDashboard = {
       averageScore: 60,
       email: 'bob@school.com',
       accountStatus: 'invite_pending',
+      olympiads: [],
     },
     {
       id: 'e3',
@@ -42,6 +47,7 @@ const mockDashboard = {
       averageScore: null,
       email: null,
       accountStatus: null,
+      olympiads: [{ id: 'oly-1', name: 'Maths Olympiad' }],
     },
   ],
 };
@@ -392,6 +398,9 @@ describe('School Dashboard Page', () => {
       grade: '10',
       schoolId: 'school-1',
       invitationSent: true,
+      registeredRounds: [
+        { id: 'round-1', name: 'Round One', olympiadName: 'Maths Olympiad' },
+      ],
     });
     fetchSchoolDashboard.mockResolvedValue({
       school: { id: 'school-1', name: 'Testville High' },
@@ -422,6 +431,42 @@ describe('School Dashboard Page', () => {
     });
     await waitFor(() => {
       expect(screen.getByText(/has been added and emailed a link/i)).toBeTruthy();
+    });
+    // The confirmation says which rounds the student was registered into
+    await waitFor(() => {
+      expect(screen.getByText(/Registered into: Maths Olympiad — Round One/)).toBeTruthy();
+    });
+  });
+
+  it('notes when a new student has no open rounds to register into', async () => {
+    createEntrant.mockResolvedValue({
+      id: 'e4',
+      name: 'New Kid',
+      grade: '10',
+      schoolId: 'school-1',
+      invitationSent: true,
+      registeredRounds: [],
+    });
+    fetchSchoolDashboard.mockResolvedValue({
+      school: { id: 'school-1', name: 'Testville High' },
+      entrantCount: 0,
+      totalSubmissions: 0,
+      entrants: [],
+    });
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Student name')).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('Student name'), { target: { value: 'New Kid' } });
+    fireEvent.change(screen.getByPlaceholderText('Student email'), {
+      target: { value: 'newkid@school.com' },
+    });
+    fireEvent.change(screen.getByDisplayValue('Grade'), { target: { value: '10' } });
+    fireEvent.click(screen.getByText('Add Student'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/No open rounds to register them into yet/)).toBeTruthy();
     });
   });
 
@@ -479,6 +524,19 @@ describe('School Dashboard Page', () => {
       expect(screen.getByText('Invite pending')).toBeTruthy();
       expect(screen.getByText('No account')).toBeTruthy();
     });
+  });
+
+  it('shows which olympiads each student is registered under', async () => {
+    render(<SchoolDashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Alice Alpha')).toBeTruthy();
+    });
+
+    // Alice is under both olympiads, Carol under one
+    expect(screen.getAllByText('Maths Olympiad')).toHaveLength(2);
+    expect(screen.getByText('Science Olympiad')).toBeTruthy();
+    // Bob has no round registrations, so his card says so
+    expect(screen.getByText('No olympiad yet')).toBeTruthy();
   });
 
   it('shows resend invite only for pending or account-less entrants', async () => {
