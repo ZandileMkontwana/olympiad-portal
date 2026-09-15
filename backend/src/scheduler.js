@@ -34,8 +34,82 @@ function startScheduler() {
     await sendBeforeCloseNotifications(now);
     await sendResultsReleasedNotifications();
     await sendMissingSubmissionNotifications();
+
+    // Auto-advance is fully independent of the open/close step above: it
+    // looks for any closed round with a qualifyingThreshold that hasn't
+    // been processed yet (autoAdvanceProcessedAt is null), regardless of
+    // which tick actually closed it. This keeps the original open/close
+    // logic above completely untouched.
+    await processAutoAdvance();
   });
   console.log('Round scheduler started — ticking every 30s');
+}
+
+// Finds closed rounds with a qualifyingThreshold that haven't been
+// processed yet, and for each one, registers qualifying entrants into the
+// next round in the same olympiad. "Next round" is inferred as the round
+// with the earliest openTime after this one, since Round has no explicit
+// ordering/sequence field of its own. Marking autoAdvanceProcessedAt keeps
+// this idempotent across ticks - each round is only ever processed once,
+// independent of exactly when or how it was closed.
+async function processAutoAdvance() {
+  const roundsToProcess = await prisma.round.findMany({
+    where: {
+      state: 'closed',
+      qualifyingThreshold: { not: null },
+      autoAdvanceProcessedAt: null,
+    },
+    include: {
+      roundEntrants: {
+        include: {
+          entrant: {
+            include: {
+              submissions: { include: { result: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  for (const round of roundsToProcess) {
+    const nextRound = await prisma.round.findFirst({
+      where: {
+        olympiadId: round.olympiadId,
+        openTime: { gt: round.openTime },
+      },
+      orderBy: { openTime: 'asc' },
+    });
+
+    if (nextRound) {
+      for (const roundEntrant of round.roundEntrants) {
+        const entrant = roundEntrant.entrant;
+        const submission = entrant.submissions.find((s) => s.roundId === round.id);
+        const score = submission?.result?.score;
+
+        // Not marked yet (still in the marking queue, or a pending remark)
+        // - skip for now. Since this round is now marked as processed
+        // below, a late marking won't retroactively advance this entrant.
+        if (score === undefined || score === null) continue;
+        if (score < round.qualifyingThreshold) continue;
+
+        const alreadyRegistered = await prisma.roundEntrant.findUnique({
+          where: { roundId_entrantId: { roundId: nextRound.id, entrantId: entrant.id } },
+        });
+
+        if (!alreadyRegistered) {
+          await prisma.roundEntrant.create({
+            data: { roundId: nextRound.id, entrantId: entrant.id },
+          });
+        }
+      }
+    }
+
+    await prisma.round.update({
+      where: { id: round.id },
+      data: { autoAdvanceProcessedAt: new Date() },
+    });
+  }
 }
 
 async function getRecipientsForRound(round) {
@@ -194,9 +268,7 @@ async function sendMissingSubmissionNotifications() {
 
       if (hasSubmitted) continue;
 
-      const recipientEmails = new Set(
-        entrant.school.educators.map((e) => e.user.email)
-      );
+      const recipientEmails = new Set(entrant.school.educators.map((e) => e.user.email));
 
       for (const email of recipientEmails) {
         const alreadyNotified = await prisma.notificationLog.findUnique({

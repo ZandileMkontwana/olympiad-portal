@@ -55,10 +55,16 @@ export function createOlympiad({ name, timezone }) {
   });
 }
 
-export function createRound({ olympiadId, name, openTime, closeTime }) {
+export function createRound({ olympiadId, name, openTime, closeTime, qualifyingThreshold }) {
   return requestJson('/api/rounds', {
     method: 'POST',
-    body: JSON.stringify({ olympiadId, name, openTime, closeTime }),
+    body: JSON.stringify({
+      olympiadId,
+      name,
+      openTime,
+      closeTime,
+      qualifyingThreshold: qualifyingThreshold ?? null,
+    }),
   });
 }
 

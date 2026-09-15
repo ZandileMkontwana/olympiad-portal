@@ -13,6 +13,10 @@ describe('startScheduler', () => {
     });
     vi.spyOn(prisma.round, 'updateMany');
     vi.spyOn(prisma.round, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.round, 'update').mockResolvedValue({});
+    vi.spyOn(prisma.round, 'findFirst').mockResolvedValue(null);
+    vi.spyOn(prisma.roundEntrant, 'findUnique').mockResolvedValue(null);
+    vi.spyOn(prisma.roundEntrant, 'create').mockResolvedValue({});
     vi.spyOn(prisma.notificationLog, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.notificationLog, 'create').mockResolvedValue({ id: 'log-1' });
     vi.spyOn(sgMail, 'send').mockResolvedValue({});
@@ -91,6 +95,117 @@ describe('startScheduler', () => {
     const closedLogs = console.log.mock.calls.filter((c) => c[0]?.includes?.('Closed'));
     expect(openedLogs).toHaveLength(0);
     expect(closedLogs).toHaveLength(0);
+  });
+
+  describe('qualifying threshold auto-advance', () => {
+    function closedRound(overrides = {}) {
+      return {
+        id: 'round-1',
+        olympiadId: 'oly-1',
+        openTime: new Date('2026-01-01'),
+        qualifyingThreshold: 50,
+        roundEntrants: [],
+        ...overrides,
+      };
+    }
+
+    function roundEntrantWithScore(score, { entrantId = 'entrant-1', roundId = 'round-1' } = {}) {
+      return {
+        entrant: {
+          id: entrantId,
+          submissions:
+            score === undefined ? [] : [{ roundId, result: score === null ? null : { score } }],
+        },
+      };
+    }
+
+    async function runAutoAdvanceTick(roundsToProcess) {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([]) // before_open
+        .mockResolvedValueOnce([]) // before_close
+        .mockResolvedValueOnce([]) // results_released
+        .mockResolvedValueOnce([]) // missing_submission
+        .mockResolvedValueOnce(roundsToProcess); // auto-advance
+      await scheduledCallback();
+    }
+
+    it('queries only closed, unprocessed rounds with a qualifyingThreshold set', async () => {
+      await runAutoAdvanceTick([]);
+      expect(prisma.round.findMany).toHaveBeenNthCalledWith(
+        5,
+        expect.objectContaining({
+          where: {
+            state: 'closed',
+            qualifyingThreshold: { not: null },
+            autoAdvanceProcessedAt: null,
+          },
+        })
+      );
+    });
+
+    it('advances an entrant who met the threshold into the next round', async () => {
+      prisma.round.findFirst.mockResolvedValue({ id: 'round-2', openTime: new Date('2026-02-01') });
+      prisma.roundEntrant.findUnique.mockResolvedValue(null);
+
+      await runAutoAdvanceTick([closedRound({ roundEntrants: [roundEntrantWithScore(80)] })]);
+
+      expect(prisma.round.findFirst).toHaveBeenCalledWith({
+        where: { olympiadId: 'oly-1', openTime: { gt: closedRound().openTime } },
+        orderBy: { openTime: 'asc' },
+      });
+      expect(prisma.roundEntrant.create).toHaveBeenCalledWith({
+        data: { roundId: 'round-2', entrantId: 'entrant-1' },
+      });
+    });
+
+    it('does not advance an entrant who scored below the threshold', async () => {
+      prisma.round.findFirst.mockResolvedValue({ id: 'round-2', openTime: new Date('2026-02-01') });
+
+      await runAutoAdvanceTick([closedRound({ roundEntrants: [roundEntrantWithScore(30)] })]);
+
+      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+    });
+
+    it('does not advance an entrant who has not been marked yet', async () => {
+      prisma.round.findFirst.mockResolvedValue({ id: 'round-2', openTime: new Date('2026-02-01') });
+
+      await runAutoAdvanceTick([closedRound({ roundEntrants: [roundEntrantWithScore(null)] })]);
+
+      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+    });
+
+    it('does not duplicate registration for an entrant already registered in the next round', async () => {
+      prisma.round.findFirst.mockResolvedValue({ id: 'round-2', openTime: new Date('2026-02-01') });
+      prisma.roundEntrant.findUnique.mockResolvedValue({ id: 'existing-registration' });
+
+      await runAutoAdvanceTick([closedRound({ roundEntrants: [roundEntrantWithScore(80)] })]);
+
+      expect(prisma.roundEntrant.findUnique).toHaveBeenCalledWith({
+        where: { roundId_entrantId: { roundId: 'round-2', entrantId: 'entrant-1' } },
+      });
+      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when there is no next round in the olympiad', async () => {
+      prisma.round.findFirst.mockResolvedValue(null);
+
+      await runAutoAdvanceTick([closedRound({ roundEntrants: [roundEntrantWithScore(80)] })]);
+
+      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+    });
+
+    it('marks the round as processed so it is not reprocessed on the next tick', async () => {
+      prisma.round.findFirst.mockResolvedValue(null);
+
+      await runAutoAdvanceTick([closedRound()]);
+
+      expect(prisma.round.update).toHaveBeenCalledWith({
+        where: { id: 'round-1' },
+        data: { autoAdvanceProcessedAt: expect.any(Date) },
+      });
+    });
   });
 
   describe('before-open reminder emails', () => {
@@ -308,17 +423,19 @@ describe('startScheduler', () => {
       startScheduler();
       prisma.round.updateMany.mockResolvedValue({ count: 0 });
       prisma.round.findMany
-        .mockResolvedValueOnce([])  // before_open
-        .mockResolvedValueOnce([{
-          id: 'round-1',
-          name: 'Round One',
-          closeTime: new Date(Date.now() + 30 * 60 * 1000),
-          roundEntrants: [
-            { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
-          ],
-        }])
-        .mockResolvedValueOnce([])  // results_released
-        .mockResolvedValueOnce([]);  // missing_submission
+        .mockResolvedValueOnce([]) // before_open
+        .mockResolvedValueOnce([
+          {
+            id: 'round-1',
+            name: 'Round One',
+            closeTime: new Date(Date.now() + 30 * 60 * 1000),
+            roundEntrants: [
+              { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
+            ],
+          },
+        ])
+        .mockResolvedValueOnce([]) // results_released
+        .mockResolvedValueOnce([]); // missing_submission
 
       await scheduledCallback();
 
@@ -343,7 +460,8 @@ describe('startScheduler', () => {
 
       await scheduledCallback();
 
-      expect(prisma.round.findMany).toHaveBeenNthCalledWith(2,
+      expect(prisma.round.findMany).toHaveBeenNthCalledWith(
+        2,
         expect.objectContaining({
           where: { state: 'open', closeTime: { gte: expect.any(Date), lte: expect.any(Date) } },
         })
@@ -355,14 +473,16 @@ describe('startScheduler', () => {
       prisma.round.updateMany.mockResolvedValue({ count: 0 });
       prisma.round.findMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{
-          id: 'round-1',
-          name: 'Round One',
-          closeTime: new Date(Date.now() + 30 * 60 * 1000),
-          roundEntrants: [
-            { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
-          ],
-        }])
+        .mockResolvedValueOnce([
+          {
+            id: 'round-1',
+            name: 'Round One',
+            closeTime: new Date(Date.now() + 30 * 60 * 1000),
+            roundEntrants: [
+              { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
+            ],
+          },
+        ])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
       prisma.notificationLog.findUnique.mockResolvedValue({ id: 'existing-log' });
@@ -378,16 +498,18 @@ describe('startScheduler', () => {
       startScheduler();
       prisma.round.updateMany.mockResolvedValue({ count: 0 });
       prisma.round.findMany
-        .mockResolvedValueOnce([])  // before_open
-        .mockResolvedValueOnce([])  // before_close
-        .mockResolvedValueOnce([{
-          id: 'round-1',
-          name: 'Round One',
-          roundEntrants: [
-            { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
-          ],
-        }])
-        .mockResolvedValueOnce([]);  // missing_submission
+        .mockResolvedValueOnce([]) // before_open
+        .mockResolvedValueOnce([]) // before_close
+        .mockResolvedValueOnce([
+          {
+            id: 'round-1',
+            name: 'Round One',
+            roundEntrants: [
+              { entrant: { school: { educators: [{ user: { email: 'educator@school.com' } }] } } },
+            ],
+          },
+        ])
+        .mockResolvedValueOnce([]); // missing_submission
 
       await scheduledCallback();
 
@@ -410,7 +532,8 @@ describe('startScheduler', () => {
 
       await scheduledCallback();
 
-      expect(prisma.round.findMany).toHaveBeenNthCalledWith(3,
+      expect(prisma.round.findMany).toHaveBeenNthCalledWith(
+        3,
         expect.objectContaining({
           where: {
             state: 'closed',
@@ -426,23 +549,25 @@ describe('startScheduler', () => {
       startScheduler();
       prisma.round.updateMany.mockResolvedValue({ count: 0 });
       prisma.round.findMany
-        .mockResolvedValueOnce([])  // before_open
-        .mockResolvedValueOnce([])  // before_close
-        .mockResolvedValueOnce([])  // results_released
-        .mockResolvedValueOnce([{
-          id: 'round-1',
-          name: 'Round One',
-          roundEntrants: [
-            {
-              entrant: {
-                id: 'entrant-1',
-                name: 'Alice',
-                school: { educators: [{ user: { email: 'educator@school.com' } }] },
-                submissions: [],
+        .mockResolvedValueOnce([]) // before_open
+        .mockResolvedValueOnce([]) // before_close
+        .mockResolvedValueOnce([]) // results_released
+        .mockResolvedValueOnce([
+          {
+            id: 'round-1',
+            name: 'Round One',
+            roundEntrants: [
+              {
+                entrant: {
+                  id: 'entrant-1',
+                  name: 'Alice',
+                  school: { educators: [{ user: { email: 'educator@school.com' } }] },
+                  submissions: [],
+                },
               },
-            },
-          ],
-        }]);
+            ],
+          },
+        ]);
 
       await scheduledCallback();
 
@@ -467,20 +592,22 @@ describe('startScheduler', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{
-          id: 'round-1',
-          name: 'Round One',
-          roundEntrants: [
-            {
-              entrant: {
-                id: 'entrant-1',
-                name: 'Alice',
-                school: { educators: [{ user: { email: 'educator@school.com' } }] },
-                submissions: [{ roundId: 'round-1' }],
+        .mockResolvedValueOnce([
+          {
+            id: 'round-1',
+            name: 'Round One',
+            roundEntrants: [
+              {
+                entrant: {
+                  id: 'entrant-1',
+                  name: 'Alice',
+                  school: { educators: [{ user: { email: 'educator@school.com' } }] },
+                  submissions: [{ roundId: 'round-1' }],
+                },
               },
-            },
-          ],
-        }]);
+            ],
+          },
+        ]);
 
       await scheduledCallback();
 
@@ -493,7 +620,8 @@ describe('startScheduler', () => {
 
       await scheduledCallback();
 
-      expect(prisma.round.findMany).toHaveBeenNthCalledWith(4,
+      expect(prisma.round.findMany).toHaveBeenNthCalledWith(
+        4,
         expect.objectContaining({ where: { state: 'closed' } })
       );
     });

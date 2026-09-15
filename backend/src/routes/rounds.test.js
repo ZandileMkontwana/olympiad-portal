@@ -132,8 +132,47 @@ describe('Rounds routes', () => {
           name: 'Round 1',
           openTime: new Date('2026-01-01T00:00:00Z'),
           closeTime: new Date('2026-01-02T00:00:00Z'),
+          qualifyingThreshold: null,
         },
       });
+    });
+
+    it('creates round with a qualifyingThreshold when provided', async () => {
+      prisma.round.create.mockResolvedValue({ id: '1', name: 'Round 1', qualifyingThreshold: 60 });
+      const res = await request(app).post('/api/rounds').send({
+        olympiadId: '1',
+        name: 'Round 1',
+        openTime: '2026-01-01T00:00:00Z',
+        closeTime: '2026-01-02T00:00:00Z',
+        qualifyingThreshold: 60,
+      });
+      expect(res.status).toBe(201);
+      expect(prisma.round.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ qualifyingThreshold: 60 }),
+      });
+    });
+
+    it('returns 400 when qualifyingThreshold is out of range', async () => {
+      const res = await request(app).post('/api/rounds').send({
+        olympiadId: '1',
+        name: 'Round 1',
+        openTime: '2026-01-01T00:00:00Z',
+        closeTime: '2026-01-02T00:00:00Z',
+        qualifyingThreshold: 150,
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/qualifyingThreshold/);
+    });
+
+    it('returns 400 when qualifyingThreshold is not a number', async () => {
+      const res = await request(app).post('/api/rounds').send({
+        olympiadId: '1',
+        name: 'Round 1',
+        openTime: '2026-01-01T00:00:00Z',
+        closeTime: '2026-01-02T00:00:00Z',
+        qualifyingThreshold: 'sixty',
+      });
+      expect(res.status).toBe(400);
     });
 
     it('returns 500 on prisma error', async () => {
@@ -374,6 +413,79 @@ describe('Rounds routes', () => {
     it('returns 500 on error', async () => {
       prisma.submission.findMany.mockRejectedValue(new Error('DB error'));
       const res = await request(app).get('/api/rounds/1/submissions');
+      expect(res.status).toBe(500);
+    });
+  });
+
+  describe('GET /api/rounds/:id/progression', () => {
+    it('returns 404 when the round does not exist', async () => {
+      prisma.round.findUnique.mockResolvedValue(null);
+      const res = await request(app).get('/api/rounds/round-1/progression');
+      expect(res.status).toBe(404);
+    });
+
+    it('returns an explanatory message when the round has no qualifyingThreshold', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        qualifyingThreshold: null,
+        roundEntrants: [],
+      });
+      const res = await request(app).get('/api/rounds/round-1/progression');
+      expect(res.status).toBe(200);
+      expect(res.body.entrants).toEqual([]);
+      expect(res.body.message).toMatch(/no qualifyingThreshold/);
+    });
+
+    it('marks entrants as qualifying or not based on their score', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        qualifyingThreshold: 50,
+        roundEntrants: [
+          {
+            entrant: {
+              id: 'e1',
+              name: 'Alice',
+              submissions: [{ result: { score: 80 } }],
+            },
+          },
+          {
+            entrant: {
+              id: 'e2',
+              name: 'Bob',
+              submissions: [{ result: { score: 30 } }],
+            },
+          },
+        ],
+      });
+
+      const res = await request(app).get('/api/rounds/round-1/progression');
+
+      expect(res.status).toBe(200);
+      expect(res.body.qualifyingThreshold).toBe(50);
+      expect(res.body.entrants).toEqual([
+        { entrantId: 'e1', name: 'Alice', score: 80, qualifies: true },
+        { entrantId: 'e2', name: 'Bob', score: 30, qualifies: false },
+      ]);
+    });
+
+    it('marks unmarked entrants (no result yet) as not qualifying, with a null score', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        qualifyingThreshold: 50,
+        roundEntrants: [{ entrant: { id: 'e1', name: 'Alice', submissions: [] } }],
+      });
+
+      const res = await request(app).get('/api/rounds/round-1/progression');
+
+      expect(res.status).toBe(200);
+      expect(res.body.entrants).toEqual([
+        { entrantId: 'e1', name: 'Alice', score: null, qualifies: false },
+      ]);
+    });
+
+    it('returns 500 on unexpected error', async () => {
+      prisma.round.findUnique.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).get('/api/rounds/round-1/progression');
       expect(res.status).toBe(500);
     });
   });
