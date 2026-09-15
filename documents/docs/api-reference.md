@@ -2,7 +2,7 @@
 
 All endpoints are mounted under the `/api` prefix.
 
-**Production base URL:** `https://olympiad-portal.onrender.com` — e.g. <https://olympiad-portal.onrender.com/api/olympiads>. For local development the backend runs at `http://localhost:5000`.
+**Production base URL:** `https://olympiad-portal.onrender.com` — e.g. `/api/olympiads`. For local development the backend runs at `http://localhost:5000`.
 
 ## Authentication
 
@@ -11,6 +11,8 @@ Authentication is handled by **Clerk** (`@clerk/express`). Protected endpoints r
 There is no `POST /api/auth/login` or `POST /api/auth/register` endpoint. Registration and login are managed entirely through Clerk's hosted UI or embedded components on the frontend.
 
 Organiser accounts are created via the seed script (`node prisma/seed.js`), not self-registration.
+
+
 
 ### POST /api/educators/complete-profile
 
