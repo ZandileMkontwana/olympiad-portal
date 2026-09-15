@@ -101,7 +101,12 @@ describe('Students routes', () => {
           startedAt: '2026-09-01T10:00:00.000Z',
           expiresAt: '2026-09-01T12:00:00.000Z',
           completedAt: null,
-          round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: '2026-09-01T12:00:00.000Z' },
+          round: {
+            id: 'round-1',
+            name: 'Round 1',
+            state: 'open',
+            closeTime: '2026-09-01T12:00:00.000Z',
+          },
         },
       ];
       prisma.sitting.findMany.mockResolvedValue(sittings);
@@ -214,7 +219,7 @@ describe('Students routes', () => {
       expect(res.body.error).toMatch(/No entrant record linked/);
     });
 
-    it('scopes the lookup to the student\'s own released result', async () => {
+    it("scopes the lookup to the student's own released result", async () => {
       prisma.submission.findFirst.mockResolvedValue(null);
       const res = await request(app).get('/api/students/me/results/result-1');
 
@@ -319,15 +324,41 @@ describe('Students routes', () => {
       prisma.roundEntrant.upsert.mockResolvedValue({ id: 're-1' });
       // Round 1 has a sitting, Round 2 does not
       prisma.sitting.findFirst
-        .mockResolvedValueOnce({ id: 'sitting-1', completedAt: null, startedAt: '2026-09-01T10:00:00.000Z', expiresAt: '2030-01-01T00:00:00.000Z' })
+        .mockResolvedValueOnce({
+          id: 'sitting-1',
+          completedAt: null,
+          startedAt: '2026-09-01T10:00:00.000Z',
+          expiresAt: '2030-01-01T00:00:00.000Z',
+        })
         .mockResolvedValueOnce(null);
 
       const res = await request(app).get('/api/students/me/rounds');
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual([
-        { round: { id: 'round-1', name: 'Round 1', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' }, sitting: { id: 'sitting-1', completedAt: null, startedAt: '2026-09-01T10:00:00.000Z', expiresAt: '2030-01-01T00:00:00.000Z' } },
-        { round: { id: 'round-2', name: 'Round 2', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' }, sitting: null },
+        {
+          round: {
+            id: 'round-1',
+            name: 'Round 1',
+            state: 'open',
+            closeTime: '2030-01-01T00:00:00.000Z',
+          },
+          sitting: {
+            id: 'sitting-1',
+            completedAt: null,
+            startedAt: '2026-09-01T10:00:00.000Z',
+            expiresAt: '2030-01-01T00:00:00.000Z',
+          },
+        },
+        {
+          round: {
+            id: 'round-2',
+            name: 'Round 2',
+            state: 'open',
+            closeTime: '2030-01-01T00:00:00.000Z',
+          },
+          sitting: null,
+        },
       ]);
       expect(prisma.round.findMany).toHaveBeenCalledWith({
         where: { state: 'open' },

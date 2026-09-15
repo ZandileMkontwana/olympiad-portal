@@ -71,51 +71,11 @@ export function listRounds() {
 }
 
 /**
- * Fetches all papers from closed or released rounds.
- * Wired to GET /api/papers/archive (backend/src/routes/papers.js).
- *
- * @returns {Promise<Array<{
- *   id: string,
- *   roundId: string,
- *   roundName: string,
- *   olympiadName: string,
- *   closeTime: string,
- *   fileUrl: string,
- *   memoUrl: string|null,
- *   uploadedAt: string,
- * }>>}
+ * Fetches archived papers. Kept after removing the student self-registration
+ * flow because the archive page still uses it.
  */
 export function fetchArchivedPapers() {
   return requestJson('/api/papers/archive');
-}
-
-/**
- * Lists every school registered on the platform (id + name only).
- * Wired to GET /api/schools (backend/src/routes/schools.js).
- * Used by the student registration form so students pick their school
- * from a list instead of guessing the exact spelling their educator used.
- *
- * @returns {Promise<Array<{id: string, name: string}>>}
- */
-export function listSchools() {
-  return requestJson('/api/schools');
-}
-
-/**
- * Completes a student's profile by linking their Clerk account to an
- * existing Entrant record matched by name + school.
- * Wired to POST /api/students/complete-profile (backend/src/routes/auth.js).
- *
- * @param {{name: string, schoolName: string}} profile
- * @param {string} token - Clerk JWT for the Authorization header
- * @returns {Promise<{id: string, email: string, role: string, name: string, school: string}>}
- */
-export function completeStudentProfile({ name, schoolName }, token) {
-  return requestJson('/api/students/complete-profile', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name, schoolName }),
-  });
 }
 
 /**
@@ -134,7 +94,7 @@ export function fetchRoundEntrants(roundId) {
  * Wired to GET /api/entrants (backend/src/routes/entrants.js).
  *
  * @param {string} token - Clerk JWT for the Authorization header
- * @returns {Promise<Array<{id: string, name: string, grade: string, schoolId: string}>>}
+ * @returns {Promise<Array<{id: string, name: string, grade: string, schoolId: string, email: string|null, accountStatus: 'active'|'invite_pending'|null}>>}
  */
 export function listSchoolEntrants(token) {
   return requestJson('/api/entrants', {
@@ -143,18 +103,85 @@ export function listSchoolEntrants(token) {
 }
 
 /**
- * Adds a student (entrant) to the signed-in educator's school.
+ * Registers a student at the signed-in educator's school: creates the
+ * entrant record AND their student account, then emails them an
+ * invitation to set a password.
  * Wired to POST /api/entrants (backend/src/routes/entrants.js).
  *
- * @param {{name: string, grade: string}} entrant
+ * @param {{name: string, email: string, grade: string}} entrant
  * @param {string} token - Clerk JWT for the Authorization header
- * @returns {Promise<{id: string, name: string, grade: string, schoolId: string}>}
+ * @returns {Promise<{id: string, name: string, grade: string, schoolId: string, email: string, accountStatus: string, invitationSent: boolean}>}
  */
-export function createEntrant({ name, grade }, token) {
+export function createEntrant({ name, email, grade }, token) {
   return requestJson('/api/entrants', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name, grade }),
+    body: JSON.stringify({ name, email, grade }),
+  });
+}
+
+/**
+ * Re-sends the set-password invitation for one of the educator's students.
+ * Wired to POST /api/entrants/:id/resend-invite (backend/src/routes/entrants.js).
+ * `email` is only needed for legacy students that have no account yet.
+ *
+ * @param {string} entrantId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @param {{email?: string}} [body]
+ * @returns {Promise<{message: string, invitationSent: boolean}>}
+ */
+export function resendEntrantInvite(entrantId, token, body = {}) {
+  return requestJson(`/api/entrants/${entrantId}/resend-invite`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Removes a student from the educator's school — deletes the entrant, their
+ * account, and all their submissions/results. The page confirms first;
+ * this cannot be undone.
+ * Wired to DELETE /api/entrants/:id (backend/src/routes/entrants.js).
+ *
+ * @param {string} entrantId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{message: string}>}
+ */
+export function deleteEntrant(entrantId, token) {
+  return requestJson(`/api/entrants/${entrantId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Student email + password sign-in. Students are registered by their
+ * educator and set their password via an emailed invitation link.
+ * Wired to POST /api/students/login (backend/src/routes/studentAuth.js).
+ *
+ * @param {{email: string, password: string}} credentials
+ * @returns {Promise<{token: string, user: {id: string, email: string, role: string, name: string, school: {id: string, name: string}|null, entrantId: string|null}}>}
+ */
+export function studentLogin({ email, password }) {
+  return requestJson('/api/students/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+/**
+ * Activates a student account from an emailed invitation token by setting
+ * their chosen password. Returns a session so they're signed in immediately.
+ * Wired to POST /api/students/set-password (backend/src/routes/studentAuth.js).
+ *
+ * @param {{token: string, password: string}} payload
+ * @returns {Promise<{token: string, user: object}>}
+ */
+export function setStudentPassword({ token, password }) {
+  return requestJson('/api/students/set-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
   });
 }
 
@@ -447,7 +474,6 @@ export function fetchStandings(roundId) {
 export function getSchoolStandings(roundId) {
   return requestJson(`/api/rounds/${roundId}/standings/schools`);
 }
-
 
 /**
  * Fetches all 4 notification trigger types for a round, with their current

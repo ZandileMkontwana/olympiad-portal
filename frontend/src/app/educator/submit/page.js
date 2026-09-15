@@ -287,23 +287,23 @@ function SubmissionTableContent() {
 
   if (loading) {
     return (
-      <main className="round-page">
+      <div className="round-page">
         <p>Loading...</p>
-      </main>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <main className="round-page">
+      <div className="round-page">
         <div className="message">{error}</div>
-      </main>
+      </div>
     );
   }
 
   if (round.state !== 'open') {
     return (
-      <main className="round-page">
+      <div className="round-page">
         <h1>Submit Results</h1>
         <div className="card">
           <p className="description">
@@ -319,12 +319,12 @@ function SubmissionTableContent() {
               'This round has closed and results have been released. Submissions are no longer accepted.'}
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="round-page" style={{ position: 'relative' }}>
+    <div className="round-page" style={{ position: 'relative' }}>
       {toast && (
         <div
           role="alert"
@@ -524,13 +524,13 @@ function SubmissionTableContent() {
           </table>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 
 export default function SubmissionTablePage() {
   return (
-    <Suspense fallback={<main className="round-page">Loading...</main>}>
+    <Suspense fallback={<div className="round-page">Loading...</div>}>
       <SubmissionTableContent />
     </Suspense>
   );

@@ -24,17 +24,26 @@ The focus of Sprint 1 is the piece the brief identifies as the core of the entir
 
 ## Sprint 2 — Rest of Basic Tier + Start of Intermediate
 
+The focus of Sprint 2 was the online test-taking journey end to end — start a timed sitting, autosave, resume after a disconnect, submit with automarking — plus the notifications, standings and dashboard features around it.
+
+**Delivered:**
 - Past-paper archive, downloadable once released
 - Organiser console and educator portal UI polish
-- Online sitting: timer, autosave, resume-on-disconnect
-- Marking beyond MCQ: moderation queue, partial credit
-- Qualifying-threshold round advancement
+- Online sitting: timed sessions, autosave, resume-on-disconnect, submission with automarking
+- Configurable notifications: per-round rules for four trigger types, SendGrid delivery, exactly-once logging
+- Standings and per-school rankings
+- Certificates, generated on request as PDFs
+- Student login (claim-code account ↔ entrant linking) and student/school dashboards
+- Backend on Render with the database on Supabase, and CI running lint plus both test suites on every push and PR
+
+**Descoped to Sprint 3 (team decision at sprint close):**
+- Marking beyond MCQ — moderation queue, partial credit and remark requests. Sprint capacity went to the online-sitting chain and the notification/standings/dashboard cluster; MCQ automarking already covers the basic tier's marking requirement.
+- Qualifying-threshold round advancement — it depends on marks being final, which depends on the marking work above, so it moves with it.
 
 ## Sprint 3 — Intermediate Finish + Start of Advanced
 
-- Configurable notifications (reminders, results-out)
-- Standings and certificates
-- Student login and per-school dashboard
+- Marking beyond MCQ: moderation queue, partial credit, remark requests (carried over from Sprint 2)
+- Qualifying-threshold round advancement (carried over from Sprint 2)
 - Concurrency hardening at round open/close under load
 - Idempotent submission handling (already partially in place via `idempotencyKey`)
 

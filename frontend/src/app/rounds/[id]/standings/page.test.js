@@ -83,7 +83,13 @@ describe('StandingsPage', () => {
     it('fetches and renders school standings when the tab is clicked', async () => {
       fetchStandings.mockResolvedValue([]);
       getSchoolStandings.mockResolvedValue([
-        { rank: 1, schoolId: 'school-1', schoolName: 'Wits High School', totalScore: 50, entrantCount: 2 },
+        {
+          rank: 1,
+          schoolId: 'school-1',
+          schoolName: 'Wits High School',
+          totalScore: 50,
+          entrantCount: 2,
+        },
       ]);
 
       render(<StandingsPage />);
@@ -124,7 +130,9 @@ describe('StandingsPage', () => {
 
       fireEvent.click(screen.getByRole('tab', { name: /per school/i }));
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('Failed to fetch school standings');
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Failed to fetch school standings'
+      );
     });
   });
 });

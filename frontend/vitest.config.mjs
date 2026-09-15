@@ -24,6 +24,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
     include: ['src/**/*.test.{js,jsx}'],
+    // Parallel jsdom workers fail to start on slow, OneDrive-synced
+    // filesystems; the suite is small enough to run fine sequentially.
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'html', 'lcov'],

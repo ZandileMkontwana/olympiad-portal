@@ -149,7 +149,12 @@ export default function NotificationsConfigPage() {
                     </select>
 
                     <label
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                      }}
                     >
                       <input
                         type="checkbox"
