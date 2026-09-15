@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ApiError,
+  listOlympiads,
   createOlympiad,
+  updateOlympiad,
+  requestOlympiadAccess,
+  fetchAccessRequests,
+  approveAccessRequest,
+  declineAccessRequest,
   createRound,
   listOlympiadRounds,
   listRounds,
@@ -137,6 +143,200 @@ describe('api client', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ name: 'Test', timezone: 'UTC' }),
+        })
+      );
+    });
+
+    it('sends the info fields in the body', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: '1' }),
+      });
+      await createOlympiad({
+        name: 'Test',
+        timezone: 'UTC',
+        description: 'A maths olympiad',
+        grades: 'Grade 8–12',
+        startDate: '2026-02-01',
+        endDate: '2026-03-01',
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            name: 'Test',
+            timezone: 'UTC',
+            description: 'A maths olympiad',
+            grades: 'Grade 8–12',
+            startDate: '2026-02-01',
+            endDate: '2026-03-01',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('listOlympiads', () => {
+    it('sends GET to /api/olympiads without a token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 'olympiad-1', rounds: [] }]),
+      });
+
+      const result = await listOlympiads();
+
+      expect(result[0].id).toBe('olympiad-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+    });
+
+    it('forwards the Bearer token when provided for school-access enrichment', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve([{ id: 'olympiad-1', schoolAccess: 'none', schoolEntrantCounts: [] }]),
+      });
+
+      const result = await listOlympiads('test-token');
+
+      expect(result[0].schoolAccess).toBe('none');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('updateOlympiad', () => {
+    it('sends PUT with Bearer token and JSON body', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'olympiad-1', name: 'New' }),
+      });
+
+      const result = await updateOlympiad(
+        'olympiad-1',
+        { name: 'New', description: 'A maths olympiad' },
+        'test-token'
+      );
+
+      expect(result.name).toBe('New');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads/olympiad-1',
+        expect.objectContaining({
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ name: 'New', description: 'A maths olympiad' }),
+        })
+      );
+    });
+  });
+
+  describe('requestOlympiadAccess', () => {
+    it('sends POST to /api/olympiads/:id/request-access with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ status: 'pending' }),
+      });
+
+      const result = await requestOlympiadAccess('olympiad-1', 'test-token');
+
+      expect(result.status).toBe('pending');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads/olympiad-1/request-access',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('fetchAccessRequests', () => {
+    it('sends GET to /api/olympiads/access-requests with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve([
+            {
+              id: 'so-1',
+              school: { id: 'school-1', name: 'Test School' },
+              olympiad: { id: 'olympiad-1', name: 'Maths Olympiad' },
+              requestedBy: { id: 'user-1', name: 'Teacher One', email: 'teacher@school.com' },
+              requestedAt: '2026-02-01T10:00:00.000Z',
+            },
+          ]),
+      });
+
+      const result = await fetchAccessRequests('test-token');
+
+      expect(result[0].school.name).toBe('Test School');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads/access-requests',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('approveAccessRequest', () => {
+    it('sends POST to /api/olympiads/access-requests/:id/approve with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'so-1', status: 'approved' }),
+      });
+
+      const result = await approveAccessRequest('so-1', 'test-token');
+
+      expect(result.status).toBe('approved');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads/access-requests/so-1/approve',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('declineAccessRequest', () => {
+    it('sends POST to /api/olympiads/access-requests/:id/decline with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'so-1', status: 'declined' }),
+      });
+
+      const result = await declineAccessRequest('so-1', 'test-token');
+
+      expect(result.status).toBe('declined');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads/access-requests/so-1/decline',
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
         })
       );
     });
@@ -389,7 +589,15 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 201,
-        json: () => Promise.resolve({ id: 'e1', name: 'Alice', grade: '10', email: 'alice@school.com', accountStatus: 'invite_pending', invitationSent: true }),
+        json: () =>
+          Promise.resolve({
+            id: 'e1',
+            name: 'Alice',
+            grade: '10',
+            email: 'alice@school.com',
+            accountStatus: 'invite_pending',
+            invitationSent: true,
+          }),
       });
       const result = await createEntrant(
         { name: 'Alice', email: 'alice@school.com', grade: '10' },
@@ -605,10 +813,11 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({
-          token: 'jwt-token',
-          user: { id: 'user-1', email: 'student@school.com', role: 'student' },
-        }),
+        json: () =>
+          Promise.resolve({
+            token: 'jwt-token',
+            user: { id: 'user-1', email: 'student@school.com', role: 'student' },
+          }),
       });
 
       const result = await studentLogin({ email: 'student@school.com', password: 'secret123' });
@@ -649,10 +858,11 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({
-          token: 'jwt-token',
-          user: { id: 'user-1', email: 'student@school.com', role: 'student' },
-        }),
+        json: () =>
+          Promise.resolve({
+            token: 'jwt-token',
+            user: { id: 'user-1', email: 'student@school.com', role: 'student' },
+          }),
       });
 
       const result = await setStudentPassword({ token: 'invite-token', password: 'newpass123' });
@@ -733,12 +943,15 @@ describe('api client', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({
-          id: 'result-1',
-          score: 80,
-          round: { id: 'round-1', name: 'Round 1' },
-          questions: [{ questionId: 'q1', correctAnswer: 'A', studentAnswer: 'A', isCorrect: true }],
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 'result-1',
+            score: 80,
+            round: { id: 'round-1', name: 'Round 1' },
+            questions: [
+              { questionId: 'q1', correctAnswer: 'A', studentAnswer: 'A', isCorrect: true },
+            ],
+          }),
       });
 
       const result = await fetchMyResult('result-1', 'test-token');

@@ -99,8 +99,9 @@ router.get('/schools/:id/entrants', ...requireSchoolAccess(), async (req, res) =
 });
 
 // GET /schools/:id/dashboard
-// Aggregated stats: entrant count, submission count, and average score
-// per entrant across all rounds they've sat.
+// Aggregated stats: entrant count, submission count, average score per
+// entrant across all rounds they've sat, and the olympiads each entrant is
+// registered under (for the student cards).
 router.get('/schools/:id/dashboard', ...requireSchoolAccess(), async (req, res) => {
   try {
     const { id: schoolId } = req.params;
@@ -120,6 +121,9 @@ router.get('/schools/:id/dashboard', ...requireSchoolAccess(), async (req, res) 
       include: {
         submissions: { include: { result: true } },
         user: { select: { email: true, passwordHash: true } },
+        roundEntrants: {
+          include: { round: { select: { olympiad: { select: { id: true, name: true } } } } },
+        },
       },
     });
 
@@ -130,6 +134,15 @@ router.get('/schools/:id/dashboard', ...requireSchoolAccess(), async (req, res) 
 
       const averageScore =
         scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+
+      // Distinct olympiads this entrant has round registrations in — a
+      // student is "under" an olympiad exactly when they have a RoundEntrant
+      // row for one of its rounds.
+      const olympiadById = new Map();
+      for (const registration of entrant.roundEntrants) {
+        const olympiad = registration.round.olympiad;
+        if (olympiad) olympiadById.set(olympiad.id, olympiad);
+      }
 
       return {
         id: entrant.id,
@@ -143,6 +156,7 @@ router.get('/schools/:id/dashboard', ...requireSchoolAccess(), async (req, res) 
           : null,
         submissionCount: entrant.submissions.length,
         averageScore,
+        olympiads: [...olympiadById.values()].sort((a, b) => a.name.localeCompare(b.name)),
       };
     });
 

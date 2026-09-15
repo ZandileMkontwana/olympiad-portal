@@ -104,11 +104,19 @@ router.post('/entrants', ...requireRole('educator'), async (req, res) => {
       return created;
     });
 
-    // Auto-register the new entrant for all currently open rounds,
-    // so they can immediately take any active test.
+    // Auto-register the new entrant for all currently open rounds of
+    // olympiads the school has approved access to, so they can immediately
+    // take any active test.
+    const approvedAccess = await prisma.schoolOlympiad.findMany({
+      where: { schoolId: educator.schoolId, status: 'approved' },
+      select: { olympiadId: true },
+    });
     const openRounds = await prisma.round.findMany({
-      where: { state: 'open' },
-      select: { id: true },
+      where: {
+        state: 'open',
+        olympiadId: { in: approvedAccess.map((access) => access.olympiadId) },
+      },
+      select: { id: true, name: true, olympiad: { select: { name: true } } },
     });
     if (openRounds.length > 0) {
       await prisma.roundEntrant.createMany({
@@ -129,6 +137,13 @@ router.post('/entrants', ...requireRole('educator'), async (req, res) => {
       email: normalizedEmail,
       accountStatus: 'invite_pending',
       invitationSent,
+      // Which open rounds the entrant was registered for, so the educator
+      // can see which olympiads the student now falls under.
+      registeredRounds: openRounds.map((round) => ({
+        id: round.id,
+        name: round.name,
+        olympiadName: round.olympiad.name,
+      })),
     });
   } catch (err) {
     console.error(err);

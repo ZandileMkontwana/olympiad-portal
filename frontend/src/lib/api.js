@@ -44,14 +44,106 @@ async function requestJson(path, options = {}) {
   return data;
 }
 
-export function listOlympiads() {
-  return requestJson('/api/olympiads');
+/**
+ * Lists all olympiads with their rounds. When the educator's Clerk token is
+ * provided, the backend also returns their school's access state and the
+ * entrant count per school for each olympiad.
+ * Wired to GET /api/olympiads (backend/src/routes/rounds.js).
+ *
+ * @param {string} [token] - Clerk JWT for the Authorization header
+ */
+export function listOlympiads(token) {
+  return requestJson('/api/olympiads', {
+    ...(token && { headers: { Authorization: `Bearer ${token}` } }),
+  });
 }
 
-export function createOlympiad({ name, timezone }) {
+export function createOlympiad({ name, timezone, description, grades, startDate, endDate }) {
   return requestJson('/api/olympiads', {
     method: 'POST',
-    body: JSON.stringify({ name, timezone }),
+    body: JSON.stringify({ name, timezone, description, grades, startDate, endDate }),
+  });
+}
+
+/**
+ * Edits an olympiad's details and organiser-set info fields (description,
+ * grades, run dates) shown to educators on the info card.
+ * Wired to PUT /api/olympiads/:id (backend/src/routes/rounds.js).
+ *
+ * @param {string} olympiadId
+ * @param {{name?: string, timezone?: string, description?: string, grades?: string, startDate?: string, endDate?: string}} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function updateOlympiad(olympiadId, data, token) {
+  return requestJson(`/api/olympiads/${olympiadId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Asks the organiser to grant the signed-in educator's school access to an
+ * olympiad. Re-requesting is allowed after a decline.
+ * Wired to POST /api/olympiads/:id/request-access (backend/src/routes/rounds.js).
+ *
+ * @param {string} olympiadId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{status: string}>}
+ */
+export function requestOlympiadAccess(olympiadId, token) {
+  return requestJson(`/api/olympiads/${olympiadId}/request-access`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Lists pending school access requests for the organiser console.
+ * Wired to GET /api/olympiads/access-requests (backend/src/routes/rounds.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   school: {id: string, name: string},
+ *   olympiad: {id: string, name: string},
+ *   requestedBy: {id: string, name: string, email: string}|null,
+ *   requestedAt: string,
+ * }>>}
+ */
+export function fetchAccessRequests(token) {
+  return requestJson('/api/olympiads/access-requests', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Approves a pending school access request.
+ * Wired to POST /api/olympiads/access-requests/:id/approve (backend/src/routes/rounds.js).
+ *
+ * @param {string} requestId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{id: string, status: string}>}
+ */
+export function approveAccessRequest(requestId, token) {
+  return requestJson(`/api/olympiads/access-requests/${requestId}/approve`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Declines a pending school access request.
+ * Wired to POST /api/olympiads/access-requests/:id/decline (backend/src/routes/rounds.js).
+ *
+ * @param {string} requestId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{id: string, status: string}>}
+ */
+export function declineAccessRequest(requestId, token) {
+  return requestJson(`/api/olympiads/access-requests/${requestId}/decline`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
   });
 }
 

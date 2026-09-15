@@ -43,9 +43,13 @@ describe('Entrants routes', () => {
     vi.spyOn(prisma.roundEntrant, 'createMany');
     vi.spyOn(prisma.roundEntrant, 'deleteMany');
     vi.spyOn(prisma.notificationLog, 'deleteMany');
+    vi.spyOn(prisma.schoolOlympiad, 'findMany');
     vi.spyOn(prisma, '$transaction');
     vi.spyOn(sgMail, 'send').mockResolvedValue([{}]);
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Default: the school has approved access to olympiad-1, so the
+    // auto-registration step can match open rounds of that olympiad.
+    prisma.schoolOlympiad.findMany.mockResolvedValue([{ olympiadId: 'olympiad-1' }]);
     // Default: the Clerk user maps to an educator linked to school-1
     prisma.user.findUnique.mockImplementation(({ where }) => {
       if (where.clerkUserId) {
@@ -217,6 +221,7 @@ describe('Entrants routes', () => {
       expect(res.body.email).toBe('alice@school.com');
       expect(res.body.accountStatus).toBe('invite_pending');
       expect(res.body.invitationSent).toBe(true);
+      expect(res.body.registeredRounds).toEqual([]);
 
       expect(prisma.entrant.create).toHaveBeenCalledWith({
         data: { name: 'Alice', grade: '10', schoolId: 'school-1' },
@@ -267,7 +272,10 @@ describe('Entrants routes', () => {
         name: 'Alice',
         grade: '10',
       });
-      prisma.round.findMany.mockResolvedValue([{ id: 'round-1' }, { id: 'round-2' }]);
+      prisma.round.findMany.mockResolvedValue([
+        { id: 'round-1', name: 'Round One', olympiad: { name: 'Maths Olympiad' } },
+        { id: 'round-2', name: 'Round Two', olympiad: { name: 'Science Olympiad' } },
+      ]);
       prisma.roundEntrant.createMany.mockResolvedValue({ count: 2 });
 
       const res = await request(app)
@@ -275,9 +283,19 @@ describe('Entrants routes', () => {
         .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
 
       expect(res.status).toBe(201);
+      // The response tells the educator which rounds (and olympiads) the
+      // student was registered into
+      expect(res.body.registeredRounds).toEqual([
+        { id: 'round-1', name: 'Round One', olympiadName: 'Maths Olympiad' },
+        { id: 'round-2', name: 'Round Two', olympiadName: 'Science Olympiad' },
+      ]);
+      expect(prisma.schoolOlympiad.findMany).toHaveBeenCalledWith({
+        where: { schoolId: 'school-1', status: 'approved' },
+        select: { olympiadId: true },
+      });
       expect(prisma.round.findMany).toHaveBeenCalledWith({
-        where: { state: 'open' },
-        select: { id: true },
+        where: { state: 'open', olympiadId: { in: ['olympiad-1'] } },
+        select: { id: true, name: true, olympiad: { select: { name: true } } },
       });
       expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
         data: [
@@ -286,6 +304,29 @@ describe('Entrants routes', () => {
         ],
         skipDuplicates: true,
       });
+    });
+
+    it('skips auto-registration when the school has no approved olympiad access', async () => {
+      prisma.entrant.create.mockResolvedValue({
+        id: 'entrant-1',
+        schoolId: 'school-1',
+        name: 'Alice',
+        grade: '10',
+      });
+      prisma.schoolOlympiad.findMany.mockResolvedValue([]);
+      prisma.round.findMany.mockResolvedValue([]);
+
+      const res = await request(app)
+        .post('/api/entrants')
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.registeredRounds).toEqual([]);
+      expect(prisma.round.findMany).toHaveBeenCalledWith({
+        where: { state: 'open', olympiadId: { in: [] } },
+        select: { id: true, name: true, olympiad: { select: { name: true } } },
+      });
+      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
     });
 
     it('returns 500 on unexpected error', async () => {
