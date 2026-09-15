@@ -4,12 +4,63 @@ const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
+// POST /api/submissions/:id/remark
+// Create a new remark request for a submission.
+router.post('/submissions/:id/remark', ...requireRole('educator'), async (req, res) => {
+  const { reason } = req.body;
+
+  if (!reason || !reason.trim()) {
+    return res.status(400).json({ error: 'reason is required' });
+  }
+
+  try {
+    const submission = await prisma.submission.findUnique({
+      where: { id: req.params.id },
+      include: {
+        result: true,
+      },
+    });
+
+    if (!submission) {
+      return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    if (!submission.result) {
+      return res.status(400).json({
+        error: 'Cannot request a remark for a submission that has not been marked',
+      });
+    }
+
+    const existingPending = await prisma.remarkRequest.findFirst({
+      where: {
+        submissionId: req.params.id,
+        status: 'pending',
+      },
+    });
+
+    if (existingPending) {
+      return res.status(409).json({
+        error: 'A remark request is already pending for this submission',
+      });
+    }
+
+    const remarkRequest = await prisma.remarkRequest.create({
+      data: {
+        submissionId: req.params.id,
+        requestedById: req.user.id,
+        reason: reason.trim(),
+      },
+    });
+
+    res.status(201).json(remarkRequest);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not create remark request' });
+  }
+});
+
 // PATCH /api/remark/:id/review
 // An organiser approves or rejects a pending remark request.
-// - On approval, `newScore` is required and is written to the submission's
-//   Result (creating one if it didn't exist yet, e.g. for a submission that
-//   was manually marked via MarkingTask rather than automarked).
-// - On rejection, no score changes are made.
 router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res) => {
   const { status, newScore, reviewNotes } = req.body;
 
@@ -22,7 +73,10 @@ router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res)
   }
 
   try {
-    const remarkRequest = await prisma.remarkRequest.findUnique({ where: { id: req.params.id } });
+    const remarkRequest = await prisma.remarkRequest.findUnique({
+      where: { id: req.params.id },
+    });
+
     if (!remarkRequest) {
       return res.status(404).json({ error: 'Remark request not found' });
     }
@@ -48,7 +102,10 @@ router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res)
       await prisma.result.upsert({
         where: { submissionId: remarkRequest.submissionId },
         update: { score: newScore },
-        create: { submissionId: remarkRequest.submissionId, score: newScore },
+        create: {
+          submissionId: remarkRequest.submissionId,
+          score: newScore,
+        },
       });
     }
 
