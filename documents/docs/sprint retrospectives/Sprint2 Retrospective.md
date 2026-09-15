@@ -63,6 +63,40 @@
  
 - Confirm with the team whether `recipientRole: 'organiser'` on a `NotificationRule` should ever actually route email to organisers — the current implementation stores the value but has no code path to resolve "which organiser owns this round," since that relationship doesn't exist in the schema yet.
 - Consider surfacing the "already notified" dry-run flag more prominently in the notifications config UI, since it's currently only visible via the API response.
+# Sprint Retrospective
+
+
+
+## Kutloano (Paper Remarks and Marking)
+
+
+## What Went Well
+
+* We successfully implemented the marking queue and remark request functionality across the frontend and backend.
+* The remark flow was developed end-to-end, including submitting a remark request, storing the request, and displaying remark-related information to the educator.
+* Backend tests were consistently used to verify the new functionality. The remark-related tests and the wider backend test suite passed successfully.
+* Database migrations were successfully created and applied for the new remark and qualifying-threshold functionality.
+* The team was able to integrate changes from different branches while continuing development without losing existing functionality.
+* We identified and fixed issues during development through local testing before deployment.
+* The team communicated effectively when identifying bugs and clarifying how features such as remarks and marking should work.
+
+## What Could Be Improved
+
+* Some requirements were not completely clear before implementation. For example, the requirement that the organiser must be able to identify a student by their student number during the remark process should have been clarified earlier.
+* Some documentation contained incorrect MDX/Markdown syntax, which caused the Docusaurus deployment build to fail.
+* There were instances where changes from different features affected existing functionality, requiring additional testing after merges.
+* Some bugs were discovered relatively late because certain edge cases were not included in the initial tests.
+* The frontend and backend were sometimes developed separately before confirming that the API response contained all the information required by the frontend.
+* More frequent integration testing would have helped identify deployment and merge-related problems earlier.
+
+## Action Items
+
+* Ensure that remark requests display the student's student number to the organiser.
+* Review API responses before implementing frontend features to ensure all required student and submission information is available.
+* Add tests for important edge cases, especially duplicate remark requests and multiple students associated with the same educator.
+* Run the complete test suite after merging major feature branches.
+* Validate Docusaurus documentation locally before pushing changes that trigger deployment.
+* Clarify feature requirements with the team before implementation, especially where different user roles have different responsibilities.
 
 ---
 
