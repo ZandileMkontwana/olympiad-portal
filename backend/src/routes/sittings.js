@@ -7,6 +7,7 @@ const router = express.Router();
 // POST /rounds/:id/sittings
 // Starts (or resumes) an online sitting for an entrant in an open round.
 // Authenticated users only — the entrant must be registered in the round.
+// If the round has a prerequisite, the entrant must have passed it first.
 router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
   try {
     const roundId = req.params.id;
@@ -18,7 +19,10 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 
     const round = await prisma.round.findUnique({
       where: { id: roundId },
-      include: { paper: true },
+      include: {
+        paper: true,
+        prerequisiteRound: { select: { id: true, name: true } },
+      },
     });
 
     if (!round) {
@@ -33,6 +37,31 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 
     if (!round.paper) {
       return res.status(404).json({ error: 'No paper uploaded for this round yet' });
+    }
+
+    // Prerequisite gate: check if the entrant passed the required
+    // previous round before allowing them to sit this one.
+    if (round.prerequisiteRoundId) {
+      const prereqResult = await prisma.submission.findFirst({
+        where: {
+          entrantId,
+          roundId: round.prerequisiteRoundId,
+          result: { isNot: null },
+        },
+        include: { result: true },
+      });
+
+      const hasResult = !!prereqResult?.result;
+      const threshold = round.qualifyingThreshold ?? 0;
+      const meetsThreshold = hasResult && prereqResult.result.score >= threshold;
+
+      if (!hasResult || !meetsThreshold) {
+        const prereqName = round.prerequisiteRound?.name ?? 'the previous round';
+        const reason = round.qualifyingThreshold
+          ? `Requires at least ${round.qualifyingThreshold}% in ${prereqName}`
+          : `Requires completion of ${prereqName}`;
+        return res.status(403).json({ error: `Prerequisite not met: ${reason}` });
+      }
     }
 
     // Ensure the entrant is registered for this round. If not already

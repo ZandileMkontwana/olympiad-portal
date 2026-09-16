@@ -16,19 +16,23 @@ model Olympiad {
 }
 
 model Round {
-  id               String            @id @default(uuid())
-  olympiadId       String
-  name             String
-  openTime         DateTime
-  closeTime        DateTime
-  state            String            @default("scheduled")
-  paper            Paper?
-  olympiad         Olympiad          @relation(fields: [olympiadId], references: [id])
-  roundEntrants    RoundEntrant[]
-  submissions      Submission[]
-  sittings         Sitting[]
-  notificationLogs NotificationLog[]
-  notificationRules NotificationRule[]
+  id                    String            @id @default(uuid())
+  olympiadId            String
+  name                  String
+  openTime              DateTime
+  closeTime             DateTime
+  state                 String            @default("scheduled")
+  qualifyingThreshold   Float?            // minimum score % (0-100) required to pass; null = no gate
+  prerequisiteRoundId   String?           // the round that must be passed first; null = no prerequisite
+  paper                 Paper?
+  olympiad              Olympiad          @relation(fields: [olympiadId], references: [id])
+  prerequisiteRound     Round?            @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
+  dependentRounds       Round[]           @relation("RoundPrerequisites")
+  roundEntrants         RoundEntrant[]
+  submissions           Submission[]
+  sittings              Sitting[]
+  notificationLogs      NotificationLog[]
+  notificationRules     NotificationRule[]
 }
 
 model User {

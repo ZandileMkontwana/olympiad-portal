@@ -416,7 +416,7 @@ describe('Rounds routes', () => {
       expect(res.body).toHaveLength(1);
       expect(prisma.submission.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { roundId: 'round-1', result: { isNot: null } },
+          where: { roundId: 'round-1', result: { isNot: null }, entrant: { schoolId: 'school-1' } },
         })
       );
     });

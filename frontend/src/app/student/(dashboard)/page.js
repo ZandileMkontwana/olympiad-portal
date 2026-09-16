@@ -51,12 +51,14 @@ const STATUS_STYLES = {
   'not-started': 'bg-gold/10 text-gold border border-gold/30',
   completed: 'bg-lavender/10 text-lavender-deep border border-lavender/30',
   expired: 'bg-slate/10 text-slate border border-slate/30',
+  locked: 'bg-gray-100 text-gray-500 border border-gray-300',
 };
 const STATUS_LABELS = {
   'in-progress': 'In progress',
   'not-started': 'Not started',
   completed: 'Completed',
   expired: 'Expired',
+  locked: 'Locked',
 };
 
 /* ── Stat card ────────────────────────────────────────────────────────── */
@@ -286,8 +288,9 @@ function TestsSection({ tests, rounds }) {
         kind: 'available',
         id: r.round.id,
         name: r.round.name,
-        status: 'not-started',
+        status: r.locked ? 'locked' : 'not-started',
         round: r.round,
+        lockedReason: r.lockedReason,
       }));
     // Urgent first: in-progress, then tests waiting to be started (both by
     // their deadline), then finished/expired ones by most recent.
@@ -378,6 +381,9 @@ function TestsSection({ tests, rounds }) {
                     >
                       Start test
                     </Link>
+                  )}
+                  {item.status === 'locked' && item.lockedReason && (
+                    <span className="text-xs text-gray-500 italic">{item.lockedReason}</span>
                   )}
                 </div>
               </li>
@@ -511,7 +517,7 @@ export default function StudentDashboard() {
         name={user.name}
         school={user.school}
         inProgress={inProgress}
-        availableCount={rounds.filter((r) => !r.sitting).length}
+        availableCount={rounds.filter((r) => !r.sitting && !r.locked).length}
         resumeHref={resumeHref}
       />
 

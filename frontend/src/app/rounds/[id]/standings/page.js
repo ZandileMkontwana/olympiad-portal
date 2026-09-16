@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import { fetchStandings, getSchoolStandings, ApiError } from '@/lib/api';
 
 export default function StandingsPage() {
   const { id: roundId } = useParams();
+  const { getToken } = useAuth();
   const [activeTab, setActiveTab] = useState('entrants'); // 'entrants' | 'schools'
 
   // Per-entrant standings (existing #126 logic, unchanged)
@@ -18,7 +20,8 @@ export default function StandingsPage() {
 
     async function loadStandings() {
       try {
-        const data = await fetchStandings(roundId);
+        const token = await getToken();
+        const data = await fetchStandings(roundId, token);
         if (cancelled) return;
         setStandings(data);
         setStatus(data.length === 0 ? 'empty' : 'ready');
@@ -35,7 +38,7 @@ export default function StandingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [roundId]);
+  }, [roundId, getToken]);
 
   // Per-school standings — fetched lazily, only once the tab is first opened
   const [schoolStandings, setSchoolStandings] = useState([]);
@@ -52,7 +55,8 @@ export default function StandingsPage() {
 
     async function loadSchoolStandings() {
       try {
-        const data = await getSchoolStandings(roundId);
+        const token = await getToken();
+        const data = await getSchoolStandings(roundId, token);
         if (cancelled) return;
         setSchoolStandings(data);
         setSchoolStatus(data.length === 0 ? 'empty' : 'ready');
@@ -69,7 +73,7 @@ export default function StandingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, roundId]);
+  }, [activeTab, roundId, getToken]);
 
   return (
     <main className="mx-auto max-w-3xl px-8 py-12">

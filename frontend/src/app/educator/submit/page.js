@@ -3,11 +3,13 @@
 
 import { Suspense, useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import * as XLSX from 'xlsx';
 
 function SubmissionTableContent() {
   const searchParams = useSearchParams();
   const roundId = searchParams.get('id');
+  const { getToken } = useAuth();
 
   const [round, setRound] = useState(null);
   const [entrants, setEntrants] = useState([]);
@@ -45,18 +47,25 @@ function SubmissionTableContent() {
   useEffect(() => {
     async function fetchData() {
       try {
+        const token = await getToken();
+        const authHeaders = token
+          ? { Authorization: `Bearer ${token}` }
+          : {};
+
         const [roundRes, entrantsRes, paperRes, submissionsRes] = await Promise.all([
           fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`, {
             credentials: 'include',
           }),
           fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/entrants`, {
             credentials: 'include',
+            headers: authHeaders,
           }),
           fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/papers`, {
             credentials: 'include',
           }),
           fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/submissions`, {
             credentials: 'include',
+            headers: authHeaders,
           }),
         ]);
 

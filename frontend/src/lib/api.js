@@ -81,12 +81,15 @@ export function fetchArchivedPapers() {
 /**
  * Fetches the entrants registered for a round.
  * Wired to GET /api/rounds/:id/entrants (backend/src/routes/rounds.js).
+ * Educators see only their school's entrants; organisers see all.
  *
  * @param {string} roundId
+ * @param {string} [token] - Clerk JWT for the Authorization header
  * @returns {Promise<Array<{id: string, name: string, grade: string, schoolId: string}>>}
  */
-export function fetchRoundEntrants(roundId) {
-  return requestJson(`/api/rounds/${roundId}/entrants`);
+export function fetchRoundEntrants(roundId, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  return requestJson(`/api/rounds/${roundId}/entrants`, { headers });
 }
 
 /**
@@ -454,15 +457,18 @@ export function dashboardPathForRole(role) {
   return '/login';
 }
 
-export function fetchStandings(roundId) {
-  return requestJson(`/api/rounds/${roundId}/standings`);
+export function fetchStandings(roundId, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  return requestJson(`/api/rounds/${roundId}/standings`, { headers });
 }
 
 /**
  * Fetches ranked standings grouped by school for a round.
  * Wired to GET /api/rounds/:id/standings/schools (backend/src/routes/rounds.js).
+ * Educators see only their own school; organisers see all.
  *
  * @param {string} roundId
+ * @param {string} [token] - Clerk JWT for the Authorization header
  * @returns {Promise<Array<{
  *   rank: number,
  *   schoolId: string,
@@ -471,8 +477,9 @@ export function fetchStandings(roundId) {
  *   entrantCount: number,
  * }>>}
  */
-export function getSchoolStandings(roundId) {
-  return requestJson(`/api/rounds/${roundId}/standings/schools`);
+export function getSchoolStandings(roundId, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  return requestJson(`/api/rounds/${roundId}/standings/schools`, { headers });
 }
 
 /**

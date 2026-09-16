@@ -1,6 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
-const { requireRole } = require('../middleware/auth');
+const { requireRole, requireAuth, loadAuthUser } = require('../middleware/auth');
 const {
   getRecipientsForRound,
   isTriggerEnabled,
@@ -121,7 +121,10 @@ router.post('/rounds/:id/entrants', ...requireRole('educator'), async (req, res)
       return res.status(400).json({ error: 'entrantId is required' });
     }
 
-    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { prerequisiteRound: { select: { id: true, name: true } } },
+    });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
@@ -148,6 +151,31 @@ router.post('/rounds/:id/entrants', ...requireRole('educator'), async (req, res)
       return res.status(403).json({ error: 'Entrant belongs to a different school' });
     }
 
+    // Prerequisite gate: verify the entrant passed the required previous
+    // round before allowing registration into this one.
+    if (round.prerequisiteRoundId) {
+      const prereqResult = await prisma.submission.findFirst({
+        where: {
+          entrantId,
+          roundId: round.prerequisiteRoundId,
+          result: { isNot: null },
+        },
+        include: { result: true },
+      });
+
+      const hasResult = !!prereqResult?.result;
+      const threshold = round.qualifyingThreshold ?? 0;
+      const meetsThreshold = hasResult && prereqResult.result.score >= threshold;
+
+      if (!hasResult || !meetsThreshold) {
+        const prereqName = round.prerequisiteRound?.name ?? 'the previous round';
+        const reason = round.qualifyingThreshold
+          ? `Requires at least ${round.qualifyingThreshold}% in ${prereqName}`
+          : `Requires completion of ${prereqName}`;
+        return res.status(403).json({ error: `Prerequisite not met: ${reason}` });
+      }
+    }
+
     const existing = await prisma.roundEntrant.findUnique({
       where: { roundId_entrantId: { roundId: round.id, entrantId } },
     });
@@ -165,10 +193,30 @@ router.post('/rounds/:id/entrants', ...requireRole('educator'), async (req, res)
   }
 });
 
-router.get('/rounds/:id/entrants', async (req, res) => {
+// GET /rounds/:id/entrants
+// Returns entrants registered for a round. Educators see only their own
+// school's entrants; organisers see all.
+router.get('/rounds/:id/entrants', requireAuth, async (req, res) => {
   try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let schoolId = null;
+    if (user.role !== 'organiser') {
+      const educator = await prisma.educator.findUnique({
+        where: { userId: user.id },
+      });
+      schoolId = educator?.schoolId ?? null;
+      // Non-organisers must have a linked school; otherwise return no data.
+      if (!schoolId) return res.json([]);
+    }
+
+    const where = { roundId: req.params.id, entrant: { schoolId } };
+
     const roundEntrants = await prisma.roundEntrant.findMany({
-      where: { roundId: req.params.id },
+      where,
       include: { entrant: true },
     });
     res.json(roundEntrants.map((re) => re.entrant));
@@ -178,10 +226,30 @@ router.get('/rounds/:id/entrants', async (req, res) => {
   }
 });
 
-router.get('/rounds/:id/submissions', async (req, res) => {
+// GET /rounds/:id/submissions
+// Returns submissions for a round. Educators see only their own school's
+// submissions; organisers see all.
+router.get('/rounds/:id/submissions', requireAuth, async (req, res) => {
   try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let schoolId = null;
+    if (user.role !== 'organiser') {
+      const educator = await prisma.educator.findUnique({
+        where: { userId: user.id },
+      });
+      schoolId = educator?.schoolId ?? null;
+      // Non-organisers must have a linked school; otherwise return no data.
+      if (!schoolId) return res.json([]);
+    }
+
+    const where = { roundId: req.params.id, entrant: { schoolId } };
+
     const submissions = await prisma.submission.findMany({
-      where: { roundId: req.params.id },
+      where,
       include: { result: true },
     });
     res.json(submissions);
@@ -192,17 +260,36 @@ router.get('/rounds/:id/submissions', async (req, res) => {
 });
 
 // GET /rounds/:id/standings
-router.get('/rounds/:id/standings', async (req, res) => {
+// Per-entrant standings for a round. Educators see only their school's
+// entrants; organisers see all.
+router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
   try {
     const roundId = req.params.id;
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let schoolId = null;
+    if (user.role !== 'organiser') {
+      const educator = await prisma.educator.findUnique({
+        where: { userId: user.id },
+      });
+      schoolId = educator?.schoolId ?? null;
+    }
 
     const round = await prisma.round.findUnique({ where: { id: roundId } });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
 
+    // Non-organisers must have a linked school; otherwise return no data.
+    if (user.role !== 'organiser' && !schoolId) return res.json([]);
+
+    const where = { roundId, result: { isNot: null }, entrant: { schoolId } };
+
     const submissions = await prisma.submission.findMany({
-      where: { roundId, result: { isNot: null } },
+      where,
       include: {
         result: true,
         entrant: { include: { school: true } },
@@ -237,17 +324,36 @@ router.get('/rounds/:id/standings', async (req, res) => {
 });
 
 // GET /rounds/:id/standings/schools
-router.get('/rounds/:id/standings/schools', async (req, res) => {
+// Per-school standings for a round. Educators see only their own school's
+// row; organisers see all schools.
+router.get('/rounds/:id/standings/schools', requireAuth, async (req, res) => {
   try {
     const roundId = req.params.id;
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let schoolId = null;
+    if (user.role !== 'organiser') {
+      const educator = await prisma.educator.findUnique({
+        where: { userId: user.id },
+      });
+      schoolId = educator?.schoolId ?? null;
+    }
 
     const round = await prisma.round.findUnique({ where: { id: roundId } });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
 
+    // Non-organisers must have a linked school; otherwise return no data.
+    if (user.role !== 'organiser' && !schoolId) return res.json([]);
+
+    const where = { roundId, result: { isNot: null }, entrant: { schoolId } };
+
     const submissions = await prisma.submission.findMany({
-      where: { roundId, result: { isNot: null } },
+      where,
       include: {
         result: true,
         entrant: { include: { school: true } },
@@ -257,16 +363,16 @@ router.get('/rounds/:id/standings/schools', async (req, res) => {
     const bySchool = new Map();
 
     for (const s of submissions) {
-      const schoolId = s.entrant.school.id;
-      if (!bySchool.has(schoolId)) {
-        bySchool.set(schoolId, {
-          schoolId,
+      const sid = s.entrant.school.id;
+      if (!bySchool.has(sid)) {
+        bySchool.set(sid, {
+          schoolId: sid,
           schoolName: s.entrant.school.name,
           totalScore: 0,
           entrantCount: 0,
         });
       }
-      const entry = bySchool.get(schoolId);
+      const entry = bySchool.get(sid);
       entry.totalScore += s.result.score;
       entry.entrantCount += 1;
     }
@@ -566,5 +672,68 @@ router.post(
     }
   }
 );
+
+// PATCH /rounds/:id
+// Organiser-only: update qualifyingThreshold and/or prerequisiteRoundId
+// on a round. Both fields are optional; passing null clears the gate.
+router.patch('/rounds/:id', ...requireRole('organiser'), async (req, res) => {
+  try {
+    const { qualifyingThreshold, prerequisiteRoundId } = req.body;
+
+    // Validate that at least one field was provided
+    if (qualifyingThreshold === undefined && prerequisiteRoundId === undefined) {
+      return res.status(400).json({
+        error: 'At least one of qualifyingThreshold or prerequisiteRoundId is required',
+      });
+    }
+
+    // Validate qualifyingThreshold if provided
+    if (qualifyingThreshold !== undefined && qualifyingThreshold !== null) {
+      const num = Number(qualifyingThreshold);
+      if (Number.isNaN(num) || num < 0 || num > 100) {
+        return res.status(400).json({
+          error: 'qualifyingThreshold must be a number between 0 and 100, or null to clear',
+        });
+      }
+    }
+
+    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    // If setting a prerequisite, verify the referenced round exists
+    if (prerequisiteRoundId !== undefined && prerequisiteRoundId !== null) {
+      const prereq = await prisma.round.findUnique({
+        where: { id: prerequisiteRoundId },
+      });
+      if (!prereq) {
+        return res.status(404).json({ error: 'Prerequisite round not found' });
+      }
+      if (prereq.id === round.id) {
+        return res.status(400).json({ error: 'A round cannot be its own prerequisite' });
+      }
+    }
+
+    const data = {};
+    if (qualifyingThreshold !== undefined) {
+      data.qualifyingThreshold =
+        qualifyingThreshold === null ? null : Number(qualifyingThreshold);
+    }
+    if (prerequisiteRoundId !== undefined) {
+      data.prerequisiteRoundId = prerequisiteRoundId;
+    }
+
+    const updated = await prisma.round.update({
+      where: { id: round.id },
+      data,
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not update round settings' });
+  }
+});
 
 module.exports = router;
