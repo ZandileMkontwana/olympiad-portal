@@ -318,8 +318,24 @@ describe('Students routes', () => {
 
     it('returns all open rounds with sitting status and lazy-registers', async () => {
       prisma.round.findMany.mockResolvedValue([
-        { id: 'round-1', name: 'Round 1', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' },
-        { id: 'round-2', name: 'Round 2', state: 'open', closeTime: '2030-01-01T00:00:00.000Z' },
+        {
+          id: 'round-1',
+          name: 'Round 1',
+          state: 'open',
+          closeTime: '2030-01-01T00:00:00.000Z',
+          qualifyingThreshold: null,
+          prerequisiteRoundId: null,
+          prerequisiteRound: null,
+        },
+        {
+          id: 'round-2',
+          name: 'Round 2',
+          state: 'open',
+          closeTime: '2030-01-01T00:00:00.000Z',
+          qualifyingThreshold: null,
+          prerequisiteRoundId: null,
+          prerequisiteRound: null,
+        },
       ]);
       prisma.roundEntrant.upsert.mockResolvedValue({ id: 're-1' });
       // Round 1 has a sitting, Round 2 does not
@@ -349,6 +365,8 @@ describe('Students routes', () => {
             startedAt: '2026-09-01T10:00:00.000Z',
             expiresAt: '2030-01-01T00:00:00.000Z',
           },
+          locked: false,
+          lockedReason: null,
         },
         {
           round: {
@@ -358,15 +376,94 @@ describe('Students routes', () => {
             closeTime: '2030-01-01T00:00:00.000Z',
           },
           sitting: null,
+          locked: false,
+          lockedReason: null,
         },
       ]);
       expect(prisma.round.findMany).toHaveBeenCalledWith({
         where: { state: 'open' },
-        select: { id: true, name: true, state: true, closeTime: true },
+        select: {
+          id: true,
+          name: true,
+          state: true,
+          closeTime: true,
+          qualifyingThreshold: true,
+          prerequisiteRoundId: true,
+          prerequisiteRound: { select: { id: true, name: true } },
+        },
         orderBy: { openTime: 'desc' },
       });
-      // Lazy registration was called for both rounds
+      // Lazy registration was called for both rounds (both unlocked)
       expect(prisma.roundEntrant.upsert).toHaveBeenCalledTimes(2);
+    });
+
+    it('marks a gated round locked when the prerequisite was not passed', async () => {
+      prisma.round.findMany.mockResolvedValue([
+        {
+          id: 'round-2',
+          name: 'Round 2',
+          state: 'open',
+          closeTime: '2030-01-01T00:00:00.000Z',
+          qualifyingThreshold: 60,
+          prerequisiteRoundId: 'round-1',
+          prerequisiteRound: { id: 'round-1', name: 'Round 1' },
+        },
+      ]);
+      prisma.submission.findFirst.mockResolvedValue(null);
+
+      const res = await request(app).get('/api/students/me/rounds');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].locked).toBe(true);
+      expect(res.body[0].lockedReason).toBe('Score at least 60% in Round 1 to unlock');
+      // Locked rounds are not lazy-registered
+      expect(prisma.roundEntrant.upsert).not.toHaveBeenCalled();
+    });
+
+    it('locks a gated round without a threshold until the prerequisite is completed', async () => {
+      prisma.round.findMany.mockResolvedValue([
+        {
+          id: 'round-2',
+          name: 'Round 2',
+          state: 'open',
+          closeTime: '2030-01-01T00:00:00.000Z',
+          qualifyingThreshold: null,
+          prerequisiteRoundId: 'round-1',
+          prerequisiteRound: { id: 'round-1', name: 'Round 1' },
+        },
+      ]);
+      prisma.submission.findFirst.mockResolvedValue(null);
+
+      const res = await request(app).get('/api/students/me/rounds');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].locked).toBe(true);
+      expect(res.body[0].lockedReason).toBe('Complete Round 1 first');
+    });
+
+    it('unlocks a gated round once the prerequisite was passed', async () => {
+      prisma.round.findMany.mockResolvedValue([
+        {
+          id: 'round-2',
+          name: 'Round 2',
+          state: 'open',
+          closeTime: '2030-01-01T00:00:00.000Z',
+          qualifyingThreshold: 60,
+          prerequisiteRoundId: 'round-1',
+          prerequisiteRound: { id: 'round-1', name: 'Round 1' },
+        },
+      ]);
+      prisma.submission.findFirst.mockResolvedValue({ id: 'prereq-sub' });
+      prisma.roundEntrant.upsert.mockResolvedValue({ id: 're-1' });
+      prisma.sitting.findFirst.mockResolvedValue(null);
+
+      const res = await request(app).get('/api/students/me/rounds');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].locked).toBe(false);
+      expect(res.body[0].lockedReason).toBeNull();
+      expect(res.body[0].sitting).toBeNull();
+      expect(prisma.roundEntrant.upsert).toHaveBeenCalledTimes(1);
     });
 
     it('returns an empty list when no open rounds exist', async () => {

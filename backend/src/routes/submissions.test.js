@@ -34,6 +34,8 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.remarkRequest, 'create');
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
+    vi.spyOn(prisma.educator, 'findUnique');
+    vi.spyOn(prisma.submission, 'findFirst');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     sgMail.send.mockResolvedValue({});
     prisma.markingTask.create.mockResolvedValue({
@@ -46,6 +48,12 @@ describe('Submissions routes', () => {
       email: 'a@b.com',
       role: 'educator',
       name: 'Educator One',
+    });
+    // Default: that educator is linked to school-1
+    prisma.educator.findUnique.mockResolvedValue({
+      id: 'educator-1',
+      userId: 'user-1',
+      schoolId: 'school-1',
     });
     app = createApp();
   });
@@ -137,7 +145,11 @@ describe('Submissions routes', () => {
         submissionId: 'sub-1',
         status: 'unassigned',
       });
-      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice' });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-1',
+      });
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
@@ -166,7 +178,7 @@ describe('Submissions routes', () => {
         submittedAt: new Date('2026-01-01'),
       });
       prisma.result.create.mockResolvedValue({ id: 'r-1', score: 50 });
-      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice' });
+      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice', schoolId: 'school-1' });
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
@@ -192,7 +204,7 @@ describe('Submissions routes', () => {
         submittedAt: new Date('2026-01-01'),
       });
       prisma.result.create.mockResolvedValue({ id: 'r-1', score: 0 });
-      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice' });
+      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice', schoolId: 'school-1' });
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
@@ -208,6 +220,11 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+      });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-1',
       });
       const conflictError = new Error('Unique constraint');
       conflictError.code = 'P2002';
@@ -238,6 +255,11 @@ describe('Submissions routes', () => {
         name: 'Round 1',
         paper: null,
       });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-1',
+      });
       prisma.submission.create.mockRejectedValue(new Error('Unexpected'));
 
       const res = await request(app)
@@ -266,7 +288,7 @@ describe('Submissions routes', () => {
         id: 'sub-1',
         submittedAt,
       });
-      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice' });
+      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice', schoolId: 'school-1' });
 
       await request(app)
         .post('/api/rounds/round-1/submissions')
@@ -280,26 +302,120 @@ describe('Submissions routes', () => {
       );
     });
 
-    it('sends receipt with Unknown entrant when entrant not found', async () => {
+    it('returns 404 when entrant not found', async () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         state: 'open',
         name: 'Round 1',
         paper: null,
       });
+      prisma.entrant.findUnique.mockResolvedValue(null);
+
+      const res = await request(app)
+        .post('/api/rounds/round-1/submissions')
+        .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Entrant not found');
+      expect(prisma.submission.create).not.toHaveBeenCalled();
+      expect(sgMail.send).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the account has no linked school', async () => {
+      prisma.educator.findUnique.mockResolvedValue(null);
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        state: 'open',
+        name: 'Round 1',
+        paper: null,
+      });
+
+      const res = await request(app)
+        .post('/api/rounds/round-1/submissions')
+        .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('No school linked to this account');
+      expect(prisma.submission.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the entrant belongs to a different school', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        state: 'open',
+        name: 'Round 1',
+        paper: null,
+      });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-2',
+      });
+
+      const res = await request(app)
+        .post('/api/rounds/round-1/submissions')
+        .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Entrant belongs to a different school');
+      expect(prisma.submission.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the prerequisite round was not passed', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        state: 'open',
+        name: 'Round 2',
+        paper: null,
+        prerequisiteRoundId: 'round-0',
+        qualifyingThreshold: 50,
+        prerequisiteRound: { id: 'round-0', name: 'Round 1' },
+      });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-1',
+      });
+      prisma.submission.findFirst.mockResolvedValue(null);
+
+      const res = await request(app)
+        .post('/api/rounds/round-1/submissions')
+        .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Prerequisite not met: Requires at least 50% in Round 1');
+      expect(prisma.submission.create).not.toHaveBeenCalled();
+    });
+
+    it('creates the submission when the prerequisite round was passed', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        state: 'open',
+        name: 'Round 2',
+        paper: null,
+        prerequisiteRoundId: 'round-0',
+        qualifyingThreshold: 50,
+        prerequisiteRound: { id: 'round-0', name: 'Round 1' },
+      });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-1',
+      });
+      prisma.submission.findFirst.mockResolvedValue({ id: 'prereq-sub' });
       prisma.submission.create.mockResolvedValue({
         id: 'sub-1',
         submittedAt: new Date('2026-01-01'),
       });
-      prisma.entrant.findUnique.mockResolvedValue(null);
 
-      await request(app)
+      const res = await request(app)
         .post('/api/rounds/round-1/submissions')
         .send({ entrantId: 'e1', answers: { q1: 'A' }, idempotencyKey: 'key-1' });
 
-      expect(sgMail.send).toHaveBeenCalledWith(
+      expect(res.status).toBe(201);
+      expect(prisma.submission.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('Unknown entrant'),
+          where: expect.objectContaining({ entrantId: 'e1', roundId: 'round-0' }),
         })
       );
     });

@@ -295,7 +295,13 @@ describe('Entrants routes', () => {
       });
       expect(prisma.round.findMany).toHaveBeenCalledWith({
         where: { state: 'open', olympiadId: { in: ['olympiad-1'] } },
-        select: { id: true, name: true, olympiad: { select: { name: true } } },
+        select: {
+          id: true,
+          name: true,
+          prerequisiteRoundId: true,
+          qualifyingThreshold: true,
+          olympiad: { select: { name: true } },
+        },
       });
       expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
         data: [
@@ -324,9 +330,83 @@ describe('Entrants routes', () => {
       expect(res.body.registeredRounds).toEqual([]);
       expect(prisma.round.findMany).toHaveBeenCalledWith({
         where: { state: 'open', olympiadId: { in: [] } },
-        select: { id: true, name: true, olympiad: { select: { name: true } } },
+        select: {
+          id: true,
+          name: true,
+          prerequisiteRoundId: true,
+          qualifyingThreshold: true,
+          olympiad: { select: { name: true } },
+        },
       });
       expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
+    });
+
+    it('skips open rounds whose prerequisites the entrant has not met', async () => {
+      prisma.entrant.create.mockResolvedValue({
+        id: 'entrant-1',
+        schoolId: 'school-1',
+        name: 'Alice',
+        grade: '10',
+      });
+      prisma.round.findMany.mockResolvedValue([
+        {
+          id: 'round-1',
+          name: 'Round One',
+          prerequisiteRoundId: null,
+          qualifyingThreshold: null,
+          olympiad: { name: 'Maths Olympiad' },
+        },
+        {
+          id: 'round-2',
+          name: 'Round Two',
+          prerequisiteRoundId: 'round-1',
+          qualifyingThreshold: 50,
+          olympiad: { name: 'Science Olympiad' },
+        },
+      ]);
+      // The new entrant has no qualifying submission in round-1 yet
+      prisma.submission.findMany.mockResolvedValue([]);
+      prisma.roundEntrant.createMany.mockResolvedValue({ count: 1 });
+
+      const res = await request(app)
+        .post('/api/entrants')
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+
+      expect(res.status).toBe(201);
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-1', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('auto-registers for a gated round once the prerequisite has been passed', async () => {
+      prisma.entrant.create.mockResolvedValue({
+        id: 'entrant-1',
+        schoolId: 'school-1',
+        name: 'Alice',
+        grade: '10',
+      });
+      prisma.round.findMany.mockResolvedValue([
+        {
+          id: 'round-2',
+          name: 'Round Two',
+          prerequisiteRoundId: 'round-1',
+          qualifyingThreshold: 50,
+          olympiad: { name: 'Science Olympiad' },
+        },
+      ]);
+      prisma.submission.findMany.mockResolvedValue([{ entrantId: 'entrant-1' }]);
+      prisma.roundEntrant.createMany.mockResolvedValue({ count: 1 });
+
+      const res = await request(app)
+        .post('/api/entrants')
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+
+      expect(res.status).toBe(201);
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
     });
 
     it('returns 500 on unexpected error', async () => {

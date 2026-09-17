@@ -16,8 +16,10 @@ model Olympiad {
   grades      String? // target learner grades, e.g. "Grade 8-12"
   startDate   DateTime? // olympiad run dates, organiser-set
   endDate     DateTime?
+  organiserId String? // the organiser who created it; null = legacy/unowned
   rounds      Round[]
   schoolAccess SchoolOlympiad[]
+  organiser   User?            @relation(fields: [organiserId], references: [id])
 }
 
 model Round {
@@ -27,10 +29,13 @@ model Round {
   openTime               DateTime
   closeTime              DateTime
   state                  String              @default("scheduled")
-  qualifyingThreshold    Float?
+  qualifyingThreshold    Float? // minimum score % (0-100) required to pass; null = no gate
+  prerequisiteRoundId    String? // the round that must be passed first; null = no prerequisite
   autoAdvanceProcessedAt DateTime?
   paper                  Paper?
   olympiad               Olympiad            @relation(fields: [olympiadId], references: [id])
+  prerequisiteRound      Round?              @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
+  dependentRounds        Round[]             @relation("RoundPrerequisites")
   roundEntrants          RoundEntrant[]
   submissions            Submission[]
   sittings               Sitting[]
@@ -50,6 +55,7 @@ model User {
   invitationExpiresAt   DateTime?
   educator              Educator?
   entrant               Entrant?
+  olympiads             Olympiad[]
   assignedMarkingTasks  MarkingTask[]   @relation("AssignedMarkingTasks")
   moderatedMarkingTasks MarkingTask[]   @relation("ModeratedMarkingTasks")
   requestedRemarks      RemarkRequest[] @relation("RequestedRemarks")

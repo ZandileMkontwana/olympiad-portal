@@ -43,6 +43,7 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.schoolOlympiad, 'update');
     vi.spyOn(prisma.user, 'findMany');
     vi.spyOn(prisma.submission, 'findMany');
+    vi.spyOn(prisma.submission, 'findFirst');
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
@@ -74,20 +75,61 @@ describe('Rounds routes', () => {
   });
 
   describe('POST /api/olympiads', () => {
+    // Overrides the default educator mock: creating olympiads is
+    // organiser-only and the creator becomes the owner.
+    function signInAsOrganiser() {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'organiser-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+    }
+
+    it('returns 401 when not authenticated (no Clerk session)', async () => {
+      const unauthApp = createApp(false);
+      const res = await request(unauthApp)
+        .post('/api/olympiads')
+        .send({ name: 'Test', timezone: 'UTC' });
+      expect(res.status).toBe(401);
+      expect(prisma.olympiad.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the user is not an organiser', async () => {
+      const res = await request(app).post('/api/olympiads').send({ name: 'Test', timezone: 'UTC' });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('organiser access required');
+      expect(prisma.olympiad.create).not.toHaveBeenCalled();
+    });
+
     it('returns 400 when fields are missing', async () => {
+      signInAsOrganiser();
       const res = await request(app).post('/api/olympiads').send({ name: 'Test' });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/required/);
     });
 
-    it('creates olympiad and returns 201', async () => {
+    it('creates olympiad owned by the requester and returns 201', async () => {
+      signInAsOrganiser();
       prisma.olympiad.create.mockResolvedValue({ id: '1', name: 'Test', timezone: 'UTC' });
       const res = await request(app).post('/api/olympiads').send({ name: 'Test', timezone: 'UTC' });
       expect(res.status).toBe(201);
       expect(res.body.name).toBe('Test');
+      expect(prisma.olympiad.create).toHaveBeenCalledWith({
+        data: {
+          name: 'Test',
+          timezone: 'UTC',
+          description: null,
+          grades: null,
+          startDate: null,
+          endDate: null,
+          organiserId: 'organiser-1',
+        },
+      });
     });
 
     it('returns 500 on prisma error', async () => {
+      signInAsOrganiser();
       prisma.olympiad.create.mockRejectedValue(new Error('DB error'));
       const res = await request(app).post('/api/olympiads').send({ name: 'Test', timezone: 'UTC' });
       expect(res.status).toBe(500);
@@ -95,6 +137,7 @@ describe('Rounds routes', () => {
     });
 
     it('stores the optional info fields when provided', async () => {
+      signInAsOrganiser();
       prisma.olympiad.create.mockResolvedValue({ id: '1', name: 'Test', timezone: 'UTC' });
       const res = await request(app).post('/api/olympiads').send({
         name: 'Test',
@@ -113,11 +156,13 @@ describe('Rounds routes', () => {
           grades: 'Grade 8–12',
           startDate: new Date('2026-02-01T00:00:00Z'),
           endDate: new Date('2026-03-01T00:00:00Z'),
+          organiserId: 'organiser-1',
         },
       });
     });
 
     it('stores nulls when the optional info fields are missing', async () => {
+      signInAsOrganiser();
       prisma.olympiad.create.mockResolvedValue({ id: '1', name: 'Test', timezone: 'UTC' });
       const res = await request(app).post('/api/olympiads').send({ name: 'Test', timezone: 'UTC' });
       expect(res.status).toBe(201);
@@ -129,11 +174,13 @@ describe('Rounds routes', () => {
           grades: null,
           startDate: null,
           endDate: null,
+          organiserId: 'organiser-1',
         },
       });
     });
 
     it('returns 400 when endDate is before startDate', async () => {
+      signInAsOrganiser();
       const res = await request(app).post('/api/olympiads').send({
         name: 'Test',
         timezone: 'UTC',
@@ -184,6 +231,7 @@ describe('Rounds routes', () => {
 
       expect(res.status).toBe(200);
       expect(prisma.olympiad.findMany).toHaveBeenCalledWith({
+        where: {},
         include: { rounds: { orderBy: { openTime: 'asc' } } },
         orderBy: { name: 'asc' },
       });
@@ -223,6 +271,24 @@ describe('Rounds routes', () => {
       expect(res.body[0]).not.toHaveProperty('schoolAccess');
       expect(res.body[0]).not.toHaveProperty('schoolEntrantCounts');
       expect(prisma.schoolOlympiad.findMany).not.toHaveBeenCalled();
+    });
+
+    it('scopes organisers to the olympiads they created themselves', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'organiser@olympiad.com',
+        role: 'organiser',
+        name: 'Organiser One',
+      });
+      prisma.olympiad.findMany.mockResolvedValue([{ id: '3', name: 'Mine', rounds: [] }]);
+
+      const res = await request(app).get('/api/olympiads');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([{ id: '3', name: 'Mine', rounds: [] }]);
+      expect(prisma.olympiad.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organiserId: 'user-1' } })
+      );
     });
 
     it('returns 500 on error', async () => {
@@ -960,6 +1026,80 @@ describe('Rounds routes', () => {
       expect(res.status).toBe(201);
     });
 
+    it('returns 403 when the prerequisite round was not passed', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: '1',
+        state: 'open',
+        prerequisiteRoundId: 'prereq-1',
+        qualifyingThreshold: 50,
+        prerequisiteRound: { id: 'prereq-1', name: 'Round 0' },
+      });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        schoolId: 'school-1',
+        name: 'Alice',
+        grade: '10',
+      });
+      prisma.submission.findFirst.mockResolvedValue(null);
+
+      const res = await request(app).post('/api/rounds/1/entrants').send({ entrantId: 'e1' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Prerequisite not met: Requires at least 50% in Round 0');
+      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when the prerequisite round was not completed', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: '1',
+        state: 'open',
+        prerequisiteRoundId: 'prereq-1',
+        qualifyingThreshold: null,
+        prerequisiteRound: { id: 'prereq-1', name: 'Round 0' },
+      });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        schoolId: 'school-1',
+        name: 'Alice',
+        grade: '10',
+      });
+      prisma.submission.findFirst.mockResolvedValue(null);
+
+      const res = await request(app).post('/api/rounds/1/entrants').send({ entrantId: 'e1' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Prerequisite not met: Requires completion of Round 0');
+      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+    });
+
+    it('registers an entrant who passed the prerequisite round', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: '1',
+        state: 'open',
+        prerequisiteRoundId: 'prereq-1',
+        qualifyingThreshold: 50,
+        prerequisiteRound: { id: 'prereq-1', name: 'Round 0' },
+      });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        schoolId: 'school-1',
+        name: 'Alice',
+        grade: '10',
+      });
+      prisma.submission.findFirst.mockResolvedValue({ id: 'prereq-sub' });
+      prisma.roundEntrant.findUnique.mockResolvedValue(null);
+      prisma.roundEntrant.create.mockResolvedValue({ id: 're-1', roundId: '1', entrantId: 'e1' });
+
+      const res = await request(app).post('/api/rounds/1/entrants').send({ entrantId: 'e1' });
+
+      expect(res.status).toBe(201);
+      expect(prisma.submission.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ entrantId: 'e1', roundId: 'prereq-1' }),
+        })
+      );
+    });
+
     it('returns 500 on unexpected error', async () => {
       prisma.round.findUnique.mockResolvedValue({ id: '1', state: 'open' });
       prisma.entrant.findUnique.mockResolvedValue({
@@ -1149,6 +1289,7 @@ describe('Rounds routes', () => {
           where: {
             roundId: 'round-1',
             result: { isNot: null },
+            entrant: { schoolId: 'school-1' },
           },
         })
       );

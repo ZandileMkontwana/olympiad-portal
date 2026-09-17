@@ -6,20 +6,23 @@ const {
   sendResultsReleasedNotification,
   sendMissingSubmissionNotification,
 } = require('./lib/email');
+const { filterQualifiedEntrantIds } = require('./lib/qualification');
 
 const NOTIFY_BEFORE_OPEN_MS = 60 * 60 * 1000; // 1 hour
 const NOTIFY_BEFORE_CLOSE_MS = 60 * 60 * 1000; // 1 hour
 
 /**
  * When a round transitions from 'scheduled' to 'open', register all existing
- * entrants for it. This handles entrants that were created before the round
- * opened (the per-entrant auto-registration in entrants.js only fires at
- * creation time, so previously created entrants would be missed).
+ * entrants that meet the round's requirements for it. This handles entrants
+ * that were created before the round opened (the per-entrant
+ * auto-registration in entrants.js only fires at creation time, so
+ * previously created entrants would be missed). Entrants who have not
+ * passed the prerequisite round are never registered.
  */
 async function registerEntrantsForNewlyOpenRounds() {
   const openRounds = await prisma.round.findMany({
     where: { state: 'open' },
-    select: { id: true },
+    select: { id: true, prerequisiteRoundId: true, qualifyingThreshold: true },
   });
   if (openRounds.length === 0) return;
 
@@ -32,9 +35,12 @@ async function registerEntrantsForNewlyOpenRounds() {
       select: { entrantId: true },
     });
     const existingIds = new Set(existing.map((re) => re.entrantId));
-    const toCreate = entrants
-      .filter((e) => !existingIds.has(e.id))
-      .map((e) => ({ roundId: round.id, entrantId: e.id }));
+    const candidateIds = entrants.filter((e) => !existingIds.has(e.id)).map((e) => e.id);
+
+    // Qualification gate: only entrants who meet this round's requirements
+    // are registered for it.
+    const qualifiedIds = await filterQualifiedEntrantIds(candidateIds, round);
+    const toCreate = qualifiedIds.map((entrantId) => ({ roundId: round.id, entrantId }));
 
     if (toCreate.length > 0) {
       await prisma.roundEntrant.createMany({

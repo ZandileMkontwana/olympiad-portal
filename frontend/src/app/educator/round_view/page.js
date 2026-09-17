@@ -146,7 +146,9 @@ function RoundViewContent() {
           fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/entrants`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/submissions`),
+          fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/submissions`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
         if (!entrantsRes.ok) throw new Error('Could not load school entrants');

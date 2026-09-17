@@ -1,12 +1,14 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
+const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 
 const router = express.Router();
 
 // POST /rounds/:id/sittings
 // Starts (or resumes) an online sitting for an entrant in an open round.
 // Authenticated users only — the entrant must be registered in the round.
+// If the round has a prerequisite, the entrant must have passed it first.
 router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
   try {
     const roundId = req.params.id;
@@ -18,7 +20,10 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 
     const round = await prisma.round.findUnique({
       where: { id: roundId },
-      include: { paper: true },
+      include: {
+        paper: true,
+        prerequisiteRound: { select: { id: true, name: true } },
+      },
     });
 
     if (!round) {
@@ -33,6 +38,14 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 
     if (!round.paper) {
       return res.status(404).json({ error: 'No paper uploaded for this round yet' });
+    }
+
+    // Prerequisite gate: an entrant who has not met this round's
+    // requirements cannot sit it, even if they were registered earlier.
+    if (!(await hasQualifiedForRound(entrantId, round))) {
+      return res.status(403).json({
+        error: `Prerequisite not met: ${prerequisiteFailureMessage(round)}`,
+      });
     }
 
     // Ensure the entrant is registered for this round. If not already

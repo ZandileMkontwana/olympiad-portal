@@ -130,6 +130,39 @@ describe('api client', () => {
     });
   });
 
+  describe('listOlympiads', () => {
+    it('sends GET without an Authorization header when no token is given', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+      });
+      await listOlympiads();
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads',
+        expect.objectContaining({ headers: { 'Content-Type': 'application/json' } })
+      );
+    });
+
+    it('attaches the Bearer token so organisers only see their own olympiads', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+      });
+      await listOlympiads('org-token');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads',
+        expect.objectContaining({
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer org-token',
+          },
+        })
+      );
+    });
+  });
+
   describe('createOlympiad', () => {
     it('sends POST with correct body', async () => {
       fetchMock.mockResolvedValue({
@@ -143,6 +176,25 @@ describe('api client', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ name: 'Test', timezone: 'UTC' }),
+        })
+      );
+    });
+
+    it('attaches the Bearer token so the organiser becomes the owner', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: '1' }),
+      });
+      await createOlympiad({ name: 'Test', timezone: 'UTC' }, 'org-token');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer org-token',
+          },
         })
       );
     });
@@ -173,47 +225,6 @@ describe('api client', () => {
             startDate: '2026-02-01',
             endDate: '2026-03-01',
           }),
-        })
-      );
-    });
-  });
-
-  describe('listOlympiads', () => {
-    it('sends GET to /api/olympiads without a token', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve([{ id: 'olympiad-1', rounds: [] }]),
-      });
-
-      const result = await listOlympiads();
-
-      expect(result[0].id).toBe('olympiad-1');
-      expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:5000/api/olympiads',
-        expect.objectContaining({
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-        })
-      );
-    });
-
-    it('forwards the Bearer token when provided for school-access enrichment', async () => {
-      fetchMock.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () =>
-          Promise.resolve([{ id: 'olympiad-1', schoolAccess: 'none', schoolEntrantCounts: [] }]),
-      });
-
-      const result = await listOlympiads('test-token');
-
-      expect(result[0].schoolAccess).toBe('none');
-      expect(fetchMock).toHaveBeenCalledWith(
-        'http://localhost:5000/api/olympiads',
-        expect.objectContaining({
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
         })
       );
     });

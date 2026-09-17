@@ -5,6 +5,14 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'round-1' }),
 }));
 
+// The page attaches the Clerk token to both standings fetches. getToken
+// must keep a stable identity across renders, like the real Clerk hook —
+// otherwise the effects re-run and cancel their in-flight fetches.
+vi.mock('@clerk/nextjs', () => {
+  const getToken = async () => 'test-token';
+  return { useAuth: () => ({ getToken }) };
+});
+
 vi.mock('@/lib/api', () => ({
   fetchStandings: vi.fn(),
   getSchoolStandings: vi.fn(),
@@ -100,7 +108,7 @@ describe('StandingsPage', () => {
       expect(await screen.findByText('Wits High School')).toBeInTheDocument();
       expect(screen.getByText('50.00')).toBeInTheDocument();
       expect(screen.getByText('2')).toBeInTheDocument();
-      expect(getSchoolStandings).toHaveBeenCalledWith('round-1');
+      expect(getSchoolStandings).toHaveBeenCalledWith('round-1', 'test-token');
     });
 
     it('only fetches school standings once, even if the tab is clicked multiple times', async () => {

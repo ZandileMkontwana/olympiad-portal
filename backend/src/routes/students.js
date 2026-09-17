@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
+const { hasQualifiedForRound } = require('../lib/qualification');
 
 const router = express.Router();
 
@@ -44,36 +45,73 @@ router.get('/students/me/sittings', ...requireRole('student'), async (req, res) 
 });
 
 // GET /students/me/rounds
-// Lists all open rounds with sitting status. For each open round, ensures
-// the student has a RoundEntrant record (lazy registration — handles
-// entrants created before the round opened).
+// Lists all open rounds with sitting status and prerequisite gating info.
+// For each open round:
+//   - If the round has a prerequisite, checks whether the student passed
+//     (result score >= qualifyingThreshold in the prerequisite round).
+//   - Locked rounds are returned with locked=true and a human-readable
+//     lockedReason so the UI can show the unlock criteria.
+//   - Only unlocked rounds get lazy-registered and get a sitting lookup.
 router.get('/students/me/rounds', ...requireRole('student'), async (req, res) => {
   try {
     const entrant = await loadEntrant(req, res);
     if (!entrant) return;
 
-    // Get all open rounds
+    // Fetch open rounds with prerequisite chain info
     const openRounds = await prisma.round.findMany({
       where: { state: 'open' },
-      select: { id: true, name: true, state: true, closeTime: true },
+      select: {
+        id: true,
+        name: true,
+        state: true,
+        closeTime: true,
+        qualifyingThreshold: true,
+        prerequisiteRoundId: true,
+        prerequisiteRound: { select: { id: true, name: true } },
+      },
       orderBy: { openTime: 'desc' },
     });
 
-    // For each open round, ensure RoundEntrant exists and get sitting status
     const roundsWithStatus = await Promise.all(
       openRounds.map(async (round) => {
-        // Lazy registration: create RoundEntrant if it doesn't exist
-        await prisma.roundEntrant.upsert({
-          where: { roundId_entrantId: { roundId: round.id, entrantId: entrant.id } },
-          create: { roundId: round.id, entrantId: entrant.id },
-          update: {},
-        });
+        let locked = false;
+        let lockedReason = null;
 
-        const sitting = await prisma.sitting.findFirst({
-          where: { roundId: round.id, entrantId: entrant.id },
-          select: { id: true, completedAt: true, startedAt: true, expiresAt: true },
-        });
-        return { round, sitting };
+        // Prerequisite gate: a student who has not met this round's
+        // requirements stays locked out of it; the unlock criteria are
+        // surfaced in lockedReason.
+        if (!(await hasQualifiedForRound(entrant.id, round))) {
+          locked = true;
+          lockedReason = round.qualifyingThreshold
+            ? `Score at least ${round.qualifyingThreshold}% in ${round.prerequisiteRound.name} to unlock`
+            : `Complete ${round.prerequisiteRound.name} first`;
+        }
+
+        // Only lazy-register and look up sitting for unlocked rounds.
+        // Locked rounds stay visible in the UI but are not accessible.
+        let sitting = null;
+        if (!locked) {
+          await prisma.roundEntrant.upsert({
+            where: { roundId_entrantId: { roundId: round.id, entrantId: entrant.id } },
+            create: { roundId: round.id, entrantId: entrant.id },
+            update: {},
+          });
+
+          sitting = await prisma.sitting.findFirst({
+            where: { roundId: round.id, entrantId: entrant.id },
+            select: { id: true, completedAt: true, startedAt: true, expiresAt: true },
+          });
+        }
+
+        // Strip internal gating fields before returning to the client
+        const {
+          qualifyingThreshold: _qt,
+          prerequisiteRoundId: _pid,
+          prerequisiteRound: _pr,
+          ...roundInfo
+        } = round;
+
+        return { round: roundInfo, sitting, locked, lockedReason };
       })
     );
 

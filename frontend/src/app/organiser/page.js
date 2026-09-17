@@ -61,7 +61,9 @@ export default function OrganiserDashboard() {
 
     async function fetchOlympiads() {
       try {
-        const data = await listOlympiads();
+        // The token scopes the response to this organiser's own olympiads.
+        const token = await getToken();
+        const data = await listOlympiads(token);
         setOlympiads(data);
         setStatus(data.length === 0 ? 'empty' : 'ready');
       } catch {
@@ -97,14 +99,18 @@ export default function OrganiserDashboard() {
     setCreateError('');
 
     try {
-      const created = await createOlympiad({
-        name: newName.trim(),
-        timezone: newTimezone.trim(),
-        description: newDescription.trim() || null,
-        grades: newGrades.trim() || null,
-        startDate: newStartDate || null,
-        endDate: newEndDate || null,
-      });
+      const token = await getToken();
+      const created = await createOlympiad(
+        {
+          name: newName.trim(),
+          timezone: newTimezone.trim(),
+          description: newDescription.trim() || null,
+          grades: newGrades.trim() || null,
+          startDate: newStartDate || null,
+          endDate: newEndDate || null,
+        },
+        token
+      );
       // Add the new olympiad to the list (with empty rounds)
       setOlympiads((prev) => [...prev, { ...created, rounds: [] }]);
       setStatus('ready');
