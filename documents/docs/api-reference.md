@@ -2,15 +2,16 @@
 
 All endpoints are mounted under the `/api` prefix.
 
-**Production base URL:** `https://olympiad-portal.onrender.com` — e.g. <https://olympiad-portal.onrender.com/api/olympiads>. For local development the backend runs at `http://localhost:5000`.
+**Production base URL:** `https://olympiad-portal.onrender.com` — e.g. `https://olympiad-portal.onrender.com/api/olympiads`. For local development the backend runs at `http://localhost:5000`.
 
 ## Authentication
-
 Authentication is handled by **Clerk** (`@clerk/express`). Protected endpoints require a valid Clerk session — the frontend uses Clerk's `<SignIn>` / `<SignUp>` components, and the backend validates the session via `requireAuth()` middleware or `clerkMiddleware()` globally.
 
 There is no `POST /api/auth/login` or `POST /api/auth/register` endpoint. Registration and login are managed entirely through Clerk's hosted UI or embedded components on the frontend.
 
 Organiser accounts are created via the seed script (`node prisma/seed.js`), not self-registration.
+
+
 
 ### POST /api/educators/complete-profile
 
@@ -218,20 +219,30 @@ Creates a new olympiad.
 ```json
 {
   "name": "Wits Maths Olympiad",
-  "timezone": "Africa/Johannesburg"
+  "timezone": "Africa/Johannesburg",
+  "description": "A national maths olympiad",
+  "grades": "Grade 8–12",
+  "startDate": "2026-02-01",
+  "endDate": "2026-03-01"
 }
 ```
+
+`description`, `grades`, `startDate` and `endDate` are optional organiser-set info fields shown to educators on the olympiad info card.
 
 **Response (201):**
 ```json
 {
   "id": "string",
   "name": "Wits Maths Olympiad",
-  "timezone": "Africa/Johannesburg"
+  "timezone": "Africa/Johannesburg",
+  "description": "A national maths olympiad",
+  "grades": "Grade 8–12",
+  "startDate": "2026-02-01T00:00:00.000Z",
+  "endDate": "2026-03-01T00:00:00.000Z"
 }
 ```
 
-**Errors:** `400` if `name` or `timezone` is missing.
+**Errors:** `400` if `name` or `timezone` is missing, or if `endDate` is before `startDate`.
 
 ---
 
@@ -239,19 +250,53 @@ Creates a new olympiad.
 
 Returns all olympiads, each including its nested rounds ordered by `openTime` ascending.
 
-**Response (200):**
+When the request carries a valid Clerk token for an **educator**, each olympiad is additionally enriched with the educator's school access state and the distinct learner count per school — these power the educator dashboard's olympiad info card.
+
+**Response (200, authenticated educator):**
 ```json
 [
   {
     "id": "string",
     "name": "Wits Maths Olympiad",
     "timezone": "Africa/Johannesburg",
+    "description": "A national maths olympiad",
+    "grades": "Grade 8–12",
+    "startDate": "ISO date",
+    "endDate": "ISO date",
     "rounds": [
       { "id": "string", "name": "Round 1", "state": "open", "openTime": "ISO date", "closeTime": "ISO date" }
+    ],
+    "schoolAccess": "approved",
+    "schoolEntrantCounts": [
+      { "schoolName": "Testville High", "entrantCount": 12 }
     ]
   }
 ]
 ```
+
+`schoolAccess` is one of `"approved" | "pending" | "declined" | "none"` (the caller's school only). Anonymous and organiser callers get the plain list without the enrichment fields.
+
+---
+
+### PUT /api/olympiads/:id
+
+Requires auth, role `organiser`. Edits an olympiad's name, timezone and organiser-set info fields. Only the fields present in the body are updated; sending an empty string clears an optional field.
+
+**Body (all fields optional):**
+```json
+{
+  "name": "Wits Maths Olympiad",
+  "timezone": "Africa/Johannesburg",
+  "description": "A national maths olympiad",
+  "grades": "Grade 8–12",
+  "startDate": "2026-02-01",
+  "endDate": "2026-03-01"
+}
+```
+
+**Response (200):** the updated olympiad object.
+
+**Errors:** `400` if `name` or `timezone` would be cleared, or if `endDate` would end up before `startDate`, `403` if the caller is not an organiser, `404` if no olympiad matches.
 
 ---
 
@@ -311,6 +356,70 @@ Returns all rounds belonging to a specific olympiad, ordered by `openTime` ascen
 
 ---
 
+## Olympiad Access Requests
+
+A school joins an olympiad by requesting access and having an organiser approve it — see the [SchoolOlympiad](./database-schema.md) table. Access is school-scoped: every educator of an approved school shares its entrants.
+
+### POST /api/olympiads/:id/request-access
+
+Requires auth, role `educator`. Asks for the educator's school to be granted access to an olympiad, creating (or re-activating) a pending `SchoolOlympiad` row. A declined school can re-request — the row flips back to `pending`.
+
+**Response (201):**
+```json
+{ "status": "pending" }
+```
+
+**Errors:** `403` if the caller is not an educator or has no school linked, `404` if no olympiad matches, `409` if the school already has access or a request is already pending.
+
+---
+
+### GET /api/olympiads/access-requests
+
+Requires auth, role `organiser`. Lists pending access requests for the organiser console, oldest first.
+
+**Response (200):**
+```json
+[
+  {
+    "id": "string",
+    "school": { "id": "string", "name": "Testville High" },
+    "olympiad": { "id": "string", "name": "Wits Maths Olympiad" },
+    "requestedBy": { "id": "string", "name": "Ms Teacher", "email": "teacher@school.com" },
+    "requestedAt": "ISO date"
+  }
+]
+```
+
+`requestedBy` is `null` when the requesting user's account no longer exists.
+
+---
+
+### POST /api/olympiads/access-requests/:id/approve
+
+Requires auth, role `organiser`. Approves a pending access request — the school can immediately register entrants into that olympiad's rounds. Existing entrants are **not** auto-registered on approval; the educator adds them explicitly.
+
+**Response (200):**
+```json
+{ "id": "string", "status": "approved" }
+```
+
+**Errors:** `403` if the caller is not an organiser, `404` if no request matches.
+
+---
+
+### POST /api/olympiads/access-requests/:id/decline
+
+Requires auth, role `organiser`. Declines a pending access request. The school can request again later.
+
+**Response (200):**
+```json
+{ "id": "string", "status": "declined" }
+```
+
+**Errors:** `403` if the caller is not an organiser, `404` if no request matches.
+
+---
+
 ## Round Entrants
 
 ### POST /api/rounds/:id/entrants
@@ -334,7 +443,7 @@ Requires auth, role `educator`. Registers one of the educator's own entrants to 
 }
 ```
 
-**Errors:** `400` if `entrantId` is missing, `403` if the round is no longer accepting registrations (`closed`/`released`), the entrant belongs to a different school, or no educator profile exists, `404` if the round or entrant does not exist, `409` if the entrant is already registered for this round.
+**Errors:** `400` if `entrantId` is missing, `403` if the round is no longer accepting registrations (`closed`/`released`), the school hasn't been granted approved access to the olympiad, the entrant belongs to a different school, or no educator profile exists, `404` if the round or entrant does not exist, `409` if the entrant is already registered for this round.
 
 ---
 
@@ -360,12 +469,13 @@ Returns all entrants registered for a specific round — powers the "Submit Resu
 
 ### POST /api/entrants
 
-Requires auth, role `educator`. Creates an entrant (student) at the authenticated educator's school.
+Requires auth, role `educator`. Creates an entrant (student) at the authenticated educator's school and emails them a link to set their password.
 
 **Body:**
 ```json
 {
   "name": "Test Student",
+  "email": "student@school.com",
   "grade": "10"
 }
 ```
@@ -376,11 +486,19 @@ Requires auth, role `educator`. Creates an entrant (student) at the authenticate
   "id": "string",
   "schoolId": "string",
   "name": "Test Student",
-  "grade": "10"
+  "grade": "10",
+  "email": "student@school.com",
+  "accountStatus": "invite_pending",
+  "invitationSent": true,
+  "registeredRounds": [
+    { "id": "string", "name": "Round 1", "olympiadName": "Wits Maths Olympiad" }
+  ]
 }
 ```
 
-**Errors:** `400` if `name` or `grade` is missing, `403` if the account has no educator profile.
+**Errors:** `400` if `name`, `email` or `grade` is missing or invalid, `409` if a user with that email already exists, `403` if the account has no educator profile.
+
+**Note:** the new entrant is auto-registered for all currently open rounds of olympiads the school has approved access to — `registeredRounds` lists them so the educator can see which olympiads the student falls under.
 
 ---
 
@@ -388,7 +506,7 @@ Requires auth, role `educator`. Creates an entrant (student) at the authenticate
 
 Requires auth, role `educator`. Lists the entrants at the authenticated educator's school, ordered by name ascending.
 
-**Response (200):** array of entrant objects, same shape as the `POST /api/entrants` response.
+**Response (200):** array of entrant objects with `email` and `accountStatus` fields — the base shape of the `POST /api/entrants` response, without the invitation/registration fields.
 
 **Errors:** `403` if the account has no educator profile.
 
@@ -516,7 +634,7 @@ Requires auth. Lists all entrants at the specified school. Organisers can view a
 
 ### GET /api/schools/:id/dashboard
 
-Requires auth. Returns aggregated dashboard statistics for a school: entrant count, total submissions, and per-entrant average scores. Organisers can view any school; educators can only view their own.
+Requires auth. Returns aggregated dashboard statistics for a school: entrant count, total submissions, per-entrant average scores, and the olympiads each entrant is registered under. Organisers can view any school; educators can only view their own.
 
 **Response (200):**
 ```json
@@ -530,11 +648,16 @@ Requires auth. Returns aggregated dashboard statistics for a school: entrant cou
       "name": "Alice Nkosi",
       "grade": "10",
       "submissionCount": 3,
-      "averageScore": 72.5
+      "averageScore": 72.5,
+      "olympiads": [
+        { "id": "string", "name": "Wits Maths Olympiad" }
+      ]
     }
   ]
 }
 ```
+
+`olympiads` lists each distinct olympiad the entrant has a round registration in, sorted by name — empty when the student hasn't been registered for any rounds yet.
 
 **Errors:** `403` not authorized, `404` school not found.
 

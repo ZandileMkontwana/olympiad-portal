@@ -8,12 +8,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
-import {
-  createSitting,
-  saveSittingAnswers,
-  submitSitting,
-  ApiError,
-} from '@/lib/api';
+import { createSitting, saveSittingAnswers, submitSitting, ApiError } from '@/lib/api';
 
 function SitContent() {
   const searchParams = useSearchParams();
@@ -58,7 +53,9 @@ function SitContent() {
 
         if (!user.entrantId) {
           if (!cancelled) {
-            setError('Your account is not linked to a student record. Please contact your educator.');
+            setError(
+              'Your account is not linked to a student record. Please contact your educator.'
+            );
             setPhase('error');
           }
           return;

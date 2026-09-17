@@ -24,7 +24,8 @@ async function release() {
 
 async function setup() {
   const entrant = await prisma.entrant.findFirst({ where: { name: 'Thabo' } });
-  if (!entrant) throw new Error('Entrant "Thabo" not found — register the student first via /register/student');
+  if (!entrant)
+    throw new Error('Entrant "Thabo" not found — register the student first via /register/student');
 
   await prisma.olympiad.upsert({
     where: { id: OLYMPIAD_ID },
@@ -40,7 +41,7 @@ async function setup() {
       id: ROUND_ID,
       olympiadId: OLYMPIAD_ID,
       name: 'Dash Test Round',
-      openTime: new Date(now - 60 * 60 * 1000),  // opened an hour ago
+      openTime: new Date(now - 60 * 60 * 1000), // opened an hour ago
       closeTime: new Date(now + 2 * 60 * 60 * 1000), // closes in two hours
       state: 'open',
     },
@@ -55,7 +56,12 @@ async function setup() {
   await prisma.paper.upsert({
     where: { roundId: ROUND_ID },
     update: {},
-    create: { roundId: ROUND_ID, fileUrl: PAPER_FILE_URL, memoUrl: PAPER_FILE_URL, memoAnswers: MEMO_ANSWERS },
+    create: {
+      roundId: ROUND_ID,
+      fileUrl: PAPER_FILE_URL,
+      memoUrl: PAPER_FILE_URL,
+      memoAnswers: MEMO_ANSWERS,
+    },
   });
 
   const round = await prisma.round.findUnique({ where: { id: ROUND_ID } });

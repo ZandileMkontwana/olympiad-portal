@@ -79,7 +79,7 @@ function CompleteProfileForm() {
           <h1 className="font-display text-xl font-semibold text-ink">Account created</h1>
         </div>
         <p className="mt-2 text-sm text-ink-soft">
-          Welcome, {profile.name}. You&apos;re registered as an educator at {profile.school}.
+          Welcome, {profile.name}. You&apos;re registered as an educator at {profile.school.name}.
         </p>
       </div>
     );
@@ -214,8 +214,8 @@ export default function RegisterPage() {
         <div className="mt-6 rounded-md border border-lavender/25 bg-lavender/5 p-4 text-sm text-ink-soft">
           <p className="font-semibold text-ink">Are you a student?</p>
           <p className="mt-1">
-            You don&apos;t need to create an account — your educator registers you and
-            emails you a link to set your password. Then just{' '}
+            You don&apos;t need to create an account — your educator registers you and emails you a
+            link to set your password. Then just{' '}
             <a href="/login" className="font-medium text-lavender-deep hover:underline">
               sign in
             </a>{' '}

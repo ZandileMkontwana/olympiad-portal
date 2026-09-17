@@ -30,12 +30,18 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.submission, 'create');
     vi.spyOn(prisma.submission, 'findUnique');
     vi.spyOn(prisma.result, 'create');
+    vi.spyOn(prisma.markingTask, 'create');
+    vi.spyOn(prisma.remarkRequest, 'create');
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.submission, 'findFirst');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     sgMail.send.mockResolvedValue({});
+    prisma.markingTask.create.mockResolvedValue({
+      id: 'default-task-id',
+      status: 'unassigned',
+    });
     // Default: the Clerk user maps to an educator in our database
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
@@ -122,7 +128,7 @@ describe('Submissions routes', () => {
       expect(prisma.submission.create).not.toHaveBeenCalled();
     });
 
-    it('creates submission without result when no memoAnswers', async () => {
+    it('creates submission without result when no memoAnswers, and queues a MarkingTask', async () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         state: 'open',
@@ -134,7 +140,16 @@ describe('Submissions routes', () => {
         roundId: 'round-1',
         submittedAt: new Date('2026-01-01'),
       });
-      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice', schoolId: 'school-1' });
+      prisma.markingTask.create.mockResolvedValue({
+        id: 'task-1',
+        submissionId: 'sub-1',
+        status: 'unassigned',
+      });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-1',
+      });
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
@@ -143,7 +158,11 @@ describe('Submissions routes', () => {
       expect(res.status).toBe(201);
       expect(res.body.submission.id).toBe('sub-1');
       expect(res.body.result).toBeNull();
+      expect(res.body.markingTask.id).toBe('task-1');
       expect(prisma.result.create).not.toHaveBeenCalled();
+      expect(prisma.markingTask.create).toHaveBeenCalledWith({
+        data: { submissionId: 'sub-1' },
+      });
       expect(sgMail.send).toHaveBeenCalled();
     });
 
@@ -170,6 +189,7 @@ describe('Submissions routes', () => {
       expect(prisma.result.create).toHaveBeenCalledWith({
         data: { submissionId: 'sub-1', score: 50 },
       });
+      expect(prisma.markingTask.create).not.toHaveBeenCalled();
     });
 
     it('handles 0% score when all answers wrong', async () => {
@@ -213,6 +233,7 @@ describe('Submissions routes', () => {
       prisma.submission.findUnique.mockResolvedValue({
         id: 'existing-sub',
         result: { score: 80 },
+        markingTask: null,
       });
 
       const res = await request(app)
@@ -223,7 +244,7 @@ describe('Submissions routes', () => {
       expect(res.body.submission.id).toBe('existing-sub');
       expect(prisma.submission.findUnique).toHaveBeenCalledWith({
         where: { idempotencyKey: 'dup-key' },
-        include: { result: true },
+        include: { result: true, markingTask: true },
       });
     });
 
@@ -397,6 +418,66 @@ describe('Submissions routes', () => {
           where: expect.objectContaining({ entrantId: 'e1', roundId: 'round-0' }),
         })
       );
+    });
+  });
+
+  describe('POST /submissions/:id/remark', () => {
+    it('returns 401 when not authenticated', async () => {
+      const unauthApp = createApp(false);
+      const res = await request(unauthApp)
+        .post('/api/submissions/sub-1/remark')
+        .send({ reason: 'Question 3 was marked wrong' });
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 400 when reason is missing', async () => {
+      const res = await request(app).post('/api/submissions/sub-1/remark').send({});
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/reason/);
+    });
+
+    it('returns 404 when submission does not exist', async () => {
+      prisma.submission.findUnique.mockResolvedValue(null);
+      const res = await request(app)
+        .post('/api/submissions/sub-1/remark')
+        .send({ reason: 'Question 3 was marked wrong' });
+      expect(res.status).toBe(404);
+    });
+
+    it('creates a remark request tied to the requesting educator', async () => {
+      prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1' });
+      prisma.remarkRequest.create.mockResolvedValue({
+        id: 'remark-1',
+        submissionId: 'sub-1',
+        requestedById: 'user-1',
+        reason: 'Question 3 was marked wrong',
+        status: 'pending',
+      });
+
+      const res = await request(app)
+        .post('/api/submissions/sub-1/remark')
+        .send({ reason: 'Question 3 was marked wrong' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe('pending');
+      expect(prisma.remarkRequest.create).toHaveBeenCalledWith({
+        data: {
+          submissionId: 'sub-1',
+          requestedById: 'user-1',
+          reason: 'Question 3 was marked wrong',
+        },
+      });
+    });
+
+    it('returns 500 on unexpected error', async () => {
+      prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1' });
+      prisma.remarkRequest.create.mockRejectedValue(new Error('Unexpected'));
+
+      const res = await request(app)
+        .post('/api/submissions/sub-1/remark')
+        .send({ reason: 'Question 3 was marked wrong' });
+
+      expect(res.status).toBe(500);
     });
   });
 });

@@ -95,7 +95,11 @@ describe('loadAuthUser', () => {
     const { req } = makeReqRes(null, {
       authorization: `Bearer ${studentToken()}`,
     });
-    requireAuth(req, () => {}, () => {});
+    requireAuth(
+      req,
+      () => {},
+      () => {}
+    );
 
     const user = await loadAuthUser(req);
     expect(user).toEqual({ id: 'user-1', role: 'student' });
@@ -105,7 +109,11 @@ describe('loadAuthUser', () => {
   it('loads a Clerk-authenticated user by clerkUserId', async () => {
     prisma.user.findUnique.mockResolvedValue({ id: 'user-2', role: 'educator' });
     const { req } = makeReqRes(() => ({ userId: 'clerk-user-1' }));
-    requireAuth(req, () => {}, () => {});
+    requireAuth(
+      req,
+      () => {},
+      () => {}
+    );
 
     const user = await loadAuthUser(req);
     expect(user).toEqual({ id: 'user-2', role: 'educator' });

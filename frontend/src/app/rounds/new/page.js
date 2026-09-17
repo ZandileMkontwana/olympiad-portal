@@ -30,13 +30,19 @@ function validateExistingId(olympiadId) {
   return errors;
 }
 
-function validateRound(name, openTime, closeTime) {
+function validateRound(name, openTime, closeTime, qualifyingThreshold) {
   const errors = {};
   if (!name.trim()) errors.name = 'Round name is required.';
   if (!openTime) errors.openTime = 'Open time is required.';
   if (!closeTime) errors.closeTime = 'Close time is required.';
   if (openTime && closeTime && new Date(closeTime) <= new Date(openTime)) {
     errors.closeTime = 'Close time must be after open time.';
+  }
+  if (qualifyingThreshold.trim()) {
+    const n = Number(qualifyingThreshold);
+    if (Number.isNaN(n) || n < 0 || n > 100) {
+      errors.qualifyingThreshold = 'Threshold must be a number between 0 and 100.';
+    }
   }
   return errors;
 }
@@ -72,6 +78,7 @@ function NewRoundForm() {
   const [roundName, setRoundName] = useState('');
   const [openTime, setOpenTime] = useState('');
   const [closeTime, setCloseTime] = useState('');
+  const [qualifyingThreshold, setQualifyingThreshold] = useState('');
   const [roundErrors, setRoundErrors] = useState({});
   const [roundStatus, setRoundStatus] = useState('idle');
   const [roundErrorMessage, setRoundErrorMessage] = useState('');
@@ -122,7 +129,7 @@ function NewRoundForm() {
     event.preventDefault();
     setRoundErrorMessage('');
 
-    const errors = validateRound(roundName, openTime, closeTime);
+    const errors = validateRound(roundName, openTime, closeTime, qualifyingThreshold);
     setRoundErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -133,6 +140,7 @@ function NewRoundForm() {
         name: roundName.trim(),
         openTime: new Date(openTime).toISOString(),
         closeTime: new Date(closeTime).toISOString(),
+        qualifyingThreshold: qualifyingThreshold.trim() ? Number(qualifyingThreshold) : null,
       });
       setCreatedRound(round);
       setRoundStatus('success');
@@ -146,6 +154,7 @@ function NewRoundForm() {
     setRoundName('');
     setOpenTime('');
     setCloseTime('');
+    setQualifyingThreshold('');
     setRoundErrors({});
     setRoundStatus('idle');
     setRoundErrorMessage('');
@@ -428,6 +437,39 @@ function NewRoundForm() {
                 </p>
               )}
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="qualifying-threshold" className="block text-sm font-medium text-ink">
+              Qualifying threshold <span className="text-ink-soft font-normal">(optional)</span>
+            </label>
+            <input
+              id="qualifying-threshold"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={qualifyingThreshold}
+              onChange={(e) => setQualifyingThreshold(e.target.value)}
+              placeholder="e.g. 70"
+              aria-invalid={Boolean(roundErrors.qualifyingThreshold)}
+              aria-describedby={
+                roundErrors.qualifyingThreshold
+                  ? 'qualifying-threshold-error'
+                  : 'qualifying-threshold-hint'
+              }
+              className="mt-2 block w-full rounded-md border border-lavender/30 bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-soft/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
+            />
+            <p id="qualifying-threshold-hint" className="mt-1 text-xs text-ink-soft">
+              Entrants scoring at or above this percentage will be automatically registered for the
+              next round when this one closes. Leave blank if this round doesn&apos;t feed into
+              another.
+            </p>
+            {roundErrors.qualifyingThreshold && (
+              <p id="qualifying-threshold-error" role="alert" className="mt-1 text-sm text-red-600">
+                {roundErrors.qualifyingThreshold}
+              </p>
+            )}
           </div>
 
           {roundStatus === 'error' && (

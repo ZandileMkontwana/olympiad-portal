@@ -243,20 +243,25 @@ describe('Schools routes', () => {
             { id: 'sub-1', result: { score: 80 } },
             { id: 'sub-2', result: { score: 90 } },
           ],
+          roundEntrants: [
+            { round: { olympiad: { id: 'olympiad-2', name: 'Science Olympiad' } } },
+            { round: { olympiad: { id: 'olympiad-1', name: 'Maths Olympiad' } } },
+            { round: { olympiad: { id: 'olympiad-1', name: 'Maths Olympiad' } } },
+          ],
         },
         {
           id: 'entrant-2',
           name: 'Bob',
           grade: '11',
-          submissions: [
-            { id: 'sub-3', result: { score: 70 } },
-          ],
+          submissions: [{ id: 'sub-3', result: { score: 70 } }],
+          roundEntrants: [],
         },
         {
           id: 'entrant-3',
           name: 'Carol',
           grade: '9',
           submissions: [],
+          roundEntrants: [],
         },
       ]);
 
@@ -267,17 +272,22 @@ describe('Schools routes', () => {
       expect(res.body.totalSubmissions).toBe(3);
       expect(res.body.entrants).toHaveLength(3);
 
-      // Alice: avg (80+90)/2 = 85
+      // Alice: avg (80+90)/2 = 85; olympiads are deduped and sorted by name
       const alice = res.body.entrants.find((e) => e.id === 'entrant-1');
       expect(alice.submissionCount).toBe(2);
       expect(alice.averageScore).toBe(85);
       expect(alice.email).toBe('alice@school.com');
       expect(alice.accountStatus).toBe('active');
+      expect(alice.olympiads).toEqual([
+        { id: 'olympiad-1', name: 'Maths Olympiad' },
+        { id: 'olympiad-2', name: 'Science Olympiad' },
+      ]);
 
-      // Bob: avg 70
+      // Bob: avg 70; no round registrations yet
       const bob = res.body.entrants.find((e) => e.id === 'entrant-2');
       expect(bob.submissionCount).toBe(1);
       expect(bob.averageScore).toBe(70);
+      expect(bob.olympiads).toEqual([]);
 
       // Carol: no submissions ΓåÆ null average
       const carol = res.body.entrants.find((e) => e.id === 'entrant-3');
@@ -299,6 +309,7 @@ describe('Schools routes', () => {
             { id: 'sub-1', result: null },
             { id: 'sub-2', result: { score: 60 } },
           ],
+          roundEntrants: [],
         },
       ]);
 

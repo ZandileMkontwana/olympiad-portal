@@ -15,7 +15,7 @@ function argValue(flag) {
 
 async function main() {
   const email = argValue('--email') || 'zsikelelwa7@gmail.com';
-  const password = argValue('--password') || 'Codecrafters@2026';
+  const password = argValue('--password') || 'Codecrafters2026';
   const name = argValue('--name') || 'Portal Organiser';
 
   // Check if this email already has a Clerk account

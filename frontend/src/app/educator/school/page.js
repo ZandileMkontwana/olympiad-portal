@@ -572,11 +572,18 @@ export default function SchoolDashboardPage() {
         { name: newName.trim(), email: newEmail.trim(), grade: newGrade.trim() },
         token
       );
+      const registeredInto = (result.registeredRounds || [])
+        .map((round) => `${round.olympiadName} — ${round.name}`)
+        .join(', ');
       setAddMessage({
         type: 'success',
-        text: result.invitationSent
-          ? `${newName.trim()} has been added and emailed a link to set their password.`
-          : `${newName.trim()} has been added, but the invitation email could not be sent — use "Resend invite" on their card.`,
+        text:
+          (result.invitationSent
+            ? `${newName.trim()} has been added and emailed a link to set their password.`
+            : `${newName.trim()} has been added, but the invitation email could not be sent — use "Resend invite" on their card.`) +
+          (registeredInto
+            ? ` Registered into: ${registeredInto}.`
+            : ' No open rounds to register them into yet.'),
       });
       setNewName('');
       setNewEmail('');
@@ -1321,6 +1328,35 @@ export default function SchoolDashboardPage() {
                     {entrant.email || 'No account yet'}
                   </p>
                   <div style={{ display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}>
+                    {(entrant.olympiads || []).map((olympiad) => (
+                      <span
+                        key={olympiad.id}
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.68em',
+                          fontWeight: 600,
+                          background: 'rgba(56,142,204,0.12)',
+                          color: '#2c6cb0',
+                        }}
+                      >
+                        {olympiad.name}
+                      </span>
+                    ))}
+                    {(!entrant.olympiads || entrant.olympiads.length === 0) && (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.68em',
+                          fontWeight: 600,
+                          background: 'rgba(139,92,246,0.05)',
+                          color: '#8b7fa8',
+                        }}
+                      >
+                        No olympiad yet
+                      </span>
+                    )}
                     <span
                       style={{
                         padding: '2px 8px',

@@ -9,56 +9,85 @@ datasource db {
 }
 
 model Olympiad {
-  id          String  @id @default(uuid())
+  id          String           @id @default(uuid())
   name        String
   timezone    String
+  description String? // organiser-written blurb shown to educators requesting access
+  grades      String? // target learner grades, e.g. "Grade 8-12"
+  startDate   DateTime? // olympiad run dates, organiser-set
+  endDate     DateTime?
   organiserId String? // the organiser who created it; null = legacy/unowned
   rounds      Round[]
-  organiser   User?   @relation(fields: [organiserId], references: [id])
+  schoolAccess SchoolOlympiad[]
+  organiser   User?            @relation(fields: [organiserId], references: [id])
 }
 
 model Round {
-  id                    String            @id @default(uuid())
-  olympiadId            String
-  name                  String
-  openTime              DateTime
-  closeTime             DateTime
-  state                 String            @default("scheduled")
-  qualifyingThreshold   Float?            // minimum score % (0-100) required to pass; null = no gate
-  prerequisiteRoundId   String?           // the round that must be passed first; null = no prerequisite
-  paper                 Paper?
-  olympiad              Olympiad          @relation(fields: [olympiadId], references: [id])
-  prerequisiteRound     Round?            @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
-  dependentRounds       Round[]           @relation("RoundPrerequisites")
-  roundEntrants         RoundEntrant[]
-  submissions           Submission[]
-  sittings              Sitting[]
-  notificationLogs      NotificationLog[]
-  notificationRules     NotificationRule[]
+  id                     String              @id @default(uuid())
+  olympiadId             String
+  name                   String
+  openTime               DateTime
+  closeTime              DateTime
+  state                  String              @default("scheduled")
+  qualifyingThreshold    Float? // minimum score % (0-100) required to pass; null = no gate
+  prerequisiteRoundId    String? // the round that must be passed first; null = no prerequisite
+  autoAdvanceProcessedAt DateTime?
+  paper                  Paper?
+  olympiad               Olympiad            @relation(fields: [olympiadId], references: [id])
+  prerequisiteRound      Round?              @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
+  dependentRounds        Round[]             @relation("RoundPrerequisites")
+  roundEntrants          RoundEntrant[]
+  submissions            Submission[]
+  sittings               Sitting[]
+  notificationLogs       NotificationLog[]
+  notificationRules      NotificationRule[]
 }
 
 model User {
-  id                   String    @id @default(uuid())
-  clerkUserId          String?   @unique
-  email                String    @unique
-  role                 String
-  createdAt            DateTime  @default(now())
-  name                 String
-  passwordHash         String?
-  invitationToken      String?   @unique
-  invitationExpiresAt  DateTime?
-  educator             Educator?
-  entrant              Entrant?
-  olympiads            Olympiad[]
+  id                    String          @id @default(uuid())
+  clerkUserId           String?         @unique
+  email                 String          @unique
+  role                  String
+  createdAt             DateTime        @default(now())
+  name                  String
+  passwordHash          String?
+  invitationToken       String?         @unique
+  invitationExpiresAt   DateTime?
+  educator              Educator?
+  entrant               Entrant?
+  olympiads             Olympiad[]
+  assignedMarkingTasks  MarkingTask[]   @relation("AssignedMarkingTasks")
+  moderatedMarkingTasks MarkingTask[]   @relation("ModeratedMarkingTasks")
+  requestedRemarks      RemarkRequest[] @relation("RequestedRemarks")
+  reviewedRemarks       RemarkRequest[] @relation("ReviewedRemarks")
 }
 
 model School {
-  id        String     @id @default(uuid())
-  name      String
-  timezone  String
-  createdAt DateTime   @default(now())
-  educators Educator[]
-  entrants  Entrant[]
+  id              String           @id @default(uuid())
+  name            String
+  timezone        String
+  createdAt       DateTime         @default(now())
+  educators       Educator[]
+  entrants        Entrant[]
+  schoolOlympiads SchoolOlympiad[]
+}
+
+// A school's participation in an olympiad. Created as 'pending' when an
+// educator requests access and flipped to 'approved'/'declined' by the
+// organiser; only approved schools can register entrants into the
+// olympiad's rounds.
+model SchoolOlympiad {
+  id            String    @id @default(uuid())
+  schoolId      String
+  olympiadId    String
+  status        String    @default("pending") // 'pending' | 'approved' | 'declined'
+  requestedById String? // User.id of the educator who requested
+  requestedAt   DateTime  @default(now())
+  decidedAt     DateTime?
+  school        School    @relation(fields: [schoolId], references: [id])
+  olympiad      Olympiad  @relation(fields: [olympiadId], references: [id])
+
+  @@unique([schoolId, olympiadId])
 }
 
 model Educator {
@@ -94,15 +123,34 @@ model Paper {
 }
 
 model Submission {
-  id             String   @id @default(uuid())
+  id             String          @id @default(uuid())
   roundId        String
   entrantId      String
   answers        Json
-  idempotencyKey String   @unique
-  submittedAt    DateTime @default(now())
+  idempotencyKey String          @unique
+  submittedAt    DateTime        @default(now())
   result         Result?
-  entrant        Entrant  @relation(fields: [entrantId], references: [id])
-  round          Round    @relation(fields: [roundId], references: [id])
+  markingTask    MarkingTask?
+  remarkRequests RemarkRequest[]
+  entrant        Entrant         @relation(fields: [entrantId], references: [id])
+  round          Round           @relation(fields: [roundId], references: [id])
+}
+
+model MarkingTask {
+  id             String     @id @default(uuid())
+  submissionId   String     @unique
+  status         String     @default("unassigned") // 'unassigned' | 'assigned' | 'marked' | 'moderated'
+  assignedToId   String?
+  score          Float?
+  breakdown      Json?      // per-question partial credit, e.g. { "q1": 3, "q2": 5 }
+  markedAt       DateTime?
+  moderatedById  String?
+  moderatedScore Float?
+  moderatedAt    DateTime?
+  createdAt      DateTime   @default(now())
+  submission     Submission @relation(fields: [submissionId], references: [id])
+  assignedTo     User?      @relation("AssignedMarkingTasks", fields: [assignedToId], references: [id])
+  moderatedBy    User?      @relation("ModeratedMarkingTasks", fields: [moderatedById], references: [id])
 }
 
 model Result {
@@ -111,6 +159,22 @@ model Result {
   score        Float
   releasedAt   DateTime?
   submission   Submission @relation(fields: [submissionId], references: [id])
+}
+
+model RemarkRequest {
+  id            String     @id @default(uuid())
+  submissionId  String
+  requestedById String
+  reason        String
+  status        String     @default("pending") // 'pending' | 'approved' | 'rejected'
+  newScore      Float?     // updated score, set when approved
+  reviewedById  String?
+  reviewNotes   String?
+  createdAt     DateTime   @default(now())
+  reviewedAt    DateTime?
+  submission    Submission @relation(fields: [submissionId], references: [id])
+  requestedBy   User       @relation("RequestedRemarks", fields: [requestedById], references: [id])
+  reviewedBy    User?      @relation("ReviewedRemarks", fields: [reviewedById], references: [id])
 }
 
 model RoundEntrant {

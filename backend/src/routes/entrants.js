@@ -105,11 +105,25 @@ router.post('/entrants', ...requireRole('educator'), async (req, res) => {
       return created;
     });
 
-    // Auto-register the new entrant only for open rounds they qualify for.
-    // Gated rounds are skipped until the qualification is met.
+    // Auto-register the new entrant for open rounds of olympiads the school
+    // has approved access to, but only for rounds they qualify for. Gated
+    // rounds are skipped until the qualification is met.
+    const approvedAccess = await prisma.schoolOlympiad.findMany({
+      where: { schoolId: educator.schoolId, status: 'approved' },
+      select: { olympiadId: true },
+    });
     const openRounds = await prisma.round.findMany({
-      where: { state: 'open' },
-      select: { id: true, prerequisiteRoundId: true, qualifyingThreshold: true },
+      where: {
+        state: 'open',
+        olympiadId: { in: approvedAccess.map((access) => access.olympiadId) },
+      },
+      select: {
+        id: true,
+        name: true,
+        prerequisiteRoundId: true,
+        qualifyingThreshold: true,
+        olympiad: { select: { name: true } },
+      },
     });
     const registerableRoundIds = [];
     for (const round of openRounds) {
@@ -135,6 +149,16 @@ router.post('/entrants', ...requireRole('educator'), async (req, res) => {
       email: normalizedEmail,
       accountStatus: 'invite_pending',
       invitationSent,
+      // Which open rounds the entrant was registered for, so the educator
+      // can see which olympiads the student now falls under. Only rounds
+      // that passed the qualification gate are listed.
+      registeredRounds: openRounds
+        .filter((round) => registerableRoundIds.includes(round.id))
+        .map((round) => ({
+          id: round.id,
+          name: round.name,
+          olympiadName: round.olympiad.name,
+        })),
     });
   } catch (err) {
     console.error(err);

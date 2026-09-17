@@ -45,8 +45,11 @@ async function requestJson(path, options = {}) {
 }
 
 /**
- * Lists olympiads. Organisers only see the olympiads they created, so their
- * token must be attached; educators and students may call it without one.
+ * Lists olympiads with their rounds. Organisers only see the olympiads they
+ * created, so their token must be attached; when an educator's Clerk token is
+ * provided the backend also returns their school's access state and the
+ * entrant count per school. Anonymous callers may call it without a token.
+ * Wired to GET /api/olympiads (backend/src/routes/rounds.js).
  *
  * @param {string} [token] - Clerk JWT for the Authorization header
  */
@@ -58,22 +61,113 @@ export function listOlympiads(token) {
 /**
  * Creates an olympiad owned by the signed-in organiser.
  *
- * @param {{name: string, timezone: string}} payload
+ * @param {{name: string, timezone: string, description?: string, grades?: string, startDate?: string, endDate?: string}} payload
  * @param {string} token - Clerk JWT for the Authorization header
  */
-export function createOlympiad({ name, timezone }, token) {
+export function createOlympiad(
+  { name, timezone, description, grades, startDate, endDate },
+  token
+) {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
   return requestJson('/api/olympiads', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ name, timezone }),
+    body: JSON.stringify({ name, timezone, description, grades, startDate, endDate }),
   });
 }
 
-export function createRound({ olympiadId, name, openTime, closeTime }) {
+/**
+ * Edits an olympiad's details and organiser-set info fields (description,
+ * grades, run dates) shown to educators on the info card.
+ * Wired to PUT /api/olympiads/:id (backend/src/routes/rounds.js).
+ *
+ * @param {string} olympiadId
+ * @param {{name?: string, timezone?: string, description?: string, grades?: string, startDate?: string, endDate?: string}} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function updateOlympiad(olympiadId, data, token) {
+  return requestJson(`/api/olympiads/${olympiadId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Asks the organiser to grant the signed-in educator's school access to an
+ * olympiad. Re-requesting is allowed after a decline.
+ * Wired to POST /api/olympiads/:id/request-access (backend/src/routes/rounds.js).
+ *
+ * @param {string} olympiadId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{status: string}>}
+ */
+export function requestOlympiadAccess(olympiadId, token) {
+  return requestJson(`/api/olympiads/${olympiadId}/request-access`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Lists pending school access requests for the organiser console.
+ * Wired to GET /api/olympiads/access-requests (backend/src/routes/rounds.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   school: {id: string, name: string},
+ *   olympiad: {id: string, name: string},
+ *   requestedBy: {id: string, name: string, email: string}|null,
+ *   requestedAt: string,
+ * }>>}
+ */
+export function fetchAccessRequests(token) {
+  return requestJson('/api/olympiads/access-requests', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Approves a pending school access request.
+ * Wired to POST /api/olympiads/access-requests/:id/approve (backend/src/routes/rounds.js).
+ *
+ * @param {string} requestId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{id: string, status: string}>}
+ */
+export function approveAccessRequest(requestId, token) {
+  return requestJson(`/api/olympiads/access-requests/${requestId}/approve`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Declines a pending school access request.
+ * Wired to POST /api/olympiads/access-requests/:id/decline (backend/src/routes/rounds.js).
+ *
+ * @param {string} requestId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{id: string, status: string}>}
+ */
+export function declineAccessRequest(requestId, token) {
+  return requestJson(`/api/olympiads/access-requests/${requestId}/decline`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function createRound({ olympiadId, name, openTime, closeTime, qualifyingThreshold }) {
   return requestJson('/api/rounds', {
     method: 'POST',
-    body: JSON.stringify({ olympiadId, name, openTime, closeTime }),
+    body: JSON.stringify({
+      olympiadId,
+      name,
+      openTime,
+      closeTime,
+      qualifyingThreshold: qualifyingThreshold ?? null,
+    }),
   });
 }
 
@@ -552,5 +646,121 @@ export function testNotificationTrigger(roundId, triggerType, token) {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ triggerType }),
+  });
+}
+
+/**
+ * Lists marking tasks for organisers to work through.
+ * Wired to GET /api/marking/queue (backend/src/routes/marking.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @param {string} [status] - 'unassigned' (default), 'assigned', 'marked', 'moderated', or 'all'
+ */
+export function listMarkingQueue(token, status) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return requestJson(`/api/marking/queue${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Assigns a marking task to an organiser (defaults to the requester).
+ * Wired to PATCH /api/marking/:id/assign (backend/src/routes/marking.js).
+ *
+ * @param {string} taskId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @param {string} [assignedToId] - defaults to the requester on the backend
+ */
+export function assignMarkingTask(taskId, token, assignedToId) {
+  return requestJson(`/api/marking/${taskId}/assign`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(assignedToId ? { assignedToId } : {}),
+  });
+}
+
+/**
+ * Records a marker's score (with optional per-question breakdown) for a task.
+ * Wired to PATCH /api/marking/:id (backend/src/routes/marking.js).
+ *
+ * @param {string} taskId
+ * @param {{score: number, breakdown?: Record<string, number>}} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function submitMarking(taskId, { score, breakdown }, token) {
+  return requestJson(`/api/marking/${taskId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ score, breakdown }),
+  });
+}
+
+/**
+ * Records a moderator's reviewed score for an already-marked task.
+ * Wired to PATCH /api/marking/:id/moderate (backend/src/routes/marking.js).
+ *
+ * @param {string} taskId
+ * @param {number} moderatedScore
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function moderateMarkingTask(taskId, moderatedScore, token) {
+  return requestJson(`/api/marking/${taskId}/moderate`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ moderatedScore }),
+  });
+}
+
+/**
+ * Lists submissions for a round, with result and remark request info.
+ * Wired to GET /api/rounds/:id/submissions (backend/src/routes/rounds.js).
+ */
+export function listRoundSubmissions(roundId) {
+  return requestJson(`/api/rounds/${roundId}/submissions`);
+}
+
+/**
+ * Requests a remark on a submission, explaining why in `reason`.
+ * Wired to POST /api/submissions/:id/remark (backend/src/routes/submissions.js).
+ *
+ * @param {string} submissionId
+ * @param {string} reason
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function requestRemark(submissionId, reason, token) {
+  return requestJson(`/api/submissions/${submissionId}/remark`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/**
+ * Lists remark requests for organisers to review.
+ * Wired to GET /api/remark/queue (backend/src/routes/remark.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @param {string} [status] - 'pending' (default), 'approved', 'rejected', or 'all'
+ */
+export function listRemarkQueue(token, status) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return requestJson(`/api/remark/queue${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Approves or rejects a pending remark request. Approving requires newScore.
+ * Wired to PATCH /api/remark/:id/review (backend/src/routes/remark.js).
+ *
+ * @param {string} remarkRequestId
+ * @param {{status: 'approved'|'rejected', newScore?: number, reviewNotes?: string}} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function reviewRemarkRequest(remarkRequestId, { status, newScore, reviewNotes }, token) {
+  return requestJson(`/api/remark/${remarkRequestId}/review`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status, newScore, reviewNotes }),
   });
 }
