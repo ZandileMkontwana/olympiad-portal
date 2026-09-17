@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useClerk } from '@clerk/nextjs';
+import { useClerk, useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { listOlympiads, createOlympiad, ApiError } from '@/lib/api';
 
 export default function OrganiserDashboard() {
   const { user, checking } = useRequireRole('organiser');
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
 
   const [olympiads, setOlympiads] = useState([]);
   const [status, setStatus] = useState('loading');
@@ -23,7 +24,9 @@ export default function OrganiserDashboard() {
 
     async function fetchOlympiads() {
       try {
-        const data = await listOlympiads();
+        // The token scopes the response to this organiser's own olympiads.
+        const token = await getToken();
+        const data = await listOlympiads(token);
         setOlympiads(data);
         setStatus(data.length === 0 ? 'empty' : 'ready');
       } catch {
@@ -42,10 +45,14 @@ export default function OrganiserDashboard() {
     setCreateError('');
 
     try {
-      const created = await createOlympiad({
-        name: newName.trim(),
-        timezone: newTimezone.trim(),
-      });
+      const token = await getToken();
+      const created = await createOlympiad(
+        {
+          name: newName.trim(),
+          timezone: newTimezone.trim(),
+        },
+        token
+      );
       // Add the new olympiad to the list (with empty rounds)
       setOlympiads((prev) => [...prev, { ...created, rounds: [] }]);
       setStatus('ready');

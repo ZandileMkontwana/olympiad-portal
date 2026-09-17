@@ -277,13 +277,63 @@ describe('Entrants routes', () => {
       expect(res.status).toBe(201);
       expect(prisma.round.findMany).toHaveBeenCalledWith({
         where: { state: 'open' },
-        select: { id: true },
+        select: { id: true, prerequisiteRoundId: true, qualifyingThreshold: true },
       });
       expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
         data: [
           { roundId: 'round-1', entrantId: 'entrant-1' },
           { roundId: 'round-2', entrantId: 'entrant-1' },
         ],
+        skipDuplicates: true,
+      });
+    });
+
+    it('skips open rounds whose prerequisites the entrant has not met', async () => {
+      prisma.entrant.create.mockResolvedValue({
+        id: 'entrant-1',
+        schoolId: 'school-1',
+        name: 'Alice',
+        grade: '10',
+      });
+      prisma.round.findMany.mockResolvedValue([
+        { id: 'round-1', prerequisiteRoundId: null, qualifyingThreshold: null },
+        { id: 'round-2', prerequisiteRoundId: 'round-1', qualifyingThreshold: 50 },
+      ]);
+      // The new entrant has no qualifying submission in round-1 yet
+      prisma.submission.findMany.mockResolvedValue([]);
+      prisma.roundEntrant.createMany.mockResolvedValue({ count: 1 });
+
+      const res = await request(app)
+        .post('/api/entrants')
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+
+      expect(res.status).toBe(201);
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-1', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('auto-registers for a gated round once the prerequisite has been passed', async () => {
+      prisma.entrant.create.mockResolvedValue({
+        id: 'entrant-1',
+        schoolId: 'school-1',
+        name: 'Alice',
+        grade: '10',
+      });
+      prisma.round.findMany.mockResolvedValue([
+        { id: 'round-2', prerequisiteRoundId: 'round-1', qualifyingThreshold: 50 },
+      ]);
+      prisma.submission.findMany.mockResolvedValue([{ entrantId: 'entrant-1' }]);
+      prisma.roundEntrant.createMany.mockResolvedValue({ count: 1 });
+
+      const res = await request(app)
+        .post('/api/entrants')
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+
+      expect(res.status).toBe(201);
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
         skipDuplicates: true,
       });
     });

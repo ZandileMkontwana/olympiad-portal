@@ -9,10 +9,12 @@ datasource db {
 }
 
 model Olympiad {
-  id       String  @id @default(uuid())
-  name     String
-  timezone String
-  rounds   Round[]
+  id          String  @id @default(uuid())
+  name        String
+  timezone    String
+  organiserId String? // the organiser who created it; null = legacy/unowned
+  rounds      Round[]
+  organiser   User?   @relation(fields: [organiserId], references: [id])
 }
 
 model Round {
@@ -47,6 +49,7 @@ model User {
   invitationExpiresAt  DateTime?
   educator             Educator?
   entrant              Entrant?
+  olympiads            Olympiad[]
 }
 
 model School {

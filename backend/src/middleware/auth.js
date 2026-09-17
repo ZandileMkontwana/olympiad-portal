@@ -73,6 +73,33 @@ async function loadAuthUser(req) {
 }
 
 /**
+ * Resolves the caller's database User when credentials are present, without
+ * rejecting anonymous requests. Used by public endpoints that behave
+ * differently for signed-in users (e.g. GET /olympiads filters for
+ * organisers but stays open to educators and anonymous visitors).
+ */
+async function loadOptionalUser(req) {
+  const token = extractBearerToken(req);
+  if (token) {
+    const userId = verifyStudentJwt(token);
+    if (userId) {
+      req.authMode = 'jwt';
+      req.authUserId = userId;
+      return prisma.user.findUnique({ where: { id: userId } });
+    }
+  }
+
+  const auth = req.auth && req.auth();
+  if (auth && auth.userId) {
+    req.authMode = 'clerk';
+    req.authUserId = auth.userId;
+    return prisma.user.findUnique({ where: { clerkUserId: auth.userId } });
+  }
+
+  return null;
+}
+
+/**
  * Role guard — authenticates via requireAuth, then checks the user's role
  * in our database.
  */
@@ -101,4 +128,4 @@ function requireRole(role) {
   ];
 }
 
-module.exports = { requireAuth, requireRole, loadAuthUser };
+module.exports = { requireAuth, requireRole, loadAuthUser, loadOptionalUser };

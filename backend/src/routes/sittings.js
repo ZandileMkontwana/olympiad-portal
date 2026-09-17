@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
+const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 
 const router = express.Router();
 
@@ -39,29 +40,12 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'No paper uploaded for this round yet' });
     }
 
-    // Prerequisite gate: check if the entrant passed the required
-    // previous round before allowing them to sit this one.
-    if (round.prerequisiteRoundId) {
-      const prereqResult = await prisma.submission.findFirst({
-        where: {
-          entrantId,
-          roundId: round.prerequisiteRoundId,
-          result: { isNot: null },
-        },
-        include: { result: true },
+    // Prerequisite gate: an entrant who has not met this round's
+    // requirements cannot sit it, even if they were registered earlier.
+    if (!(await hasQualifiedForRound(entrantId, round))) {
+      return res.status(403).json({
+        error: `Prerequisite not met: ${prerequisiteFailureMessage(round)}`,
       });
-
-      const hasResult = !!prereqResult?.result;
-      const threshold = round.qualifyingThreshold ?? 0;
-      const meetsThreshold = hasResult && prereqResult.result.score >= threshold;
-
-      if (!hasResult || !meetsThreshold) {
-        const prereqName = round.prerequisiteRound?.name ?? 'the previous round';
-        const reason = round.qualifyingThreshold
-          ? `Requires at least ${round.qualifyingThreshold}% in ${prereqName}`
-          : `Requires completion of ${prereqName}`;
-        return res.status(403).json({ error: `Prerequisite not met: ${reason}` });
-      }
     }
 
     // Ensure the entrant is registered for this round. If not already

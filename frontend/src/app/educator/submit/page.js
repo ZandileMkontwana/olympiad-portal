@@ -208,6 +208,9 @@ function SubmissionTableContent() {
     const entrantName = entrant ? entrant.name : entrantId;
 
     try {
+      // The backend scopes submissions to the educator's own school, so
+      // this POST must carry the same Clerk token as the GET requests.
+      const token = await getToken();
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}/submissions`,
         {
@@ -215,6 +218,7 @@ function SubmissionTableContent() {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             entrantId,

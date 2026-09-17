@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
 const { sendStudentInvitation } = require('../lib/email');
+const { filterQualifiedEntrantIds } = require('../lib/qualification');
 
 const router = express.Router();
 
@@ -104,15 +105,20 @@ router.post('/entrants', ...requireRole('educator'), async (req, res) => {
       return created;
     });
 
-    // Auto-register the new entrant for all currently open rounds,
-    // so they can immediately take any active test.
+    // Auto-register the new entrant only for open rounds they qualify for.
+    // Gated rounds are skipped until the qualification is met.
     const openRounds = await prisma.round.findMany({
       where: { state: 'open' },
-      select: { id: true },
+      select: { id: true, prerequisiteRoundId: true, qualifyingThreshold: true },
     });
-    if (openRounds.length > 0) {
+    const registerableRoundIds = [];
+    for (const round of openRounds) {
+      const qualifiedIds = await filterQualifiedEntrantIds([entrant.id], round);
+      if (qualifiedIds.length > 0) registerableRoundIds.push(round.id);
+    }
+    if (registerableRoundIds.length > 0) {
       await prisma.roundEntrant.createMany({
-        data: openRounds.map((r) => ({ roundId: r.id, entrantId: entrant.id })),
+        data: registerableRoundIds.map((roundId) => ({ roundId, entrantId: entrant.id })),
         skipDuplicates: true,
       });
     }

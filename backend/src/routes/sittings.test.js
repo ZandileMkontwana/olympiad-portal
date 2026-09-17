@@ -47,6 +47,7 @@ describe('Sittings routes', () => {
     vi.spyOn(prisma.sitting, 'create');
     vi.spyOn(prisma.sitting, 'update');
     vi.spyOn(prisma.submission, 'findUnique');
+    vi.spyOn(prisma.submission, 'findFirst');
     vi.spyOn(prisma.submission, 'create');
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -137,6 +138,46 @@ describe('Sittings routes', () => {
         .send({ entrantId: 'entrant-1' });
       expect(res.status).toBe(404);
       expect(res.body.error).toMatch(/No paper uploaded/);
+    });
+
+    it('returns 403 when the prerequisite round was not passed', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        ...openRound,
+        prerequisiteRoundId: 'round-0',
+        qualifyingThreshold: 50,
+        prerequisiteRound: { id: 'round-0', name: 'Round 1' },
+      });
+      prisma.submission.findFirst.mockResolvedValue(null);
+
+      const res = await request(app)
+        .post('/api/rounds/round-1/sittings')
+        .send({ entrantId: 'entrant-1' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Prerequisite not met: Requires at least 50% in Round 1');
+      expect(prisma.sitting.upsert).not.toHaveBeenCalled();
+    });
+
+    it('starts the sitting when the prerequisite round was passed', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        ...openRound,
+        prerequisiteRoundId: 'round-0',
+        qualifyingThreshold: 50,
+        prerequisiteRound: { id: 'round-0', name: 'Round 1' },
+      });
+      prisma.submission.findFirst.mockResolvedValue({ id: 'prereq-sub' });
+
+      const res = await request(app)
+        .post('/api/rounds/round-1/sittings')
+        .send({ entrantId: 'entrant-1' });
+
+      expect(res.status).toBe(200);
+      expect(prisma.submission.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ entrantId: 'entrant-1', roundId: 'round-0' }),
+        })
+      );
+      expect(prisma.sitting.upsert).toHaveBeenCalled();
     });
 
     it('auto-registers the entrant when not already registered for the round', async () => {

@@ -16,6 +16,7 @@ describe('startScheduler', () => {
     vi.spyOn(prisma.entrant, 'findMany').mockResolvedValue([]);
     vi.spyOn(prisma.roundEntrant, 'findMany').mockResolvedValue([]);
     vi.spyOn(prisma.roundEntrant, 'createMany').mockResolvedValue({ count: 0 });
+    vi.spyOn(prisma.submission, 'findMany');
     vi.spyOn(prisma.notificationLog, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.notificationLog, 'create').mockResolvedValue({ id: 'log-1' });
     vi.spyOn(prisma.notificationRule, 'findUnique').mockResolvedValue(null);
@@ -116,6 +117,42 @@ describe('startScheduler', () => {
     });
     expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
       data: [{ roundId: 'round-1', entrantId: 'entrant-2' }],
+      skipDuplicates: true,
+    });
+  });
+
+  it('does not register entrants who have not passed a gated round prerequisite', async () => {
+    startScheduler();
+    prisma.round.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    prisma.round.findMany
+      .mockResolvedValueOnce([
+        { id: 'round-2', prerequisiteRoundId: 'round-1', qualifyingThreshold: 50 },
+      ])
+      .mockResolvedValueOnce([]);
+    prisma.entrant.findMany.mockResolvedValue([{ id: 'entrant-1' }]);
+    // No qualifying submission in the prerequisite round
+    prisma.submission.findMany.mockResolvedValue([]);
+
+    await scheduledCallback();
+
+    expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
+  });
+
+  it('registers entrants who passed a gated round prerequisite', async () => {
+    startScheduler();
+    prisma.round.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    prisma.round.findMany
+      .mockResolvedValueOnce([
+        { id: 'round-2', prerequisiteRoundId: 'round-1', qualifyingThreshold: 50 },
+      ])
+      .mockResolvedValueOnce([]);
+    prisma.entrant.findMany.mockResolvedValue([{ id: 'entrant-1' }]);
+    prisma.submission.findMany.mockResolvedValue([{ entrantId: 'entrant-1' }]);
+
+    await scheduledCallback();
+
+    expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+      data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
       skipDuplicates: true,
     });
   });

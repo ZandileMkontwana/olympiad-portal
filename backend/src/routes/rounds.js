@@ -1,6 +1,10 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
-const { requireRole, requireAuth, loadAuthUser } = require('../middleware/auth');
+const { requireRole, requireAuth, loadAuthUser, loadOptionalUser } = require('../middleware/auth');
+const {
+  hasQualifiedForRound,
+  prerequisiteFailureMessage,
+} = require('../lib/qualification');
 const {
   getRecipientsForRound,
   isTriggerEnabled,
@@ -24,13 +28,17 @@ const NOTIFICATION_TRIGGER_TYPES = [
 ];
 const NOTIFICATION_RECIPIENT_ROLES = ['educator', 'organiser', 'all'];
 
-router.post('/olympiads', async (req, res) => {
+// POST /olympiads — organiser-only; the creator becomes the owner, and
+// organisers only ever see their own olympiads afterwards.
+router.post('/olympiads', ...requireRole('organiser'), async (req, res) => {
   try {
     const { name, timezone } = req.body;
     if (!name || !timezone) {
       return res.status(400).json({ error: 'name and timezone are required' });
     }
-    const olympiad = await prisma.olympiad.create({ data: { name, timezone } });
+    const olympiad = await prisma.olympiad.create({
+      data: { name, timezone, organiserId: req.user.id },
+    });
     res.status(201).json(olympiad);
   } catch (err) {
     console.error(err);
@@ -38,9 +46,15 @@ router.post('/olympiads', async (req, res) => {
   }
 });
 
+// GET /olympiads — public so educators/students can browse rounds, but
+// organisers are scoped to the olympiads they created themselves.
 router.get('/olympiads', async (req, res) => {
   try {
+    const user = await loadOptionalUser(req);
+    const where = user && user.role === 'organiser' ? { organiserId: user.id } : {};
+
     const olympiads = await prisma.olympiad.findMany({
+      where,
       include: {
         rounds: {
           orderBy: { openTime: 'asc' },
@@ -151,29 +165,13 @@ router.post('/rounds/:id/entrants', ...requireRole('educator'), async (req, res)
       return res.status(403).json({ error: 'Entrant belongs to a different school' });
     }
 
-    // Prerequisite gate: verify the entrant passed the required previous
-    // round before allowing registration into this one.
-    if (round.prerequisiteRoundId) {
-      const prereqResult = await prisma.submission.findFirst({
-        where: {
-          entrantId,
-          roundId: round.prerequisiteRoundId,
-          result: { isNot: null },
-        },
-        include: { result: true },
+    // Prerequisite gate: verify the entrant met this round's requirements
+    // (passed the prerequisite round at or above the qualifying threshold)
+    // before allowing registration into it.
+    if (!(await hasQualifiedForRound(entrantId, round))) {
+      return res.status(403).json({
+        error: `Prerequisite not met: ${prerequisiteFailureMessage(round)}`,
       });
-
-      const hasResult = !!prereqResult?.result;
-      const threshold = round.qualifyingThreshold ?? 0;
-      const meetsThreshold = hasResult && prereqResult.result.score >= threshold;
-
-      if (!hasResult || !meetsThreshold) {
-        const prereqName = round.prerequisiteRound?.name ?? 'the previous round';
-        const reason = round.qualifyingThreshold
-          ? `Requires at least ${round.qualifyingThreshold}% in ${prereqName}`
-          : `Requires completion of ${prereqName}`;
-        return res.status(403).json({ error: `Prerequisite not met: ${reason}` });
-      }
     }
 
     const existing = await prisma.roundEntrant.findUnique({
@@ -213,7 +211,13 @@ router.get('/rounds/:id/entrants', requireAuth, async (req, res) => {
       if (!schoolId) return res.json([]);
     }
 
-    const where = { roundId: req.params.id, entrant: { schoolId } };
+    // Organisers see every school; educators only their own school. The
+    // filter is omitted entirely for organisers — a null schoolId would
+    // otherwise match only entrants with no school at all.
+    const where = {
+      roundId: req.params.id,
+      ...(schoolId ? { entrant: { schoolId } } : {}),
+    };
 
     const roundEntrants = await prisma.roundEntrant.findMany({
       where,
@@ -246,7 +250,13 @@ router.get('/rounds/:id/submissions', requireAuth, async (req, res) => {
       if (!schoolId) return res.json([]);
     }
 
-    const where = { roundId: req.params.id, entrant: { schoolId } };
+    // Organisers see every school; educators only their own school. The
+    // filter is omitted entirely for organisers — a null schoolId would
+    // otherwise match only entrants with no school at all.
+    const where = {
+      roundId: req.params.id,
+      ...(schoolId ? { entrant: { schoolId } } : {}),
+    };
 
     const submissions = await prisma.submission.findMany({
       where,
@@ -286,7 +296,14 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
     // Non-organisers must have a linked school; otherwise return no data.
     if (user.role !== 'organiser' && !schoolId) return res.json([]);
 
-    const where = { roundId, result: { isNot: null }, entrant: { schoolId } };
+    // Organisers see every school; educators only their own school. The
+    // filter is omitted entirely for organisers — a null schoolId would
+    // otherwise match only entrants with no school at all.
+    const where = {
+      roundId,
+      result: { isNot: null },
+      ...(schoolId ? { entrant: { schoolId } } : {}),
+    };
 
     const submissions = await prisma.submission.findMany({
       where,
@@ -350,7 +367,14 @@ router.get('/rounds/:id/standings/schools', requireAuth, async (req, res) => {
     // Non-organisers must have a linked school; otherwise return no data.
     if (user.role !== 'organiser' && !schoolId) return res.json([]);
 
-    const where = { roundId, result: { isNot: null }, entrant: { schoolId } };
+    // Organisers see every school; educators only their own school. The
+    // filter is omitted entirely for organisers — a null schoolId would
+    // otherwise match only entrants with no school at all.
+    const where = {
+      roundId,
+      result: { isNot: null },
+      ...(schoolId ? { entrant: { schoolId } } : {}),
+    };
 
     const submissions = await prisma.submission.findMany({
       where,

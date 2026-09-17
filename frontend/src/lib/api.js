@@ -44,13 +44,28 @@ async function requestJson(path, options = {}) {
   return data;
 }
 
-export function listOlympiads() {
-  return requestJson('/api/olympiads');
+/**
+ * Lists olympiads. Organisers only see the olympiads they created, so their
+ * token must be attached; educators and students may call it without one.
+ *
+ * @param {string} [token] - Clerk JWT for the Authorization header
+ */
+export function listOlympiads(token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  return requestJson('/api/olympiads', { headers });
 }
 
-export function createOlympiad({ name, timezone }) {
+/**
+ * Creates an olympiad owned by the signed-in organiser.
+ *
+ * @param {{name: string, timezone: string}} payload
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function createOlympiad({ name, timezone }, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
   return requestJson('/api/olympiads', {
     method: 'POST',
+    headers,
     body: JSON.stringify({ name, timezone }),
   });
 }

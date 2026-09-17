@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@clerk/nextjs';
 import { createOlympiad, createRound, ApiError } from '@/lib/api';
 
 // Best-effort list of IANA timezones for the datalist. Falls back to a
@@ -43,6 +44,7 @@ function validateRound(name, openTime, closeTime) {
 function NewRoundForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { getToken } = useAuth();
   const presetOlympiadId = searchParams.get('olympiadId');
   const presetOlympiadName = searchParams.get('olympiadName');
 
@@ -86,10 +88,16 @@ function NewRoundForm() {
 
       setOlympiadStatus('submitting');
       try {
-        const created = await createOlympiad({
-          name: olympiadName.trim(),
-          timezone: timezone.trim(),
-        });
+        // Organiser-only endpoint: the token both authorises the request
+        // and makes this organiser the olympiad's owner.
+        const token = await getToken();
+        const created = await createOlympiad(
+          {
+            name: olympiadName.trim(),
+            timezone: timezone.trim(),
+          },
+          token
+        );
         setOlympiad(created);
         setOlympiadStatus('success');
         setStep(2);

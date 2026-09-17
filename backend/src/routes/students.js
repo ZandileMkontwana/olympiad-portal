@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
+const { hasQualifiedForRound } = require('../lib/qualification');
 
 const router = express.Router();
 
@@ -76,28 +77,14 @@ router.get('/students/me/rounds', ...requireRole('student'), async (req, res) =>
         let locked = false;
         let lockedReason = null;
 
-        // Prerequisite gate: if this round requires passing another round
-        // first, check the student's best result in the prerequisite.
-        if (round.prerequisiteRoundId) {
-          const prereqResult = await prisma.submission.findFirst({
-            where: {
-              entrantId: entrant.id,
-              roundId: round.prerequisiteRoundId,
-              result: { isNot: null },
-            },
-            include: { result: true },
-          });
-
-          const hasResult = !!prereqResult?.result;
-          const threshold = round.qualifyingThreshold ?? 0;
-          const meetsThreshold = hasResult && prereqResult.result.score >= threshold;
-
-          if (!hasResult || !meetsThreshold) {
-            locked = true;
-            lockedReason = round.qualifyingThreshold
-              ? `Score at least ${round.qualifyingThreshold}% in ${round.prerequisiteRound.name} to unlock`
-              : `Complete ${round.prerequisiteRound.name} first`;
-          }
+        // Prerequisite gate: a student who has not met this round's
+        // requirements stays locked out of it; the unlock criteria are
+        // surfaced in lockedReason.
+        if (!(await hasQualifiedForRound(entrant.id, round))) {
+          locked = true;
+          lockedReason = round.qualifyingThreshold
+            ? `Score at least ${round.qualifyingThreshold}% in ${round.prerequisiteRound.name} to unlock`
+            : `Complete ${round.prerequisiteRound.name} first`;
         }
 
         // Only lazy-register and look up sitting for unlocked rounds.

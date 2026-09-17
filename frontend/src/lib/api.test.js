@@ -3,6 +3,7 @@ import {
   ApiError,
   createOlympiad,
   createRound,
+  listOlympiads,
   listOlympiadRounds,
   listRounds,
   getRound,
@@ -124,6 +125,39 @@ describe('api client', () => {
     });
   });
 
+  describe('listOlympiads', () => {
+    it('sends GET without an Authorization header when no token is given', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+      });
+      await listOlympiads();
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads',
+        expect.objectContaining({ headers: { 'Content-Type': 'application/json' } })
+      );
+    });
+
+    it('attaches the Bearer token so organisers only see their own olympiads', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+      });
+      await listOlympiads('org-token');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads',
+        expect.objectContaining({
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer org-token',
+          },
+        })
+      );
+    });
+  });
+
   describe('createOlympiad', () => {
     it('sends POST with correct body', async () => {
       fetchMock.mockResolvedValue({
@@ -137,6 +171,25 @@ describe('api client', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ name: 'Test', timezone: 'UTC' }),
+        })
+      );
+    });
+
+    it('attaches the Bearer token so the organiser becomes the owner', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: '1' }),
+      });
+      await createOlympiad({ name: 'Test', timezone: 'UTC' }, 'org-token');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer org-token',
+          },
         })
       );
     });
