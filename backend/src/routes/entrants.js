@@ -51,9 +51,12 @@ function newInvitation() {
 // to set a password, then emails the student the activation link.
 router.post('/entrants', ...requireRole('educator'), async (req, res) => {
   try {
-    const { name, email, grade } = req.body;
+    const { name, email, grade, olympiadId } = req.body;
     if (!name || !email || !grade) {
       return res.status(400).json({ error: 'name, email and grade are required' });
+    }
+    if (!olympiadId) {
+      return res.status(400).json({ error: 'olympiadId is required — select which olympiad to add the student under' });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
@@ -105,17 +108,24 @@ router.post('/entrants', ...requireRole('educator'), async (req, res) => {
       return created;
     });
 
-    // Auto-register the new entrant for open rounds of olympiads the school
-    // has approved access to, but only for rounds they qualify for. Gated
-    // rounds are skipped until the qualification is met.
-    const approvedAccess = await prisma.schoolOlympiad.findMany({
-      where: { schoolId: educator.schoolId, status: 'approved' },
-      select: { olympiadId: true },
+    // Auto-register the new entrant for open rounds of the specified
+    // olympiad, but only if the school has approved access to it and only
+    // for rounds the entrant qualifies for. Gated rounds are skipped until
+    // the qualification is met.
+    const access = await prisma.schoolOlympiad.findUnique({
+      where: {
+        schoolId_olympiadId: { schoolId: educator.schoolId, olympiadId },
+      },
     });
+    if (!access || access.status !== 'approved') {
+      return res.status(403).json({
+        error: "Your school doesn't have access to this olympiad yet — request access from the organiser.",
+      });
+    }
     const openRounds = await prisma.round.findMany({
       where: {
         state: 'open',
-        olympiadId: { in: approvedAccess.map((access) => access.olympiadId) },
+        olympiadId,
       },
       select: {
         id: true,

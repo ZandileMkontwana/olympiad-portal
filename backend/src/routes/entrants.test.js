@@ -44,12 +44,18 @@ describe('Entrants routes', () => {
     vi.spyOn(prisma.roundEntrant, 'deleteMany');
     vi.spyOn(prisma.notificationLog, 'deleteMany');
     vi.spyOn(prisma.schoolOlympiad, 'findMany');
+    vi.spyOn(prisma.schoolOlympiad, 'findUnique');
     vi.spyOn(prisma, '$transaction');
     vi.spyOn(sgMail, 'send').mockResolvedValue([{}]);
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: the school has approved access to olympiad-1, so the
     // auto-registration step can match open rounds of that olympiad.
     prisma.schoolOlympiad.findMany.mockResolvedValue([{ olympiadId: 'olympiad-1' }]);
+    prisma.schoolOlympiad.findUnique.mockResolvedValue({
+      schoolId: 'school-1',
+      olympiadId: 'olympiad-1',
+      status: 'approved',
+    });
     // Default: the Clerk user maps to an educator linked to school-1
     prisma.user.findUnique.mockImplementation(({ where }) => {
       if (where.clerkUserId) {
@@ -94,7 +100,7 @@ describe('Entrants routes', () => {
       const unauthApp = createApp(false);
       const res = await request(unauthApp)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-1' });
       expect(res.status).toBe(401);
       expect(prisma.entrant.create).not.toHaveBeenCalled();
     });
@@ -103,7 +109,7 @@ describe('Entrants routes', () => {
       prisma.user.findUnique.mockResolvedValue(null);
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-1' });
       expect(res.status).toBe(404);
       expect(res.body.error).toBe('User not found');
     });
@@ -117,22 +123,30 @@ describe('Entrants routes', () => {
       });
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-1' });
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('educator access required');
       expect(prisma.entrant.create).not.toHaveBeenCalled();
     });
 
     it('returns 400 when fields are missing', async () => {
-      const res = await request(app).post('/api/entrants').send({ name: 'Alice', grade: '10' });
+      const res = await request(app).post('/api/entrants').send({ name: 'Alice', grade: '10', olympiadId: 'olympiad-1' });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/name, email and grade are required/);
+    });
+
+    it('returns 400 when olympiadId is missing', async () => {
+      const res = await request(app)
+        .post('/api/entrants')
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/olympiadId is required/);
     });
 
     it('returns 400 when the email is invalid', async () => {
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'not-an-email', grade: '10' });
+        .send({ name: 'Alice', email: 'not-an-email', grade: '10', olympiadId: 'olympiad-1' });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/valid email/);
       expect(prisma.entrant.create).not.toHaveBeenCalled();
@@ -142,7 +156,7 @@ describe('Entrants routes', () => {
       for (const grade of ['0', '13', 'ten', '1.5', '-3', '100', 'Grade 10']) {
         const res = await request(app)
           .post('/api/entrants')
-          .send({ name: 'Alice', email: 'alice@school.com', grade });
+          .send({ name: 'Alice', email: 'alice@school.com', grade, olympiadId: 'olympiad-1' });
         expect(res.status).toBe(400);
         expect(res.body.error).toMatch(/grade must be a whole number from 1 to 12/);
       }
@@ -161,7 +175,7 @@ describe('Entrants routes', () => {
       for (const grade of ['1', '9', '10', '12', ' 11 ']) {
         const res = await request(app)
           .post('/api/entrants')
-          .send({ name: 'Alice', email: 'alice@school.com', grade });
+          .send({ name: 'Alice', email: 'alice@school.com', grade, olympiadId: 'olympiad-1' });
         expect(res.status).toBe(201);
       }
       // Whitespace is trimmed before storing
@@ -174,7 +188,7 @@ describe('Entrants routes', () => {
       prisma.educator.findUnique.mockResolvedValue(null);
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-1' });
       expect(res.status).toBe(403);
       expect(res.body.error).toMatch(/No school linked/);
       expect(prisma.entrant.create).not.toHaveBeenCalled();
@@ -197,7 +211,7 @@ describe('Entrants routes', () => {
 
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'taken@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'taken@school.com', grade: '10', olympiadId: 'olympiad-1' });
 
       expect(res.status).toBe(409);
       expect(res.body.error).toMatch(/already exists/);
@@ -214,7 +228,7 @@ describe('Entrants routes', () => {
       prisma.round.findMany.mockResolvedValue([]);
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: ' Alice ', email: 'Alice@School.com', grade: '10' });
+        .send({ name: ' Alice ', email: 'Alice@School.com', grade: '10', olympiadId: 'olympiad-1' });
 
       expect(res.status).toBe(201);
       expect(res.body.name).toBe('Alice');
@@ -259,13 +273,13 @@ describe('Entrants routes', () => {
 
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-1' });
 
       expect(res.status).toBe(201);
       expect(res.body.invitationSent).toBe(false);
     });
 
-    it('auto-registers the new entrant for all open rounds', async () => {
+    it('auto-registers the new entrant for open rounds of the specified olympiad', async () => {
       prisma.entrant.create.mockResolvedValue({
         id: 'entrant-1',
         schoolId: 'school-1',
@@ -280,21 +294,20 @@ describe('Entrants routes', () => {
 
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-1' });
 
       expect(res.status).toBe(201);
-      // The response tells the educator which rounds (and olympiads) the
-      // student was registered into
       expect(res.body.registeredRounds).toEqual([
         { id: 'round-1', name: 'Round One', olympiadName: 'Maths Olympiad' },
         { id: 'round-2', name: 'Round Two', olympiadName: 'Science Olympiad' },
       ]);
-      expect(prisma.schoolOlympiad.findMany).toHaveBeenCalledWith({
-        where: { schoolId: 'school-1', status: 'approved' },
-        select: { olympiadId: true },
+      expect(prisma.schoolOlympiad.findUnique).toHaveBeenCalledWith({
+        where: {
+          schoolId_olympiadId: { schoolId: 'school-1', olympiadId: 'olympiad-1' },
+        },
       });
       expect(prisma.round.findMany).toHaveBeenCalledWith({
-        where: { state: 'open', olympiadId: { in: ['olympiad-1'] } },
+        where: { state: 'open', olympiadId: 'olympiad-1' },
         select: {
           id: true,
           name: true,
@@ -312,33 +325,21 @@ describe('Entrants routes', () => {
       });
     });
 
-    it('skips auto-registration when the school has no approved olympiad access', async () => {
+    it('returns 403 when the school does not have approved access to the olympiad', async () => {
       prisma.entrant.create.mockResolvedValue({
         id: 'entrant-1',
         schoolId: 'school-1',
         name: 'Alice',
         grade: '10',
       });
-      prisma.schoolOlympiad.findMany.mockResolvedValue([]);
-      prisma.round.findMany.mockResolvedValue([]);
+      prisma.schoolOlympiad.findUnique.mockResolvedValue(null);
 
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-99' });
 
-      expect(res.status).toBe(201);
-      expect(res.body.registeredRounds).toEqual([]);
-      expect(prisma.round.findMany).toHaveBeenCalledWith({
-        where: { state: 'open', olympiadId: { in: [] } },
-        select: {
-          id: true,
-          name: true,
-          prerequisiteRoundId: true,
-          qualifyingThreshold: true,
-          olympiad: { select: { name: true } },
-        },
-      });
-      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/doesn't have access/);
     });
 
     it('skips open rounds whose prerequisites the entrant has not met', async () => {
@@ -370,7 +371,7 @@ describe('Entrants routes', () => {
 
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-1' });
 
       expect(res.status).toBe(201);
       expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
@@ -400,7 +401,7 @@ describe('Entrants routes', () => {
 
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-1' });
 
       expect(res.status).toBe(201);
       expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
@@ -413,7 +414,7 @@ describe('Entrants routes', () => {
       prisma.entrant.create.mockRejectedValue(new Error('DB error'));
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: 'Alice', email: 'alice@school.com', grade: '10' });
+        .send({ name: 'Alice', email: 'alice@school.com', grade: '10', olympiadId: 'olympiad-1' });
       expect(res.status).toBe(500);
       expect(res.body.error).toMatch(/Could not create entrant/);
     });

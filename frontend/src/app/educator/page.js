@@ -399,6 +399,17 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
   // An unknown access state (enrichment unavailable) keeps the old rounds view.
   const showsRounds = !olympiad.schoolAccess || olympiad.schoolAccess === 'approved';
 
+  const start = olympiad.startDate ? formatDate(olympiad.startDate) : null;
+  const end = olympiad.endDate ? formatDate(olympiad.endDate) : null;
+  const dateRange = start && end ? `${start} → ${end}` : start || end || null;
+  const now = new Date();
+  const isUpcoming = olympiad.startDate && new Date(olympiad.startDate) > now;
+  const isOngoing =
+    olympiad.startDate &&
+    new Date(olympiad.startDate) <= now &&
+    olympiad.endDate &&
+    new Date(olympiad.endDate) >= now;
+
   return (
     <div
       style={{
@@ -442,10 +453,42 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
           🏆
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: '#2d2640' }}>
-            {olympiad.name}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: '#2d2640' }}>
+              {olympiad.name}
+            </p>
+            {isUpcoming && (
+              <span
+                style={{
+                  background: 'rgba(245,158,11,0.1)',
+                  color: '#b45309',
+                  padding: '1px 8px',
+                  borderRadius: '10px',
+                  fontSize: '0.65em',
+                  fontWeight: 700,
+                }}
+              >
+                Upcoming
+              </span>
+            )}
+            {isOngoing && (
+              <span
+                style={{
+                  background: 'rgba(63,174,122,0.1)',
+                  color: '#2d8a5e',
+                  padding: '1px 8px',
+                  borderRadius: '10px',
+                  fontSize: '0.65em',
+                  fontWeight: 700,
+                }}
+              >
+                Active
+              </span>
+            )}
+          </div>
           <p style={{ margin: '2px 0 0', fontSize: '0.78em', color: '#8b7fa8' }}>
+            {dateRange ? `📅 ${dateRange}` : '📅 Dates TBC'}
+            {' · '}
             {rounds.length} round{rounds.length !== 1 ? 's' : ''}
             {openCount > 0 && ` · ${openCount} open`}
             {scheduledCount > 0 && ` · ${scheduledCount} scheduled`}

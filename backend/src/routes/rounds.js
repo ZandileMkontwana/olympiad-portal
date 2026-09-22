@@ -83,9 +83,17 @@ router.get('/olympiads', async (req, res) => {
       return res.json(olympiads);
     }
 
+    // Hide olympiads whose end date has already passed — educators can't
+    // act on them and the team wants to keep the list tidy. Past papers
+    // remain available in the archive.
+    const now = new Date();
+    const activeOlympiads = olympiads.filter(
+      (o) => !o.endDate || new Date(o.endDate) >= now
+    );
+
     const educator = await prisma.educator.findUnique({ where: { userId: user.id } });
     if (!educator) {
-      return res.json(olympiads);
+      return res.json(activeOlympiads);
     }
 
     const [accessRows, registrations] = await Promise.all([
@@ -125,7 +133,7 @@ router.get('/olympiads', async (req, res) => {
     }
 
     res.json(
-      olympiads.map((olympiad) => ({
+      activeOlympiads.map((olympiad) => ({
         ...olympiad,
         schoolAccess: accessByOlympiad.get(olympiad.id) || 'none',
         schoolEntrantCounts: Array.from(countsByOlympiad.get(olympiad.id) || new Map())
@@ -194,6 +202,11 @@ router.post('/olympiads/:id/request-access', ...requireRole('educator'), async (
     const olympiad = await prisma.olympiad.findUnique({ where: { id: req.params.id } });
     if (!olympiad) {
       return res.status(404).json({ error: 'Olympiad not found' });
+    }
+
+    // Block access requests for olympiads that have already closed.
+    if (olympiad.endDate && new Date(olympiad.endDate) < new Date()) {
+      return res.status(403).json({ error: 'This olympiad has closed' });
     }
 
     const educator = await prisma.educator.findUnique({ where: { userId: req.user.id } });

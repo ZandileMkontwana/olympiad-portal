@@ -217,18 +217,19 @@ export function listSchoolEntrants(token) {
 /**
  * Registers a student at the signed-in educator's school: creates the
  * entrant record AND their student account, then emails them an
- * invitation to set a password.
+ * invitation to set a password. The educator must select which olympiad
+ * the student is being added under.
  * Wired to POST /api/entrants (backend/src/routes/entrants.js).
  *
- * @param {{name: string, email: string, grade: string}} entrant
+ * @param {{name: string, email: string, grade: string, olympiadId: string}} entrant
  * @param {string} token - Clerk JWT for the Authorization header
  * @returns {Promise<{id: string, name: string, grade: string, schoolId: string, email: string, accountStatus: string, invitationSent: boolean}>}
  */
-export function createEntrant({ name, email, grade }, token) {
+export function createEntrant({ name, email, grade, olympiadId }, token) {
   return requestJson('/api/entrants', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name, email, grade }),
+    body: JSON.stringify({ name, email, grade, olympiadId }),
   });
 }
 
