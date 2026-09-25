@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
+const { getDbNow } = require('../lib/dbTime');
 
 const router = express.Router();
 
@@ -71,7 +72,9 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 
     // The sitting expires when the round closes (the round's time limit).
     // An in-progress sitting past expiresAt can no longer be resumed.
-    if (new Date(sitting.expiresAt) < new Date()) {
+    // Using the database's own clock avoids app-server clock drift
+    // incorrectly allowing/blocking a resume near the boundary.
+    if (new Date(sitting.expiresAt) < (await getDbNow())) {
       return res.status(403).json({ error: 'Test expired - it can no longer be resumed' });
     }
 
@@ -129,7 +132,7 @@ router.patch('/sittings/:id/answers', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Test already completed' });
     }
 
-    if (new Date(sitting.expiresAt) < new Date()) {
+    if (new Date(sitting.expiresAt) < (await getDbNow())) {
       return res.status(403).json({ error: 'Test expired - answers can no longer be saved' });
     }
 
@@ -185,7 +188,7 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Test already completed' });
     }
 
-    if (new Date(sitting.expiresAt) < new Date()) {
+    if (new Date(sitting.expiresAt) < (await getDbNow())) {
       return res.status(403).json({ error: 'Test expired - it can no longer be submitted' });
     }
 

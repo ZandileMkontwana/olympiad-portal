@@ -24,6 +24,7 @@ describe('startScheduler', () => {
     vi.spyOn(prisma.notificationLog, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.notificationLog, 'create').mockResolvedValue({ id: 'log-1' });
     vi.spyOn(prisma.notificationRule, 'findUnique').mockResolvedValue(null);
+    vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ now: new Date() }]);
     vi.spyOn(sgMail, 'send').mockResolvedValue({});
     vi.spyOn(console, 'log').mockImplementation(() => {});
   });

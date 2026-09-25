@@ -49,6 +49,7 @@ describe('Sittings routes', () => {
     vi.spyOn(prisma.submission, 'findUnique');
     vi.spyOn(prisma.submission, 'findFirst');
     vi.spyOn(prisma.submission, 'create');
+    vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ now: new Date() }]);
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     // Defaults: round is open with a paper, entrant is registered,
