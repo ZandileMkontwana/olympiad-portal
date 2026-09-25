@@ -64,10 +64,7 @@ export function listOlympiads(token) {
  * @param {{name: string, timezone: string, description?: string, grades?: string, startDate?: string, endDate?: string}} payload
  * @param {string} token - Clerk JWT for the Authorization header
  */
-export function createOlympiad(
-  { name, timezone, description, grades, startDate, endDate },
-  token
-) {
+export function createOlympiad({ name, timezone, description, grades, startDate, endDate }, token) {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
   return requestJson('/api/olympiads', {
     method: 'POST',
@@ -736,14 +733,19 @@ export function requestRemark(submissionId, reason, token) {
 }
 
 /**
- * Lists remark requests for organisers to review.
+ * Lists remark requests visible to an organiser.
  * Wired to GET /api/remark/queue (backend/src/routes/remark.js).
  *
  * @param {string} token - Clerk JWT for the Authorization header
- * @param {string} [status] - 'pending' (default), 'approved', 'rejected', or 'all'
+ * @param {{status?: string, assignedTo?: 'me'}} [options] - Queue filters. Passing
+ *   assignedTo: 'me' returns only work assigned to the signed-in reviewer.
  */
-export function listRemarkQueue(token, status) {
-  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+export function listRemarkQueue(token, { status, assignedTo } = {}) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (assignedTo) params.set('assignedTo', assignedTo);
+  const query = params.size ? `?${params.toString()}` : '';
+
   return requestJson(`/api/remark/queue${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });

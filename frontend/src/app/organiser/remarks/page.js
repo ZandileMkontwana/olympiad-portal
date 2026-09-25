@@ -24,7 +24,7 @@ export default function RemarksPage() {
     setStatus('loading');
     try {
       const token = await getToken();
-      const data = await listRemarkQueue(token);
+      const data = await listRemarkQueue(token, { assignedTo: 'me' });
       setRequests(data);
       setStatus(data.length === 0 ? 'empty' : 'ready');
     } catch {
@@ -96,16 +96,18 @@ export default function RemarksPage() {
 
   return (
     <main className="round-page">
-      <h1>Remark Requests</h1>
+      <h1>Assigned Appeals</h1>
       <p className="description">
-        Logged in as <strong>{user.email}</strong> ({user.role})
+        Review the appeals assigned to you, <strong>{user.email}</strong>.
       </p>
 
-      {status === 'loading' && <p className="description">Loading remark requests...</p>}
+      {status === 'loading' && <p className="description">Loading assigned appeals...</p>}
       {status === 'error' && (
-        <p className="message">Couldn&apos;t load remark requests. Try refreshing.</p>
+        <p className="message" role="alert">
+          Couldn&apos;t load assigned appeals. Try refreshing.
+        </p>
       )}
-      {status === 'empty' && <p className="description">No pending remark requests. 🎉</p>}
+      {status === 'empty' && <p className="description">No appeals are assigned to you.</p>}
 
       {status === 'ready' && !selected && (
         <ul style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -239,7 +241,9 @@ export default function RemarksPage() {
           </div>
 
           {formStatus === 'error' && (
-            <p style={{ color: 'red', fontSize: '0.9em', marginBottom: '8px' }}>{formError}</p>
+            <p role="alert" style={{ color: 'red', fontSize: '0.9em', marginBottom: '8px' }}>
+              {formError}
+            </p>
           )}
 
           <div style={{ display: 'flex', gap: '10px' }}>

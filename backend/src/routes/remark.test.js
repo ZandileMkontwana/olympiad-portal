@@ -199,6 +199,24 @@ describe('Remark routes', () => {
       expect(res.status).toBe(401);
     });
 
+    it('does not let an educator record an appeal decision', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'educator-1',
+        email: 'educator@school.com',
+        role: 'educator',
+        name: 'Educator One',
+      });
+
+      const res = await request(app)
+        .patch('/api/remark/remark-1/review')
+        .send({ status: 'rejected' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('organiser access required');
+      expect(prisma.remarkRequest.findUnique).not.toHaveBeenCalled();
+      expect(prisma.remarkRequest.updateMany).not.toHaveBeenCalled();
+    });
+
     it("returns 400 when status is not 'approved' or 'rejected'", async () => {
       const res = await request(app).patch('/api/remark/remark-1/review').send({ status: 'maybe' });
       expect(res.status).toBe(400);
@@ -304,7 +322,9 @@ describe('Remark routes', () => {
           data: expect.objectContaining({
             status: 'rejected',
             newScore: undefined,
+            reviewNotes: 'Marking was correct',
             reviewedById: organiser.id,
+            reviewedAt: expect.any(Date),
           }),
         })
       );
