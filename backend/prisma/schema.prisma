@@ -9,33 +9,33 @@ datasource db {
 }
 
 model Olympiad {
-  id          String           @id @default(uuid())
-  name        String
-  timezone    String
-  description String? // organiser-written blurb shown to educators requesting access
-  grades      String? // target learner grades, e.g. "Grade 8-12"
-  startDate   DateTime? // olympiad run dates, organiser-set
-  endDate     DateTime?
-  organiserId String? // the organiser who created it; null = legacy/unowned
-  rounds      Round[]
+  id           String           @id @default(uuid())
+  name         String
+  timezone     String
+  description  String? // organiser-written blurb shown to educators requesting access
+  grades       String? // target learner grades, e.g. "Grade 8-12"
+  startDate    DateTime? // olympiad run dates, organiser-set
+  endDate      DateTime?
+  organiserId  String? // the organiser who created it; null = legacy/unowned
+  rounds       Round[]
   schoolAccess SchoolOlympiad[]
-  organiser   User?            @relation(fields: [organiserId], references: [id])
+  organiser    User?            @relation(fields: [organiserId], references: [id])
 }
 
 model Round {
-  id                     String              @id @default(uuid())
+  id                     String             @id @default(uuid())
   olympiadId             String
   name                   String
   openTime               DateTime
   closeTime              DateTime
-  state                  String              @default("scheduled")
+  state                  String             @default("scheduled")
   qualifyingThreshold    Float? // minimum score % (0-100) required to pass; null = no gate
   prerequisiteRoundId    String? // the round that must be passed first; null = no prerequisite
   autoAdvanceProcessedAt DateTime?
   paper                  Paper?
-  olympiad               Olympiad            @relation(fields: [olympiadId], references: [id])
-  prerequisiteRound      Round?              @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
-  dependentRounds        Round[]             @relation("RoundPrerequisites")
+  olympiad               Olympiad           @relation(fields: [olympiadId], references: [id])
+  prerequisiteRound      Round?             @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
+  dependentRounds        Round[]            @relation("RoundPrerequisites")
   roundEntrants          RoundEntrant[]
   submissions            Submission[]
   sittings               Sitting[]
@@ -59,6 +59,7 @@ model User {
   assignedMarkingTasks  MarkingTask[]   @relation("AssignedMarkingTasks")
   moderatedMarkingTasks MarkingTask[]   @relation("ModeratedMarkingTasks")
   requestedRemarks      RemarkRequest[] @relation("RequestedRemarks")
+  assignedRemarks       RemarkRequest[] @relation("AssignedRemarkRequests")
   reviewedRemarks       RemarkRequest[] @relation("ReviewedRemarks")
 }
 
@@ -142,7 +143,7 @@ model MarkingTask {
   status         String     @default("unassigned") // 'unassigned' | 'assigned' | 'marked' | 'moderated'
   assignedToId   String?
   score          Float?
-  breakdown      Json?      // per-question partial credit, e.g. { "q1": 3, "q2": 5 }
+  breakdown      Json? // per-question partial credit, e.g. { "q1": 3, "q2": 5 }
   markedAt       DateTime?
   moderatedById  String?
   moderatedScore Float?
@@ -166,15 +167,19 @@ model RemarkRequest {
   submissionId  String
   requestedById String
   reason        String
-  status        String     @default("pending") // 'pending' | 'approved' | 'rejected'
-  newScore      Float?     // updated score, set when approved
+  status        String     @default("pending") // 'pending' | 'assigned' | 'approved' | 'rejected'
+  assignedToId  String?
+  newScore      Float? // updated score, set when approved
   reviewedById  String?
   reviewNotes   String?
   createdAt     DateTime   @default(now())
   reviewedAt    DateTime?
   submission    Submission @relation(fields: [submissionId], references: [id])
   requestedBy   User       @relation("RequestedRemarks", fields: [requestedById], references: [id])
+  assignedTo    User?      @relation("AssignedRemarkRequests", fields: [assignedToId], references: [id])
   reviewedBy    User?      @relation("ReviewedRemarks", fields: [reviewedById], references: [id])
+
+  @@index([assignedToId, status])
 }
 
 model RoundEntrant {
