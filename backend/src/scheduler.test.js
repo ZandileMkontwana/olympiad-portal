@@ -968,4 +968,104 @@ describe('startScheduler', () => {
       );
     });
   });
+
+  describe('resilience to clock skew between the app server and the database', () => {
+    // These tests deliberately set the app server's system clock (via
+    // vi.setSystemTime) to a wildly different time than the database's
+    // clock (via the prisma.$queryRaw mock, which stands in for
+    // getDbNow()). If the scheduler ever accidentally used new Date() /
+    // Date.now() for a round boundary decision instead of getDbNow(), the
+    // skewed system clock would leak into the query and these tests would
+    // fail - proving the fix from #191 actually holds, not just that
+    // getDbNow() itself works in isolation (see lib/dbTime.test.js).
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('uses the database clock (not the app server clock) to decide which rounds have opened, even when the app server clock is far in the past', async () => {
+      const dbNow = new Date('2026-06-15T12:00:00.000Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2000-01-01T00:00:00.000Z')); // app server thinks it's the year 2000
+      prisma.$queryRaw.mockResolvedValue([{ now: dbNow }]);
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+
+      startScheduler();
+      await scheduledCallback();
+
+      expect(prisma.round.updateMany).toHaveBeenNthCalledWith(1, {
+        where: { state: 'scheduled', openTime: { lte: dbNow } },
+        data: { state: 'open' },
+      });
+    });
+
+    it('uses the database clock (not the app server clock) to decide which rounds have opened, even when the app server clock is far in the future', async () => {
+      const dbNow = new Date('2026-06-15T12:00:00.000Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2099-01-01T00:00:00.000Z')); // app server thinks it's 2099
+      prisma.$queryRaw.mockResolvedValue([{ now: dbNow }]);
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+
+      startScheduler();
+      await scheduledCallback();
+
+      expect(prisma.round.updateMany).toHaveBeenNthCalledWith(1, {
+        where: { state: 'scheduled', openTime: { lte: dbNow } },
+        data: { state: 'open' },
+      });
+    });
+
+    it('uses the database clock to decide which rounds have closed, regardless of app server clock skew', async () => {
+      const dbNow = new Date('2026-06-15T12:00:00.000Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('1970-01-01T00:00:00.000Z')); // app server clock wildly wrong
+      prisma.$queryRaw.mockResolvedValue([{ now: dbNow }]);
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+
+      startScheduler();
+      await scheduledCallback();
+
+      expect(prisma.round.updateMany).toHaveBeenNthCalledWith(2, {
+        where: { state: 'open', closeTime: { lte: dbNow } },
+        data: { state: 'closed' },
+      });
+    });
+
+    it('bases before-open notification windows on the database clock, not the app server clock', async () => {
+      const dbNow = new Date('2026-06-15T12:00:00.000Z');
+      const expectedWindowEnd = new Date(dbNow.getTime() + 60 * 60 * 1000);
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2099-01-01T00:00:00.000Z')); // app server clock wildly wrong
+      prisma.$queryRaw.mockResolvedValue([{ now: dbNow }]);
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+
+      startScheduler();
+      await scheduledCallback();
+
+      expect(prisma.round.findMany).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          where: {
+            state: 'scheduled',
+            openTime: { gte: dbNow, lte: expectedWindowEnd },
+          },
+        })
+      );
+    });
+
+    it('logs the opened/closed timestamps from the database clock, not the app server clock', async () => {
+      const dbNow = new Date('2026-06-15T12:00:00.000Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2099-01-01T00:00:00.000Z'));
+      prisma.$queryRaw.mockResolvedValue([{ now: dbNow }]);
+      prisma.round.updateMany
+        .mockResolvedValueOnce({ count: 2 })
+        .mockResolvedValueOnce({ count: 0 });
+
+      startScheduler();
+      await scheduledCallback();
+
+      const openedLog = console.log.mock.calls.find((c) => c[0]?.includes?.('Opened'));
+      expect(openedLog[0]).toContain(dbNow.toISOString());
+    });
+  });
 });
