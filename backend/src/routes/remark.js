@@ -4,61 +4,6 @@ const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-// POST /api/submissions/:id/remark
-// Create a new remark request for a submission.
-router.post('/submissions/:id/remark', ...requireRole('educator'), async (req, res) => {
-  const { reason } = req.body;
-
-  if (!reason || !reason.trim()) {
-    return res.status(400).json({ error: 'reason is required' });
-  }
-
-  try {
-    const submission = await prisma.submission.findUnique({
-      where: { id: req.params.id },
-      include: {
-        result: true,
-      },
-    });
-
-    if (!submission) {
-      return res.status(404).json({ error: 'Submission not found' });
-    }
-
-    if (!submission.result) {
-      return res.status(400).json({
-        error: 'Cannot request a remark for a submission that has not been marked',
-      });
-    }
-
-    const existingActiveRequest = await prisma.remarkRequest.findFirst({
-      where: {
-        submissionId: req.params.id,
-        status: { in: ['pending', 'assigned'] },
-      },
-    });
-
-    if (existingActiveRequest) {
-      return res.status(409).json({
-        error: 'A remark request is already active for this submission',
-      });
-    }
-
-    const remarkRequest = await prisma.remarkRequest.create({
-      data: {
-        submissionId: req.params.id,
-        requestedById: req.user.id,
-        reason: reason.trim(),
-      },
-    });
-
-    res.status(201).json(remarkRequest);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not create remark request' });
-  }
-});
-
 // GET /api/remark/queue
 // Lists remark requests an organiser owns or has been assigned to review. It
 // defaults to pending requests, except for ?assignedTo=me which defaults to

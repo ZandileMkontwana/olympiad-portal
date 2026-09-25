@@ -69,34 +69,6 @@ describe('Remark routes', () => {
     vi.restoreAllMocks();
   });
 
-  describe('POST /api/submissions/:id/remark', () => {
-    it('does not create a second appeal after the first has been routed', async () => {
-      prisma.user.findUnique.mockResolvedValue({ ...organiser, role: 'educator' });
-      prisma.submission.findUnique.mockResolvedValue({
-        id: 'submission-1',
-        result: { score: 8 },
-      });
-      prisma.remarkRequest.findFirst.mockResolvedValue({
-        id: 'remark-1',
-        status: 'assigned',
-      });
-
-      const res = await request(app)
-        .post('/api/submissions/submission-1/remark')
-        .send({ reason: 'Question 3 was marked incorrectly' });
-
-      expect(res.status).toBe(409);
-      expect(res.body.error).toMatch(/already active/);
-      expect(prisma.remarkRequest.findFirst).toHaveBeenCalledWith({
-        where: {
-          submissionId: 'submission-1',
-          status: { in: ['pending', 'assigned'] },
-        },
-      });
-      expect(prisma.remarkRequest.create).not.toHaveBeenCalled();
-    });
-  });
-
   describe('PATCH /api/remark/:id/assign', () => {
     it('returns 401 when not authenticated', async () => {
       const unauthApp = createApp(false);
