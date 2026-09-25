@@ -162,8 +162,9 @@ describe('Educator Dashboard Page', () => {
 
     // Organiser-set info is shown instead of the rounds
     expect(screen.getByText('A general science olympiad.')).toBeTruthy();
-    expect(screen.getByText(/Feb 2026/)).toBeTruthy();
-    expect(screen.getByText(/Mar 2026/)).toBeTruthy();
+    // Dates show on both the card header and the info panel
+    expect(screen.getAllByText(/Feb 2026/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Mar 2026/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Grade 8–12/)).toBeTruthy();
     expect(screen.getByText('Testville High')).toBeTruthy();
     expect(screen.getByText('4 learners')).toBeTruthy();
@@ -193,8 +194,8 @@ describe('Educator Dashboard Page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Science Olympiad/ }));
 
     expect(screen.getByText('No description yet.')).toBeTruthy();
-    // Both the date and grades chips fall back to TBC
-    expect(screen.getAllByText(/TBC/)).toHaveLength(2);
+    // The card header, date chip, and grades chip all fall back to TBC
+    expect(screen.getAllByText(/TBC/)).toHaveLength(3);
     expect(screen.getByText(/No learners registered yet/)).toBeTruthy();
   });
 
