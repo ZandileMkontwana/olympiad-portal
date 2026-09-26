@@ -60,41 +60,66 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
   }
 
   try {
-    const submission = await prisma.submission.create({
-      data: { roundId, entrantId, answers, idempotencyKey },
-    });
+    // Everything from here down runs in a single transaction:
+    // - The round's state is re-checked immediately before writing, right
+    //   next to the create calls, instead of relying on the snapshot read
+    //   several awaits ago (educator lookup, entrant lookup, prerequisite
+    //   check). That earlier snapshot could be stale by the time we get
+    //   here - the scheduler ticks every 30s and could have closed this
+    //   round in the meantime.
+    // - The Submission and its Result/MarkingTask are created together,
+    //   so a crash or error between the two can never leave a Submission
+    //   with neither - it either fully commits or fully rolls back.
+    const { submission, result, markingTask } = await prisma.$transaction(async (tx) => {
+      const freshRound = await tx.round.findUnique({
+        where: { id: roundId },
+        include: { paper: true },
+      });
 
-    // Automark immediately if this round's paper has a memo answer key.
-    // Otherwise, queue it for manual marking.
-    let result = null;
-    let markingTask = null;
-
-    if (round.paper && round.paper.memoAnswers) {
-      const memo = round.paper.memoAnswers;
-      const totalQuestions = Object.keys(memo).length;
-      let correctCount = 0;
-
-      for (const questionId in memo) {
-        if (answers[questionId] === memo[questionId]) {
-          correctCount++;
-        }
+      if (!freshRound || freshRound.state !== 'open') {
+        const err = new Error(
+          `Submissions not accepted - round is currently '${freshRound?.state ?? 'unknown'}'`
+        );
+        err.httpStatus = 403;
+        throw err;
       }
 
-      const score = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+      const submission = await tx.submission.create({
+        data: { roundId, entrantId, answers, idempotencyKey },
+      });
 
-      result = await prisma.result.create({
-        data: {
-          submissionId: submission.id,
-          score,
-        },
-      });
-    } else {
-      markingTask = await prisma.markingTask.create({
-        data: {
-          submissionId: submission.id,
-        },
-      });
-    }
+      let result = null;
+      let markingTask = null;
+
+      if (freshRound.paper && freshRound.paper.memoAnswers) {
+        const memo = freshRound.paper.memoAnswers;
+        const totalQuestions = Object.keys(memo).length;
+        let correctCount = 0;
+
+        for (const questionId in memo) {
+          if (answers[questionId] === memo[questionId]) {
+            correctCount++;
+          }
+        }
+
+        const score = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+
+        result = await tx.result.create({
+          data: {
+            submissionId: submission.id,
+            score,
+          },
+        });
+      } else {
+        markingTask = await tx.markingTask.create({
+          data: {
+            submissionId: submission.id,
+          },
+        });
+      }
+
+      return { submission, result, markingTask };
+    });
 
     res.status(201).json({ submission, result, markingTask });
 
@@ -111,6 +136,9 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
       });
     }
   } catch (err) {
+    if (err.httpStatus) {
+      return res.status(err.httpStatus).json({ error: err.message });
+    }
     if (
       err.code === 'P2002' &&
       err.meta &&

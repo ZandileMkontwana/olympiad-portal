@@ -36,6 +36,7 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.entrant, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.submission, 'findFirst');
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => callback(prisma));
     vi.spyOn(console, 'error').mockImplementation(() => {});
     sgMail.send.mockResolvedValue({});
     prisma.markingTask.create.mockResolvedValue({
@@ -178,7 +179,11 @@ describe('Submissions routes', () => {
         submittedAt: new Date('2026-01-01'),
       });
       prisma.result.create.mockResolvedValue({ id: 'r-1', score: 50 });
-      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice', schoolId: 'school-1' });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-1',
+      });
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
@@ -204,7 +209,11 @@ describe('Submissions routes', () => {
         submittedAt: new Date('2026-01-01'),
       });
       prisma.result.create.mockResolvedValue({ id: 'r-1', score: 0 });
-      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice', schoolId: 'school-1' });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-1',
+      });
 
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
@@ -288,7 +297,11 @@ describe('Submissions routes', () => {
         id: 'sub-1',
         submittedAt,
       });
-      prisma.entrant.findUnique.mockResolvedValue({ id: 'e1', name: 'Alice', schoolId: 'school-1' });
+      prisma.entrant.findUnique.mockResolvedValue({
+        id: 'e1',
+        name: 'Alice',
+        schoolId: 'school-1',
+      });
 
       await request(app)
         .post('/api/rounds/round-1/submissions')

@@ -27,4 +27,19 @@ describe('getDbNow', () => {
 
     expect(result).toEqual(dbTimestamp);
   });
+
+  it('queries on the given client instead of the default one, when passed one (e.g. a transaction tx)', async () => {
+    vi.spyOn(prisma, '$queryRaw').mockResolvedValue([
+      { now: new Date('2000-01-01T00:00:00.000Z') },
+    ]);
+
+    const dbTimestamp = new Date('2026-06-15T12:00:00.000Z');
+    const fakeTx = { $queryRaw: vi.fn().mockResolvedValue([{ now: dbTimestamp }]) };
+
+    const result = await getDbNow(fakeTx);
+
+    expect(fakeTx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(result).toEqual(dbTimestamp);
+  });
 });

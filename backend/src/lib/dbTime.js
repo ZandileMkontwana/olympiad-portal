@@ -17,9 +17,15 @@ const prisma = require('./prisma');
  * of bug entirely: the same source of truth (Postgres) both stores the
  * boundary timestamps and defines what "now" means when comparing against
  * them.
+ *
+ * @param {object} [client] - Optionally, a Prisma client to run the query
+ *   on - pass a transaction's `tx` here so the "now" read participates in
+ *   the same transaction as the write it's guarding, rather than hitting
+ *   the connection pool on a separate connection. Defaults to the shared
+ *   top-level Prisma client.
  */
-async function getDbNow() {
-  const [{ now }] = await prisma.$queryRaw`SELECT NOW() as now`;
+async function getDbNow(client = prisma) {
+  const [{ now }] = await client.$queryRaw`SELECT NOW() as now`;
   return now;
 }
 

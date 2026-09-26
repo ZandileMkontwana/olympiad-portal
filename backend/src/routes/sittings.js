@@ -49,21 +49,38 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
       });
     }
 
-    // Ensure the entrant is registered for this round. If not already
-    // registered (e.g. the entrant was created before the round opened),
-    // create the RoundEntrant record on the fly so the student can start.
-    await prisma.roundEntrant.upsert({
-      where: { roundId_entrantId: { roundId, entrantId } },
-      create: { roundId, entrantId },
-      update: {},
-    });
+    // Everything from here down runs in a single transaction: the round's
+    // state is re-checked immediately next to the writes (instead of
+    // relying on the snapshot read above, taken before the prerequisite
+    // check's extra DB round-trip), and the two upserts happen atomically
+    // together.
+    const sitting = await prisma.$transaction(async (tx) => {
+      const freshRound = await tx.round.findUnique({ where: { id: roundId } });
 
-    // Upsert instead of findUnique + create to avoid a P2002 race when
-    // React Strict Mode or a double-click fires two requests in parallel.
-    const sitting = await prisma.sitting.upsert({
-      where: { roundId_entrantId: { roundId, entrantId } },
-      create: { roundId, entrantId, expiresAt: round.closeTime },
-      update: {},
+      if (!freshRound || freshRound.state !== 'open') {
+        const err = new Error(
+          `Test cannot be started - round is currently '${freshRound?.state ?? 'unknown'}'`
+        );
+        err.httpStatus = 403;
+        throw err;
+      }
+
+      // Ensure the entrant is registered for this round. If not already
+      // registered (e.g. the entrant was created before the round opened),
+      // create the RoundEntrant record on the fly so the student can start.
+      await tx.roundEntrant.upsert({
+        where: { roundId_entrantId: { roundId, entrantId } },
+        create: { roundId, entrantId },
+        update: {},
+      });
+
+      // Upsert instead of findUnique + create to avoid a P2002 race when
+      // React Strict Mode or a double-click fires two requests in parallel.
+      return tx.sitting.upsert({
+        where: { roundId_entrantId: { roundId, entrantId } },
+        create: { roundId, entrantId, expiresAt: freshRound.closeTime },
+        update: {},
+      });
     });
 
     if (sitting.completedAt) {
@@ -103,6 +120,9 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
+    if (err.httpStatus) {
+      return res.status(err.httpStatus).json({ error: err.message });
+    }
     console.error(err);
     res.status(500).json({ error: 'Could not start the test' });
   }
@@ -212,21 +232,50 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
       resultData = { create: { score } };
     }
 
-    const submission = await prisma.submission.create({
-      data: {
-        roundId: sitting.roundId,
-        entrantId: sitting.entrantId,
-        answers,
-        idempotencyKey: `sitting:${sitting.id}`,
-        result: resultData,
-      },
-      include: { result: true },
-    });
+    // Wrapped in a transaction so the Submission and the sitting's
+    // completedAt flip are atomic together. If a concurrent duplicate
+    // submit races past the completedAt check above (e.g. a genuine
+    // double-click before either request has committed), both requests'
+    // idempotencyKey is identical (`sitting:${sitting.id}`), so the
+    // database's unique constraint rejects the second one - caught below
+    // and turned into the same 200 response the retried-request path
+    // already returns, instead of a confusing 500.
+    let submission;
+    try {
+      submission = await prisma.$transaction(async (tx) => {
+        const created = await tx.submission.create({
+          data: {
+            roundId: sitting.roundId,
+            entrantId: sitting.entrantId,
+            answers,
+            idempotencyKey: `sitting:${sitting.id}`,
+            result: resultData,
+          },
+          include: { result: true },
+        });
 
-    await prisma.sitting.update({
-      where: { id: sitting.id },
-      data: { completedAt: new Date() },
-    });
+        await tx.sitting.update({
+          where: { id: sitting.id },
+          data: { completedAt: new Date() },
+        });
+
+        return created;
+      });
+    } catch (err) {
+      if (
+        err.code === 'P2002' &&
+        err.meta &&
+        err.meta.target &&
+        err.meta.target.includes('idempotencyKey')
+      ) {
+        const existing = await prisma.submission.findUnique({
+          where: { idempotencyKey: `sitting:${sitting.id}` },
+          include: { result: true },
+        });
+        return res.status(200).json({ submission: existing, result: existing.result });
+      }
+      throw err;
+    }
 
     res.status(201).json({ submission, result: submission.result });
   } catch (err) {
