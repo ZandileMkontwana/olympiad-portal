@@ -40,8 +40,7 @@ function ownedRemark(overrides = {}) {
     status: 'pending',
     submission: {
       round: {
-        olympiadId: 'oly-1',
-        olympiad: { organiserId: organiser.id },
+        olympiad: { id: 'oly-1' },
       },
     },
     ...overrides,
@@ -158,6 +157,8 @@ describe('Remark routes', () => {
     it('does not let a different organiser route the appeal', async () => {
       prisma.user.findUnique.mockResolvedValueOnce(reviewer);
       prisma.remarkRequest.findUnique.mockResolvedValue(ownedRemark());
+      // Mock that reviewer is NOT a member of this olympiad
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue(null);
 
       const reviewerApp = createApp(true, 'clerk-user-2');
       const res = await request(reviewerApp).patch('/api/remark/remark-1/assign').send({});
@@ -634,7 +635,7 @@ describe('Remark routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('defaults to the owner’s pending appeals', async () => {
+    it('defaults to the owner\'s pending appeals', async () => {
       prisma.remarkRequest.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/remark/queue');
@@ -648,7 +649,7 @@ describe('Remark routes', () => {
               {
                 submission: {
                   round: {
-                    olympiad: { organiserId: organiser.id },
+                    olympiadId: { in: ['oly-1'] },
                   },
                 },
               },
@@ -662,13 +663,15 @@ describe('Remark routes', () => {
       );
     });
 
-    it('returns an assigned reviewer’s work when assignedTo=me is passed', async () => {
+    it('returns an assigned reviewer\'s work when assignedTo=me is passed', async () => {
       prisma.user.findUnique.mockResolvedValueOnce(reviewer);
+      // Mock that reviewer is a member of olympiad 'oly-1'
+      prisma.olympiadOrganiser.findMany.mockResolvedValueOnce([{ olympiadId: 'oly-1' }]);
       prisma.remarkRequest.findMany.mockResolvedValue([]);
-
+    
       const reviewerApp = createApp(true, 'clerk-user-2');
       const res = await request(reviewerApp).get('/api/remark/queue?assignedTo=me');
-
+    
       expect(res.status).toBe(200);
       expect(prisma.remarkRequest.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -679,7 +682,7 @@ describe('Remark routes', () => {
               {
                 submission: {
                   round: {
-                    olympiad: { organiserId: reviewer.id },
+                    olympiadId: { in: ['oly-1'] },
                   },
                 },
               },
@@ -703,7 +706,7 @@ describe('Remark routes', () => {
               {
                 submission: {
                   round: {
-                    olympiad: { organiserId: organiser.id },
+                    olympiadId: { in: ['oly-1'] },
                   },
                 },
               },
