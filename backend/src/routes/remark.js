@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
+const { isOlympiadOrganiser } = require('../lib/authorization');
 const {
   advanceQualifiedEntrantsForRound,
   AUTO_ADVANCE_ROUND_INCLUDE,
@@ -16,13 +17,21 @@ router.get('/remark/queue', ...requireRole('organiser'), async (req, res) => {
   try {
     const { status, assignedTo } = req.query;
     const selectedStatus = status || (assignedTo === 'me' ? 'assigned' : 'pending');
+
+    // Scope to remark requests for olympiads the caller organises.
+    const organiserRows = await prisma.olympiadOrganiser.findMany({
+      where: { organiserId: req.user.id },
+      select: { olympiadId: true },
+    });
+    const organisedOlympiadIds = organiserRows.map((r) => r.olympiadId);
+
     const where = {
       ...(selectedStatus === 'all' ? {} : { status: selectedStatus }),
       OR: [
         {
           submission: {
             round: {
-              olympiad: { organiserId: req.user.id },
+              olympiadId: { in: organisedOlympiadIds },
             },
           },
         },
@@ -70,7 +79,7 @@ router.patch('/remark/:id/assign', ...requireRole('organiser'), async (req, res)
       include: {
         submission: {
           select: {
-            round: { select: { olympiad: { select: { organiserId: true } } } },
+            round: { select: { olympiad: { select: { id: true } } } },
           },
         },
       },
@@ -80,7 +89,9 @@ router.patch('/remark/:id/assign', ...requireRole('organiser'), async (req, res)
       return res.status(404).json({ error: 'Remark request not found' });
     }
 
-    if (remarkRequest.submission.round.olympiad.organiserId !== req.user.id) {
+    // Only organisers of this specific olympiad may assign remark requests.
+    const olympiadId = remarkRequest.submission.round.olympiad.id;
+    if (!(await isOlympiadOrganiser(req.user.id, olympiadId))) {
       return res.status(404).json({ error: 'Remark request not found' });
     }
 

@@ -40,6 +40,7 @@ function ownedRemark(overrides = {}) {
     status: 'pending',
     submission: {
       round: {
+        olympiadId: 'oly-1',
         olympiad: { organiserId: organiser.id },
       },
     },
@@ -65,8 +66,20 @@ describe('Remark routes', () => {
     vi.spyOn(prisma.roundEntrant, 'createMany').mockResolvedValue({ count: 0 });
     vi.spyOn(prisma.submission, 'findUnique');
     vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(organiser);
+    vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    vi.spyOn(prisma.olympiadOrganiser, 'findMany');
     vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => callback(prisma));
     vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Default: organiser is a member of olympiad 'oly-1'
+    prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+      id: 'oo-1',
+      olympiadId: 'oly-1',
+      organiserId: 'organiser-1',
+    });
+    prisma.olympiadOrganiser.findMany.mockResolvedValue([
+      { olympiadId: 'oly-1' },
+    ]);
 
     app = createApp();
   });

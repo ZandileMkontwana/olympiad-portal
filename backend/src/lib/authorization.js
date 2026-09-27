@@ -29,7 +29,13 @@ async function getOlympiadOrganiserIds(olympiadId) {
  * Organisers bypass this check (pass role='organiser' to skip).
  */
 async function getSchoolOlympiadAccess(schoolId, olympiadId, role) {
-  if (role === 'organiser') return { status: 'approved' };
+  if (role === 'organiser') {
+    // Organisers bypass school-based access checks, but we still need to
+    // verify they're an organiser of THIS specific olympiad (not just any).
+    // That check happens in requireOlympiadAccess, so we return a synthetic
+    // approved status here to let the caller proceed.
+    return { status: 'approved' };
+  }
   if (!schoolId || !olympiadId) return null;
 
   const access = await prisma.schoolOlympiad.findUnique({
@@ -45,7 +51,9 @@ async function getSchoolOlympiadAccess(schoolId, olympiadId, role) {
  * access to the olympiad that owns the given round. Returns the educator
  * on success. Responds with 403 and returns null on failure.
  *
- * Organisers bypass the olympiad-access check (they see all data).
+ * Organisers must be members of the specific olympiad (via OlympiadOrganiser
+ * join table) — the blanket bypass has been removed to prevent cross-olympiad
+ * access. See #174, #247.
  *
  * @param {object} req  Express request
  * @param {object} res  Express response
@@ -58,7 +66,17 @@ async function requireOlympiadAccess(req, res, round, user) {
     res.status(403).json({ error: 'Not authenticated' });
     return null;
   }
+
+  // Organisers must be members of THIS specific olympiad (not just any).
+  // The OlympiadOrganiser join table is the single source of truth for
+  // organiser access — the creator is backfilled there so all checks go
+  // through one path.
   if (u.role === 'organiser') {
+    const isMember = await isOlympiadOrganiser(u.id, round.olympiadId);
+    if (!isMember) {
+      res.status(403).json({ error: 'You are not an organiser of this olympiad' });
+      return null;
+    }
     return { bypassed: true };
   }
 
