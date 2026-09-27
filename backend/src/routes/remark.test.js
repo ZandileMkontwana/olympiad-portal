@@ -56,7 +56,13 @@ describe('Remark routes', () => {
     vi.spyOn(prisma.remarkRequest, 'findUnique');
     vi.spyOn(prisma.remarkRequest, 'create');
     vi.spyOn(prisma.remarkRequest, 'updateMany');
-    vi.spyOn(prisma.result, 'upsert');
+    vi.spyOn(prisma.result, 'upsert').mockResolvedValue({});
+    vi.spyOn(prisma.round, 'update').mockResolvedValue({});
+    // Auto-advance re-run inside the review transaction: the round fetch,
+    // next-round lookup and registration insert all need database-free mocks.
+    vi.spyOn(prisma.round, 'findUnique').mockResolvedValue(null);
+    vi.spyOn(prisma.round, 'findFirst').mockResolvedValue(null);
+    vi.spyOn(prisma.roundEntrant, 'createMany').mockResolvedValue({ count: 0 });
     vi.spyOn(prisma.submission, 'findUnique');
     vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(organiser);
     vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => callback(prisma));
@@ -230,6 +236,47 @@ describe('Remark routes', () => {
       expect(res.body.error).toMatch(/newScore/);
     });
 
+    it.each([-1, 101])(
+      'returns 400 when approving with an out-of-range newScore (%i)',
+      async (newScore) => {
+        const res = await request(app)
+          .patch('/api/remark/remark-1/review')
+          .send({ status: 'approved', newScore });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/between 0 and 100/);
+        expect(prisma.remarkRequest.findUnique).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([0, 100])('accepts the boundary newScore %i', async (newScore) => {
+      prisma.remarkRequest.findUnique
+        .mockResolvedValueOnce({
+          id: 'remark-1',
+          status: 'assigned',
+          assignedToId: organiser.id,
+          submissionId: 'sub-1',
+          submission: { roundId: 'round-1' },
+        })
+        .mockResolvedValueOnce({
+          id: 'remark-1',
+          status: 'approved',
+          newScore,
+        });
+      prisma.remarkRequest.updateMany.mockResolvedValue({ count: 1 });
+
+      const res = await request(app)
+        .patch('/api/remark/remark-1/review')
+        .send({ status: 'approved', newScore });
+
+      expect(res.status).toBe(200);
+      expect(prisma.result.upsert).toHaveBeenCalledWith({
+        where: { submissionId: 'sub-1' },
+        update: { score: newScore },
+        create: { submissionId: 'sub-1', score: newScore },
+      });
+    });
+
     it('returns 404 when the remark request does not exist', async () => {
       prisma.remarkRequest.findUnique.mockResolvedValue(null);
 
@@ -329,39 +376,223 @@ describe('Remark routes', () => {
         })
       );
       expect(prisma.result.upsert).not.toHaveBeenCalled();
+      expect(prisma.round.findUnique).not.toHaveBeenCalled();
+      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
+      expect(prisma.round.update).not.toHaveBeenCalled();
     });
 
-    it('approves an assigned remark request and upserts the Result score', async () => {
+    it('amends the canonical Result score that standings and certificates read', async () => {
       prisma.remarkRequest.findUnique
         .mockResolvedValueOnce({
           id: 'remark-1',
           status: 'assigned',
           assignedToId: organiser.id,
           submissionId: 'sub-1',
+          submission: { roundId: 'round-1' },
         })
         .mockResolvedValueOnce({
           id: 'remark-1',
           status: 'approved',
-          newScore: 9,
+          newScore: 90,
           reviewedById: organiser.id,
         });
       prisma.remarkRequest.updateMany.mockResolvedValue({ count: 1 });
-      prisma.result.upsert.mockResolvedValue({ submissionId: 'sub-1', score: 9 });
 
       const res = await request(app)
         .patch('/api/remark/remark-1/review')
-        .send({ status: 'approved', newScore: 9 });
+        .send({ status: 'approved', newScore: 90, reviewNotes: 'Q3 was marked incorrectly' });
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('approved');
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(prisma.result.upsert).toHaveBeenCalledWith({
         where: { submissionId: 'sub-1' },
-        update: { score: 9 },
+        // Omitting releasedAt in `update` keeps an already-published result
+        // published; the amended score is what standings and certificates
+        // read from then on.
+        update: { score: 90 },
         create: {
           submissionId: 'sub-1',
-          score: 9,
+          score: 90,
         },
+      });
+      expect(prisma.remarkRequest.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'approved',
+            newScore: 90,
+            reviewNotes: 'Q3 was marked incorrectly',
+          }),
+        })
+      );
+    });
+
+    it('registers a newly qualified entrant for the next round immediately after approval', async () => {
+      prisma.remarkRequest.findUnique
+        .mockResolvedValueOnce({
+          id: 'remark-1',
+          status: 'assigned',
+          assignedToId: organiser.id,
+          submissionId: 'sub-1',
+          submission: { roundId: 'round-1' },
+        })
+        .mockResolvedValueOnce({
+          id: 'remark-1',
+          status: 'approved',
+          newScore: 85,
+        });
+      prisma.remarkRequest.updateMany.mockResolvedValue({ count: 1 });
+      // The in-transaction fetch sees the score upserted moments earlier.
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        olympiadId: 'oly-1',
+        state: 'closed',
+        openTime: new Date('2026-01-01'),
+        qualifyingThreshold: 50,
+        roundEntrants: [
+          {
+            entrant: {
+              id: 'entrant-1',
+              submissions: [{ roundId: 'round-1', result: { score: 85 } }],
+            },
+          },
+        ],
+      });
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        state: 'open',
+        openTime: new Date('2026-02-01'),
+      });
+
+      const res = await request(app)
+        .patch('/api/remark/remark-1/review')
+        .send({ status: 'approved', newScore: 85 });
+
+      expect(res.status).toBe(200);
+      expect(prisma.round.findUnique).toHaveBeenCalledWith({
+        where: { id: 'round-1' },
+        include: expect.objectContaining({ roundEntrants: expect.any(Object) }),
+      });
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+      // The pass stamps the marker inside the same transaction, so the
+      // scheduler sweep does not need to reprocess the round.
+      expect(prisma.round.update).toHaveBeenCalledWith({
+        where: { id: 'round-1' },
+        data: { autoAdvanceProcessedAt: expect.any(Date) },
+      });
+    });
+
+    it('post-publication: amends a released result in place and still re-triggers qualification', async () => {
+      prisma.remarkRequest.findUnique
+        .mockResolvedValueOnce({
+          id: 'remark-1',
+          status: 'assigned',
+          assignedToId: organiser.id,
+          submissionId: 'sub-1',
+          submission: { roundId: 'round-1' },
+        })
+        .mockResolvedValueOnce({
+          id: 'remark-1',
+          status: 'approved',
+          newScore: 85,
+        });
+      prisma.remarkRequest.updateMany.mockResolvedValue({ count: 1 });
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        olympiadId: 'oly-1',
+        state: 'released',
+        openTime: new Date('2026-01-01'),
+        qualifyingThreshold: 50,
+        roundEntrants: [
+          {
+            entrant: {
+              id: 'entrant-1',
+              submissions: [
+                { roundId: 'round-1', result: { score: 85, releasedAt: new Date('2026-09-01') } },
+              ],
+            },
+          },
+        ],
+      });
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        state: 'scheduled',
+        openTime: new Date('2026-02-01'),
+      });
+
+      const res = await request(app)
+        .patch('/api/remark/remark-1/review')
+        .send({ status: 'approved', newScore: 85 });
+
+      expect(res.status).toBe(200);
+      // The upsert payload touches only the score — the published timestamp
+      // survives, so the round stays 'released' and certificate downloads
+      // keep working with the revised mark.
+      expect(prisma.result.upsert).toHaveBeenCalledWith({
+        where: { submissionId: 'sub-1' },
+        update: { score: 85 },
+        create: { submissionId: 'sub-1', score: 85 },
+      });
+      // Released rounds re-run qualification just like closed ones.
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+      expect(prisma.round.update).toHaveBeenCalledWith({
+        where: { id: 'round-1' },
+        data: { autoAdvanceProcessedAt: expect.any(Date) },
+      });
+    });
+
+    it('does not register anyone when the revised score still misses the threshold', async () => {
+      prisma.remarkRequest.findUnique
+        .mockResolvedValueOnce({
+          id: 'remark-1',
+          status: 'assigned',
+          assignedToId: organiser.id,
+          submissionId: 'sub-1',
+          submission: { roundId: 'round-1' },
+        })
+        .mockResolvedValueOnce({
+          id: 'remark-1',
+          status: 'approved',
+          newScore: 30,
+        });
+      prisma.remarkRequest.updateMany.mockResolvedValue({ count: 1 });
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        olympiadId: 'oly-1',
+        state: 'closed',
+        openTime: new Date('2026-01-01'),
+        qualifyingThreshold: 50,
+        roundEntrants: [
+          {
+            entrant: {
+              id: 'entrant-1',
+              submissions: [{ roundId: 'round-1', result: { score: 30 } }],
+            },
+          },
+        ],
+      });
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        state: 'open',
+        openTime: new Date('2026-02-01'),
+      });
+
+      const res = await request(app)
+        .patch('/api/remark/remark-1/review')
+        .send({ status: 'approved', newScore: 30 });
+
+      expect(res.status).toBe(200);
+      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
+      // The pass still ran and stamped the marker — an idempotent no-op.
+      expect(prisma.round.update).toHaveBeenCalledWith({
+        where: { id: 'round-1' },
+        data: { autoAdvanceProcessedAt: expect.any(Date) },
       });
     });
 

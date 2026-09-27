@@ -1,6 +1,10 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
+const {
+  advanceQualifiedEntrantsForRound,
+  AUTO_ADVANCE_ROUND_INCLUDE,
+} = require('../lib/qualification');
 
 const router = express.Router();
 
@@ -138,13 +142,20 @@ router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res)
     return res.status(400).json({ error: "status must be 'approved' or 'rejected'" });
   }
 
-  if (status === 'approved' && typeof newScore !== 'number') {
-    return res.status(400).json({ error: 'newScore (number) is required when approving' });
+  // Scores are percentages (0-100); anything else would poison the live
+  // standings, qualification gates and certificate PDFs it feeds.
+  if (status === 'approved' && (!Number.isFinite(newScore) || newScore < 0 || newScore > 100)) {
+    return res
+      .status(400)
+      .json({ error: 'newScore must be a number between 0 and 100 when approving' });
   }
 
   try {
     const remarkRequest = await prisma.remarkRequest.findUnique({
       where: { id: req.params.id },
+      include: {
+        submission: { select: { roundId: true } },
+      },
     });
 
     if (!remarkRequest) {
@@ -183,6 +194,11 @@ router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res)
       }
 
       if (status === 'approved') {
+        // Result.score is the canonical source for live standings, on-demand
+        // certificate PDFs, and every qualification gate. The decision is
+        // wired straight into it; the update omits releasedAt so an appeal
+        // resolved after publication amends the released score in place
+        // instead of unpublishing it (see documents/docs/appeal-workflow.md).
         await tx.result.upsert({
           where: { submissionId: remarkRequest.submissionId },
           update: { score: newScore },
@@ -191,6 +207,22 @@ router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res)
             score: newScore,
           },
         });
+
+        // Re-run qualification for the revised score immediately, inside the
+        // same transaction: the shared pass registers anyone who now meets
+        // the threshold and stamps autoAdvanceProcessedAt. Doing it here —
+        // rather than clearing the marker for the next scheduler tick —
+        // closes the race where a concurrent tick could re-stamp the marker
+        // after the clear and silently swallow the re-trigger. The pass is
+        // idempotent (skipDuplicates), so a concurrent tick processing the
+        // same round cannot double-register anyone.
+        const round = await tx.round.findUnique({
+          where: { id: remarkRequest.submission.roundId },
+          include: AUTO_ADVANCE_ROUND_INCLUDE,
+        });
+        if (round) {
+          await advanceQualifiedEntrantsForRound(round, tx);
+        }
       }
 
       return tx.remarkRequest.findUnique({ where: { id: req.params.id } });
