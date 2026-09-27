@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('@clerk/express');
+const { isOlympiadOrganiser } = require('../lib/authorization');
 
 const router = express.Router();
 
@@ -36,6 +37,8 @@ async function requireOrganiserRole(req, res, next) {
     return res.status(403).json({ error: 'Organiser access required' });
   }
 
+  // Attach the user to the request for downstream checks.
+  req.organiserUser = user;
   next();
 }
 
@@ -50,6 +53,15 @@ router.post(
   ]),
   async (req, res) => {
     const roundId = req.params.id;
+
+    // Only organisers of this specific olympiad may upload papers.
+    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+    if (!(await isOlympiadOrganiser(req.organiserUser.id, round.olympiadId))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
+    }
 
     if (!req.files || !req.files.paper || !req.files.memo) {
       return res.status(400).json({ error: 'Both paper and memo files are required' });

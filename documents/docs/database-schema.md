@@ -206,10 +206,14 @@ The co-organiser model lets multiple organisers share management of an olympiad.
 - Edit the olympiad's details (name, dates, description)
 - Create and manage rounds
 - Upload papers and configure notifications
-- View all entrant data, submissions, and standings
+- View all entrant data, submissions, standings, audit logs, and replay timelines
 - Add or remove other co-organisers (except the creator)
+- Approve or decline school access requests
+- Manage remark requests and marking tasks for the olympiad
 
-The `GET /api/olympiads` endpoint returns olympiads where the authenticated organiser is either the creator or listed in `OlympiadOrganiser`. The `PUT /api/olympiads/:id` endpoint checks membership before allowing edits.
+**Authorization:** All routes that operate on olympiad-scoped resources (rounds, papers, submissions, standings, audit logs, replay, notifications, remark requests, marking tasks) check `OlympiadOrganiser` membership before granting access. This prevents cross-olympiad access — an organiser of Olympiad A cannot view or modify data from Olympiad B unless they are also listed as an organiser of Olympiad B.
+
+The `GET /api/olympiads` endpoint returns olympiads where the authenticated organiser is either the creator or listed in `OlympiadOrganiser`. The `PUT /api/olympiads/:id` endpoint checks membership before allowing edits. Similarly, all round-level operations verify that the organiser is a member of the round's parent olympiad.
 
 ## Deliberate omissions
 

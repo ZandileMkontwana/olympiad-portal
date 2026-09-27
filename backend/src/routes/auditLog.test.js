@@ -27,12 +27,19 @@ describe('GET /rounds/:id/audit-log', () => {
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.schoolOlympiad, 'findUnique');
-    // Default: loadAuthUser returns an organiser
+    vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    // Default: loadAuthUser returns an organiser who is a member of the olympiad
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       email: 'test@test.com',
       role: 'organiser',
       name: 'Organiser',
+    });
+    // Organiser is a member of the olympiad by default
+    prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+      id: 'oo-1',
+      olympiadId: 'oly-1',
+      organiserId: 'user-1',
     });
     app = createApp(true, 'organiser');
   });
@@ -101,11 +108,18 @@ describe('GET /rounds/:id/replay', () => {
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.schoolOlympiad, 'findUnique');
+    vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       email: 'test@test.com',
       role: 'organiser',
       name: 'Organiser',
+    });
+    // Organiser is a member of the olympiad by default
+    prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+      id: 'oo-1',
+      olympiadId: 'oly-1',
+      organiserId: 'user-1',
     });
     app = createApp(true, 'organiser');
   });

@@ -58,8 +58,6 @@ export default function ReplayPage() {
   // Fetch replay data when a round is selected.
   useEffect(() => {
     if (!selectedRoundId) {
-      setReplay(null);
-      setStatus('idle');
       return;
     }
 
