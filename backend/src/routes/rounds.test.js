@@ -1337,6 +1337,51 @@ describe('Rounds routes', () => {
       });
     });
 
+    it('reflects a score amended by an approved appeal when standings are re-fetched', async () => {
+      // An appeal approval updates Result.score in place (routes/remark.js);
+      // standings always read the live result row — no cached ranking exists
+      // — so the amended score and its new rank appear on the next fetch.
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+      });
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: {
+            id: 'entrant-1',
+            name: 'Thabo',
+            school: { name: 'Wits High School' },
+          },
+          result: { score: 95 }, // amended up from 50 by an approved appeal
+          submittedAt: '2026-09-12T20:00:00.000Z',
+        },
+        {
+          entrant: {
+            id: 'entrant-2',
+            name: 'Naledi',
+            school: { name: "St Mary's" },
+          },
+          result: { score: 60 },
+          submittedAt: '2026-09-12T20:10:00.000Z',
+        },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0]).toMatchObject({
+        rank: 1,
+        entrantName: 'Thabo',
+        score: 95,
+      });
+      expect(res.body[1]).toMatchObject({
+        rank: 2,
+        entrantName: 'Naledi',
+        score: 60,
+      });
+    });
+
     it('gives tied scores the same rank, and skips the next rank accordingly', async () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',

@@ -302,6 +302,82 @@ describe('startScheduler', () => {
       });
     });
 
+    it('re-qualifies from a released round so a post-publication appeal still advances the entrant', async () => {
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        openTime: new Date('2026-02-01'),
+        state: 'scheduled',
+      });
+
+      await runAutoAdvanceTick([
+        closedRound({
+          state: 'released',
+          roundEntrants: [roundEntrantWithScore(80)],
+        }),
+      ]);
+
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('does not double-register when the re-triggered pass runs again for the same scores', async () => {
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        openTime: new Date('2026-02-01'),
+        state: 'open',
+      });
+
+      const round = closedRound({
+        roundEntrants: [roundEntrantWithScore(80)],
+      });
+
+      await runAutoAdvanceTick([round]);
+      await runAutoAdvanceTick([round]);
+
+      // Both passes queue the identical registration; the unique
+      // (roundId, entrantId) constraint keeps the second insert a no-op.
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledTimes(2);
+      expect(prisma.roundEntrant.createMany).toHaveBeenNthCalledWith(1, {
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+      expect(prisma.roundEntrant.createMany).toHaveBeenNthCalledWith(2, {
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('registers an entrant only on the pass that follows a score revision', async () => {
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        openTime: new Date('2026-02-01'),
+        state: 'open',
+      });
+
+      // First pass: the entrant's score is still below the threshold.
+      await runAutoAdvanceTick([
+        closedRound({
+          roundEntrants: [roundEntrantWithScore(30)],
+        }),
+      ]);
+      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
+
+      // Second pass (re-triggered by the approved appeal): revised score.
+      await runAutoAdvanceTick([
+        closedRound({
+          roundEntrants: [roundEntrantWithScore(80)],
+        }),
+      ]);
+
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledTimes(1);
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+    });
+
     it('marks the round as processed so it is not reprocessed on the next tick', async () => {
       prisma.round.findFirst.mockResolvedValue(null);
 
