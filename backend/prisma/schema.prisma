@@ -9,7 +9,7 @@ datasource db {
 }
 
 model Olympiad {
-  id           String           @id @default(uuid())
+  id           String              @id @default(uuid())
   name         String
   timezone     String
   description  String? // organiser-written blurb shown to educators requesting access
@@ -19,7 +19,22 @@ model Olympiad {
   organiserId  String? // the organiser who created it; null = legacy/unowned
   rounds       Round[]
   schoolAccess SchoolOlympiad[]
-  organiser    User?            @relation(fields: [organiserId], references: [id])
+  organiser    User?               @relation(fields: [organiserId], references: [id])
+  organisers   OlympiadOrganiser[]
+}
+
+// A co-organiser's access to an olympiad. The creator (Olympiad.organiserId)
+// is backfilled here so all access checks go through this single table.
+// The creator is not removable — see removal rules in the routes.
+model OlympiadOrganiser {
+  id          String   @id @default(uuid())
+  olympiadId  String
+  organiserId String
+  addedAt     DateTime @default(now())
+  olympiad    Olympiad @relation(fields: [olympiadId], references: [id])
+  organiser   User     @relation(fields: [organiserId], references: [id])
+
+  @@unique([olympiadId, organiserId])
 }
 
 model Round {
@@ -57,6 +72,7 @@ model User {
   educator              Educator?
   entrant               Entrant?
   olympiads             Olympiad[]
+  organisedOlympiads    OlympiadOrganiser[]
   assignedMarkingTasks  MarkingTask[]   @relation("AssignedMarkingTasks")
   moderatedMarkingTasks MarkingTask[]   @relation("ModeratedMarkingTasks")
   requestedRemarks      RemarkRequest[] @relation("RequestedRemarks")

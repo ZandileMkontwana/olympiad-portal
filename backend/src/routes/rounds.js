@@ -17,7 +17,7 @@ const {
   buildResultsReleasedMessage,
   buildMissingSubmissionMessage,
 } = require('../lib/email');
-const { requireOlympiadAccess } = require('../lib/authorization');
+const { requireOlympiadAccess, isOlympiadOrganiser } = require('../lib/authorization');
 const { toUTCDate } = require('../lib/timezone');
 
 const router = express.Router();
@@ -52,6 +52,11 @@ router.post('/olympiads', ...requireRole('organiser'), async (req, res) => {
         organiserId: req.user.id,
       },
     });
+    // Backfill the creator into the OlympiadOrganiser join table so
+    // membership-based access checks work uniformly.
+    await prisma.olympiadOrganiser.create({
+      data: { olympiadId: olympiad.id, organiserId: req.user.id },
+    });
     res.status(201).json(olympiad);
   } catch (err) {
     console.error(err);
@@ -60,11 +65,21 @@ router.post('/olympiads', ...requireRole('organiser'), async (req, res) => {
 });
 
 // GET /olympiads — public so educators/students can browse rounds, but
-// organisers are scoped to the olympiads they created themselves.
+// organisers are scoped to the olympiads they created or co-organise
+// (via the OlympiadOrganiser join table).
 router.get('/olympiads', async (req, res) => {
   try {
     const user = await loadOptionalUser(req);
-    const where = user && user.role === 'organiser' ? { organiserId: user.id } : {};
+    let where = {};
+    if (user && user.role === 'organiser') {
+      // Organisers see olympiads they created OR co-organise.
+      const organiserIds = await prisma.olympiadOrganiser.findMany({
+        where: { organiserId: user.id },
+        select: { olympiadId: true },
+      });
+      const organisedIds = organiserIds.map((o) => o.olympiadId);
+      where = { OR: [{ organiserId: user.id }, { id: { in: organisedIds } }] };
+    }
 
     const olympiads = await prisma.olympiad.findMany({
       where,
@@ -161,6 +176,11 @@ router.put('/olympiads/:id', ...requireRole('organiser'), async (req, res) => {
     const existing = await prisma.olympiad.findUnique({ where: { id: req.params.id } });
     if (!existing) {
       return res.status(404).json({ error: 'Olympiad not found' });
+    }
+
+    // Only organisers of this specific olympiad may edit it.
+    if (!(await isOlympiadOrganiser(req.user.id, req.params.id))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 
     if (name !== undefined && !name) {
