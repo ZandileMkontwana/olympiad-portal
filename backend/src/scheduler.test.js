@@ -123,6 +123,7 @@ describe('startScheduler', () => {
       return {
         id: 'round-1',
         olympiadId: 'oly-1',
+        state: 'closed',
         openTime: new Date('2026-01-01'),
         qualifyingThreshold: 50,
         roundEntrants: [],
@@ -162,14 +163,14 @@ describe('startScheduler', () => {
       await scheduledCallback();
     }
 
-    it('queries only closed, unprocessed rounds with a qualifyingThreshold set', async () => {
+    it('queries unprocessed closed or released rounds with a qualifyingThreshold set', async () => {
       await runAutoAdvanceTick([]);
 
       expect(prisma.round.findMany).toHaveBeenNthCalledWith(
         5,
         expect.objectContaining({
           where: {
-            state: 'closed',
+            state: { in: ['closed', 'released'] },
             qualifyingThreshold: { not: null },
             autoAdvanceProcessedAt: null,
           },
@@ -181,9 +182,10 @@ describe('startScheduler', () => {
       prisma.round.findFirst.mockResolvedValue({
         id: 'round-2',
         openTime: new Date('2026-02-01'),
+        state: 'open',
       });
 
-      prisma.roundEntrant.findUnique.mockResolvedValue(null);
+      prisma.roundEntrant.createMany.mockResolvedValue({ count: 1 });
 
       await runAutoAdvanceTick([
         closedRound({
@@ -199,11 +201,9 @@ describe('startScheduler', () => {
         orderBy: { openTime: 'asc' },
       });
 
-      expect(prisma.roundEntrant.create).toHaveBeenCalledWith({
-        data: {
-          roundId: 'round-2',
-          entrantId: 'entrant-1',
-        },
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
       });
     });
 
@@ -211,6 +211,7 @@ describe('startScheduler', () => {
       prisma.round.findFirst.mockResolvedValue({
         id: 'round-2',
         openTime: new Date('2026-02-01'),
+        state: 'open',
       });
 
       await runAutoAdvanceTick([
@@ -219,13 +220,14 @@ describe('startScheduler', () => {
         }),
       ]);
 
-      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
     });
 
     it('does not advance an entrant who has not been marked yet', async () => {
       prisma.round.findFirst.mockResolvedValue({
         id: 'round-2',
         openTime: new Date('2026-02-01'),
+        state: 'open',
       });
 
       await runAutoAdvanceTick([
@@ -234,18 +236,19 @@ describe('startScheduler', () => {
         }),
       ]);
 
-      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
     });
 
     it('does not duplicate registration for an entrant already registered in the next round', async () => {
       prisma.round.findFirst.mockResolvedValue({
         id: 'round-2',
         openTime: new Date('2026-02-01'),
+        state: 'open',
       });
 
-      prisma.roundEntrant.findUnique.mockResolvedValue({
-        id: 'existing-registration',
-      });
+      // skipDuplicates makes the insert a no-op when the unique
+      // (roundId, entrantId) registration already exists.
+      prisma.roundEntrant.createMany.mockResolvedValue({ count: 0 });
 
       await runAutoAdvanceTick([
         closedRound({
@@ -253,15 +256,14 @@ describe('startScheduler', () => {
         }),
       ]);
 
-      expect(prisma.roundEntrant.findUnique).toHaveBeenCalledWith({
-        where: {
-          roundId_entrantId: {
-            roundId: 'round-2',
-            entrantId: 'entrant-1',
-          },
-        },
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
       });
 
+      // Dedup is delegated to the database constraint — no per-entrant
+      // existence check is done before the insert.
+      expect(prisma.roundEntrant.findUnique).not.toHaveBeenCalled();
       expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
     });
 
@@ -274,7 +276,106 @@ describe('startScheduler', () => {
         }),
       ]);
 
-      expect(prisma.roundEntrant.create).not.toHaveBeenCalled();
+      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
+    });
+
+    it('does not backfill an entrant into a round that has already ended', async () => {
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        openTime: new Date('2026-02-01'),
+        state: 'closed',
+      });
+
+      await runAutoAdvanceTick([
+        closedRound({
+          roundEntrants: [roundEntrantWithScore(80)],
+        }),
+      ]);
+
+      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
+
+      // The source round is still marked processed — late backfill is left
+      // to the organiser rather than skipping the entrant further ahead.
+      expect(prisma.round.update).toHaveBeenCalledWith({
+        where: { id: 'round-1' },
+        data: { autoAdvanceProcessedAt: expect.any(Date) },
+      });
+    });
+
+    it('re-qualifies from a released round so a post-publication appeal still advances the entrant', async () => {
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        openTime: new Date('2026-02-01'),
+        state: 'scheduled',
+      });
+
+      await runAutoAdvanceTick([
+        closedRound({
+          state: 'released',
+          roundEntrants: [roundEntrantWithScore(80)],
+        }),
+      ]);
+
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('does not double-register when the re-triggered pass runs again for the same scores', async () => {
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        openTime: new Date('2026-02-01'),
+        state: 'open',
+      });
+
+      const round = closedRound({
+        roundEntrants: [roundEntrantWithScore(80)],
+      });
+
+      await runAutoAdvanceTick([round]);
+      await runAutoAdvanceTick([round]);
+
+      // Both passes queue the identical registration; the unique
+      // (roundId, entrantId) constraint keeps the second insert a no-op.
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledTimes(2);
+      expect(prisma.roundEntrant.createMany).toHaveBeenNthCalledWith(1, {
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+      expect(prisma.roundEntrant.createMany).toHaveBeenNthCalledWith(2, {
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
+    });
+
+    it('registers an entrant only on the pass that follows a score revision', async () => {
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        openTime: new Date('2026-02-01'),
+        state: 'open',
+      });
+
+      // First pass: the entrant's score is still below the threshold.
+      await runAutoAdvanceTick([
+        closedRound({
+          roundEntrants: [roundEntrantWithScore(30)],
+        }),
+      ]);
+      expect(prisma.roundEntrant.createMany).not.toHaveBeenCalled();
+
+      // Second pass (re-triggered by the approved appeal): revised score.
+      await runAutoAdvanceTick([
+        closedRound({
+          roundEntrants: [roundEntrantWithScore(80)],
+        }),
+      ]);
+
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledTimes(1);
+      expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
+        data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
+        skipDuplicates: true,
+      });
     });
 
     it('marks the round as processed so it is not reprocessed on the next tick', async () => {

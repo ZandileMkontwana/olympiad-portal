@@ -6,7 +6,11 @@ const {
   sendResultsReleasedNotification,
   sendMissingSubmissionNotification,
 } = require('./lib/email');
-const { filterQualifiedEntrantIds } = require('./lib/qualification');
+const {
+  filterQualifiedEntrantIds,
+  advanceQualifiedEntrantsForRound,
+  AUTO_ADVANCE_ROUND_INCLUDE,
+} = require('./lib/qualification');
 
 const NOTIFY_BEFORE_OPEN_MS = 60 * 60 * 1000; // 1 hour
 const NOTIFY_BEFORE_CLOSE_MS = 60 * 60 * 1000; // 1 hour
@@ -88,70 +92,30 @@ function startScheduler() {
   console.log('Round scheduler started — ticking every 30s');
 }
 
-// Finds closed rounds with a qualifyingThreshold that haven't been
-// processed yet, and for each one, registers qualifying entrants into the
-// next round in the same olympiad. "Next round" is inferred as the round
-// with the earliest openTime after this one, since Round has no explicit
-// ordering/sequence field of its own. Marking autoAdvanceProcessedAt keeps
-// this idempotent across ticks - each round is only ever processed once,
-// independent of exactly when or how it was closed.
+// Finds closed or released rounds with a qualifyingThreshold whose latest
+// score change has not been processed yet, and advances qualifying entrants
+// via the shared pass in lib/qualification.js. "Next round" is inferred as
+// the round with the earliest openTime after this one, since Round has no
+// explicit ordering/sequence field of its own.
+//
+// Approved appeals do NOT wait for this sweep: the review route runs the
+// same pass immediately inside its transaction (routes/remark.js), which
+// also removes the race where a tick could stamp autoAdvanceProcessedAt
+// after the appeal cleared it and silently swallow the re-trigger. This
+// periodic sweep is the safety net for late-scored rounds and anything the
+// in-request re-run missed.
 async function processAutoAdvance() {
   const roundsToProcess = await prisma.round.findMany({
     where: {
-      state: 'closed',
+      state: { in: ['closed', 'released'] },
       qualifyingThreshold: { not: null },
       autoAdvanceProcessedAt: null,
     },
-    include: {
-      roundEntrants: {
-        include: {
-          entrant: {
-            include: {
-              submissions: { include: { result: true } },
-            },
-          },
-        },
-      },
-    },
+    include: AUTO_ADVANCE_ROUND_INCLUDE,
   });
 
   for (const round of roundsToProcess) {
-    const nextRound = await prisma.round.findFirst({
-      where: {
-        olympiadId: round.olympiadId,
-        openTime: { gt: round.openTime },
-      },
-      orderBy: { openTime: 'asc' },
-    });
-
-    if (nextRound) {
-      for (const roundEntrant of round.roundEntrants) {
-        const entrant = roundEntrant.entrant;
-        const submission = entrant.submissions.find((s) => s.roundId === round.id);
-        const score = submission?.result?.score;
-
-        // Not marked yet (still in the marking queue, or a pending remark)
-        // - skip for now. Since this round is now marked as processed
-        // below, a late marking won't retroactively advance this entrant.
-        if (score === undefined || score === null) continue;
-        if (score < round.qualifyingThreshold) continue;
-
-        const alreadyRegistered = await prisma.roundEntrant.findUnique({
-          where: { roundId_entrantId: { roundId: nextRound.id, entrantId: entrant.id } },
-        });
-
-        if (!alreadyRegistered) {
-          await prisma.roundEntrant.create({
-            data: { roundId: nextRound.id, entrantId: entrant.id },
-          });
-        }
-      }
-    }
-
-    await prisma.round.update({
-      where: { id: round.id },
-      data: { autoAdvanceProcessedAt: new Date() },
-    });
+    await advanceQualifiedEntrantsForRound(round);
   }
 }
 
