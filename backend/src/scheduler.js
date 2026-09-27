@@ -152,7 +152,7 @@ async function processAutoAdvance() {
 
   for (const round of roundsToProcess) {
     // Collect entrants before advance so we can audit-log them
-    const entrantsBefore = new Set(
+    const _entrantsBefore = new Set(
       round.roundEntrants.map((re) => re.entrant.id)
     );
 
