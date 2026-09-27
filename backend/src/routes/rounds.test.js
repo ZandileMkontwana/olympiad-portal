@@ -52,6 +52,9 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.notificationRule, 'deleteMany');
     vi.spyOn(prisma.result, 'updateMany');
     vi.spyOn(prisma.auditLog, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.olympiadOrganiser, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.olympiadOrganiser, 'findUnique').mockResolvedValue(null);
+    vi.spyOn(prisma.olympiadOrganiser, 'create').mockResolvedValue({});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: no registrations anywhere (GET /olympiads enrichment counts
     // them) — schools have approved access (POST /rounds/:id/entrants gate).
@@ -288,7 +291,9 @@ describe('Rounds routes', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual([{ id: '3', name: 'Mine', rounds: [] }]);
       expect(prisma.olympiad.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { organiserId: 'user-1' } })
+        expect.objectContaining({
+          where: { OR: [{ organiserId: 'user-1' }, { id: { in: [] } }] },
+        })
       );
     });
 
@@ -452,6 +457,12 @@ describe('Rounds routes', () => {
         email: 'organiser@olympiad.com',
         role: 'organiser',
         name: 'Organiser One',
+      });
+      // The organiser is a member of the olympiad via the join table.
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+        id: 'oo-1',
+        olympiadId: 'olympiad-1',
+        organiserId: 'user-1',
       });
     });
 

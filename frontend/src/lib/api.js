@@ -767,3 +767,67 @@ export function reviewRemarkRequest(remarkRequestId, { status, newScore, reviewN
     body: JSON.stringify({ status, newScore, reviewNotes }),
   });
 }
+
+/**
+ * Lists the organisers (creator + co-organisers) for an olympiad.
+ * Wired to GET /api/olympiads/:id/organisers (backend/src/routes/olympiadOrganisers.js).
+ *
+ * @param {string} olympiadId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   organiserId: string,
+ *   name: string,
+ *   email: string,
+ *   addedAt: string,
+ *   isCreator: boolean,
+ * }>>}
+ */
+export function listOlympiadOrganisers(olympiadId, token) {
+  return requestJson(`/api/olympiads/${olympiadId}/organisers`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Adds an organiser to an olympiad. Only existing organisers may call this.
+ * Wired to POST /api/olympiads/:id/organisers (backend/src/routes/olympiadOrganisers.js).
+ *
+ * @param {string} olympiadId
+ * @param {string} organiserId - User.id of the organiser to add
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function addOlympiadOrganiser(olympiadId, organiserId, token) {
+  return requestJson(`/api/olympiads/${olympiadId}/organisers`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ organiserId }),
+  });
+}
+
+/**
+ * Removes a co-organiser from an olympiad. The creator cannot be removed.
+ * Wired to DELETE /api/olympiads/:id/organisers/:organiserId.
+ *
+ * @param {string} olympiadId
+ * @param {string} organiserId
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function removeOlympiadOrganiser(olympiadId, organiserId, token) {
+  return requestJson(`/api/olympiads/${olympiadId}/organisers/${organiserId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Lists all users with role 'organiser' — used by the "Add organiser"
+ * dropdown to pick a co-organiser.
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function listAllOrganisers(token) {
+  return requestJson('/api/organisers', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}

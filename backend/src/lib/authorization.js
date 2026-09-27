@@ -1,6 +1,29 @@
 const prisma = require('./prisma');
 
 /**
+ * Checks whether a user is an organiser of a specific olympiad
+ * (via the OlympiadOrganiser join table).
+ */
+async function isOlympiadOrganiser(userId, olympiadId) {
+  if (!userId || !olympiadId) return false;
+  const row = await prisma.olympiadOrganiser.findUnique({
+    where: { olympiadId_organiserId: { olympiadId, organiserId: userId } },
+  });
+  return Boolean(row);
+}
+
+/**
+ * Returns the user IDs of all organisers for an olympiad.
+ */
+async function getOlympiadOrganiserIds(olympiadId) {
+  const rows = await prisma.olympiadOrganiser.findMany({
+    where: { olympiadId },
+    select: { organiserId: true },
+  });
+  return rows.map((r) => r.organiserId);
+}
+
+/**
  * Verifies that a school has approved access to a given olympiad.
  * Returns the SchoolOlympiad row on success, or null if access is not granted.
  * Organisers bypass this check (pass role='organiser' to skip).
@@ -63,4 +86,9 @@ async function requireOlympiadAccess(req, res, round, user) {
   return { educator, access };
 }
 
-module.exports = { getSchoolOlympiadAccess, requireOlympiadAccess };
+module.exports = {
+  getSchoolOlympiadAccess,
+  requireOlympiadAccess,
+  isOlympiadOrganiser,
+  getOlympiadOrganiserIds,
+};
