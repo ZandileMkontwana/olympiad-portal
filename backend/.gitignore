@@ -3,3 +3,4 @@ uploads/
 .env
 /generated/prisma
 coverage/
+load-test-results*.json
