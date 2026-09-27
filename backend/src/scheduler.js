@@ -88,17 +88,17 @@ function startScheduler() {
   console.log('Round scheduler started — ticking every 30s');
 }
 
-// Finds closed rounds with a qualifyingThreshold that haven't been
-// processed yet, and for each one, registers qualifying entrants into the
-// next round in the same olympiad. "Next round" is inferred as the round
-// with the earliest openTime after this one, since Round has no explicit
-// ordering/sequence field of its own. Marking autoAdvanceProcessedAt keeps
-// this idempotent across ticks - each round is only ever processed once,
-// independent of exactly when or how it was closed.
+// Finds closed or released rounds with a qualifyingThreshold that have not
+// been processed since their latest score change. It registers qualifying
+// entrants into the immediate next round in the same olympiad. "Next round"
+// is inferred as the round with the earliest openTime after this one, since
+// Round has no explicit ordering/sequence field of its own. Clearing
+// autoAdvanceProcessedAt after an approved appeal deliberately makes the
+// source round eligible for another idempotent pass.
 async function processAutoAdvance() {
   const roundsToProcess = await prisma.round.findMany({
     where: {
-      state: 'closed',
+      state: { in: ['closed', 'released'] },
       qualifyingThreshold: { not: null },
       autoAdvanceProcessedAt: null,
     },
@@ -124,27 +124,30 @@ async function processAutoAdvance() {
       orderBy: { openTime: 'asc' },
     });
 
-    if (nextRound) {
+    // Do not backfill a participant into a round that has already ended, or
+    // skip it to advance the entrant further ahead. The organiser can handle
+    // that exceptional late appeal manually.
+    if (nextRound && ['scheduled', 'open'].includes(nextRound.state)) {
+      const registrations = [];
+
       for (const roundEntrant of round.roundEntrants) {
         const entrant = roundEntrant.entrant;
         const submission = entrant.submissions.find((s) => s.roundId === round.id);
         const score = submission?.result?.score;
 
-        // Not marked yet (still in the marking queue, or a pending remark)
-        // - skip for now. Since this round is now marked as processed
-        // below, a late marking won't retroactively advance this entrant.
         if (score === undefined || score === null) continue;
         if (score < round.qualifyingThreshold) continue;
 
-        const alreadyRegistered = await prisma.roundEntrant.findUnique({
-          where: { roundId_entrantId: { roundId: nextRound.id, entrantId: entrant.id } },
-        });
+        registrations.push({ roundId: nextRound.id, entrantId: entrant.id });
+      }
 
-        if (!alreadyRegistered) {
-          await prisma.roundEntrant.create({
-            data: { roundId: nextRound.id, entrantId: entrant.id },
-          });
-        }
+      if (registrations.length > 0) {
+        // The unique (roundId, entrantId) constraint and skipDuplicates make
+        // reprocessing and concurrent scheduler ticks safe.
+        await prisma.roundEntrant.createMany({
+          data: registrations,
+          skipDuplicates: true,
+        });
       }
     }
 

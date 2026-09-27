@@ -145,6 +145,9 @@ router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res)
   try {
     const remarkRequest = await prisma.remarkRequest.findUnique({
       where: { id: req.params.id },
+      include: {
+        submission: { select: { roundId: true } },
+      },
     });
 
     if (!remarkRequest) {
@@ -183,6 +186,8 @@ router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res)
       }
 
       if (status === 'approved') {
+        // Keep Result.score as the canonical source for live standings and
+        // on-demand certificates. Updating only score preserves releasedAt.
         await tx.result.upsert({
           where: { submissionId: remarkRequest.submissionId },
           update: { score: newScore },
@@ -190,6 +195,13 @@ router.patch('/remark/:id/review', ...requireRole('organiser'), async (req, res)
             submissionId: remarkRequest.submissionId,
             score: newScore,
           },
+        });
+
+        // The revised score can change qualification. Clearing the completion
+        // marker makes the scheduler safely reconsider this round.
+        await tx.round.update({
+          where: { id: remarkRequest.submission.roundId },
+          data: { autoAdvanceProcessedAt: null },
         });
       }
 

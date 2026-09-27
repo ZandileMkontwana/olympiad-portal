@@ -57,6 +57,7 @@ describe('Remark routes', () => {
     vi.spyOn(prisma.remarkRequest, 'create');
     vi.spyOn(prisma.remarkRequest, 'updateMany');
     vi.spyOn(prisma.result, 'upsert');
+    vi.spyOn(prisma.round, 'update').mockResolvedValue({});
     vi.spyOn(prisma.submission, 'findUnique');
     vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(organiser);
     vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => callback(prisma));
@@ -329,15 +330,17 @@ describe('Remark routes', () => {
         })
       );
       expect(prisma.result.upsert).not.toHaveBeenCalled();
+      expect(prisma.round.update).not.toHaveBeenCalled();
     });
 
-    it('approves an assigned remark request and upserts the Result score', async () => {
+    it('approves an assigned remark request and reopens qualification processing', async () => {
       prisma.remarkRequest.findUnique
         .mockResolvedValueOnce({
           id: 'remark-1',
           status: 'assigned',
           assignedToId: organiser.id,
           submissionId: 'sub-1',
+          submission: { roundId: 'round-1' },
         })
         .mockResolvedValueOnce({
           id: 'remark-1',
@@ -346,7 +349,11 @@ describe('Remark routes', () => {
           reviewedById: organiser.id,
         });
       prisma.remarkRequest.updateMany.mockResolvedValue({ count: 1 });
-      prisma.result.upsert.mockResolvedValue({ submissionId: 'sub-1', score: 9 });
+      prisma.result.upsert.mockResolvedValue({
+        submissionId: 'sub-1',
+        score: 9,
+        releasedAt: new Date('2026-09-01T12:00:00Z'),
+      });
 
       const res = await request(app)
         .patch('/api/remark/remark-1/review')
@@ -357,11 +364,16 @@ describe('Remark routes', () => {
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(prisma.result.upsert).toHaveBeenCalledWith({
         where: { submissionId: 'sub-1' },
+        // Omitting releasedAt retains the publication timestamp.
         update: { score: 9 },
         create: {
           submissionId: 'sub-1',
           score: 9,
         },
+      });
+      expect(prisma.round.update).toHaveBeenCalledWith({
+        where: { id: 'round-1' },
+        data: { autoAdvanceProcessedAt: null },
       });
     });
 
