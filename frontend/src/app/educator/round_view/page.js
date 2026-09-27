@@ -322,12 +322,34 @@ function RoundViewContent() {
       <div className="round-information">
         <div>
           <strong>Opening Time</strong>
-          <p>{new Date(round.openTime).toLocaleString()}</p>
+          <p>
+            {new Date(round.openTime).toLocaleString('en-ZA', {
+              timeZone: round.olympiad?.timezone || undefined,
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+            {round.olympiad?.timezone && (
+              <small style={{ marginLeft: '6px', color: '#8b7fa8' }}>
+                ({round.olympiad.timezone})
+              </small>
+            )}
+          </p>
         </div>
 
         <div>
           <strong>Closing Time</strong>
-          <p>{new Date(round.closeTime).toLocaleString()}</p>
+          <p>
+            {new Date(round.closeTime).toLocaleString('en-ZA', {
+              timeZone: round.olympiad?.timezone || undefined,
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+            {round.olympiad?.timezone && (
+              <small style={{ marginLeft: '6px', color: '#8b7fa8' }}>
+                ({round.olympiad.timezone})
+              </small>
+            )}
+          </p>
         </div>
       </div>
 

@@ -3,6 +3,7 @@ const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
 const { sendSubmissionReceipt } = require('../lib/email');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
+const { requireOlympiadAccess } = require('../lib/authorization');
 
 const router = express.Router();
 
@@ -50,6 +51,11 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
   if (entrant.schoolId !== educator.schoolId) {
     return res.status(403).json({ error: 'Entrant belongs to a different school' });
   }
+
+  // Olympiad access check: the educator's school must have approved
+  // access to the olympiad that owns this round.
+  const accessCheck = await requireOlympiadAccess(req, res, round);
+  if (!accessCheck) return;
 
   // Prerequisite gate: an entrant who has not met this round's requirements
   // cannot have a submission recorded for them, even if the UI is bypassed.

@@ -24,6 +24,9 @@ describe('startScheduler', () => {
     vi.spyOn(prisma.notificationLog, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.notificationLog, 'create').mockResolvedValue({ id: 'log-1' });
     vi.spyOn(prisma.notificationRule, 'findUnique').mockResolvedValue(null);
+    vi.spyOn(prisma.schoolOlympiad, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.auditLog, 'createMany').mockResolvedValue({ count: 0 });
+    vi.spyOn(prisma.auditLog, 'create').mockResolvedValue({ id: 'audit-1' });
     vi.spyOn(sgMail, 'send').mockResolvedValue({});
     vi.spyOn(console, 'log').mockImplementation(() => {});
   });
@@ -296,8 +299,14 @@ describe('startScheduler', () => {
 
     prisma.round.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
 
-    prisma.round.findMany.mockResolvedValueOnce([{ id: 'round-1' }]).mockResolvedValueOnce([]);
+    // The audit-log findMany fires first (for opened rounds), then registerEntrants
+    prisma.round.findMany
+      .mockResolvedValueOnce([{ id: 'round-1' }]) // audit log: justOpened
+      .mockResolvedValueOnce([{ id: 'round-1', olympiadId: 'oly-1' }]) // registerEntrants
+      .mockResolvedValueOnce([]); // notification queries
 
+    // School access check: one approved school
+    prisma.schoolOlympiad.findMany.mockResolvedValueOnce([{ schoolId: 'school-1' }]);
     prisma.entrant.findMany.mockResolvedValue([{ id: 'entrant-1' }, { id: 'entrant-2' }]);
 
     // entrant-1 is already registered, entrant-2 is not
@@ -330,9 +339,10 @@ describe('startScheduler', () => {
     prisma.round.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
     prisma.round.findMany
       .mockResolvedValueOnce([
-        { id: 'round-2', prerequisiteRoundId: 'round-1', qualifyingThreshold: 50 },
+        { id: 'round-2', olympiadId: 'oly-1', prerequisiteRoundId: 'round-1', qualifyingThreshold: 50 },
       ])
       .mockResolvedValueOnce([]);
+    prisma.schoolOlympiad.findMany.mockResolvedValueOnce([{ schoolId: 'school-1' }]);
     prisma.entrant.findMany.mockResolvedValue([{ id: 'entrant-1' }]);
     // No qualifying submission in the prerequisite round
     prisma.submission.findMany.mockResolvedValue([]);
@@ -346,10 +356,12 @@ describe('startScheduler', () => {
     startScheduler();
     prisma.round.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
     prisma.round.findMany
+      .mockResolvedValueOnce([{ id: 'round-2' }]) // audit log: justOpened
       .mockResolvedValueOnce([
-        { id: 'round-2', prerequisiteRoundId: 'round-1', qualifyingThreshold: 50 },
+        { id: 'round-2', olympiadId: 'oly-1', prerequisiteRoundId: 'round-1', qualifyingThreshold: 50 },
       ])
       .mockResolvedValueOnce([]);
+    prisma.schoolOlympiad.findMany.mockResolvedValueOnce([{ schoolId: 'school-1' }]);
     prisma.entrant.findMany.mockResolvedValue([{ id: 'entrant-1' }]);
     prisma.submission.findMany.mockResolvedValue([{ entrantId: 'entrant-1' }]);
 

@@ -30,17 +30,20 @@ function scoreLabel(score) {
   return 'Needs support';
 }
 
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('en-ZA', {
+function formatDate(iso, tz) {
+  const opts = {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  });
+  };
+  if (tz) opts.timeZone = tz;
+  return new Date(iso).toLocaleDateString('en-ZA', opts);
 }
 
 function olympiadLabel(o) {
-  const start = o.startDate ? formatDate(o.startDate) : null;
-  const end = o.endDate ? formatDate(o.endDate) : null;
+  const tz = o.timezone || null;
+  const start = o.startDate ? formatDate(o.startDate, tz) : null;
+  const end = o.endDate ? formatDate(o.endDate, tz) : null;
   const range = start && end ? `${start} → ${end}` : start || end || null;
   return range ? `${o.name} (${range})` : o.name;
 }

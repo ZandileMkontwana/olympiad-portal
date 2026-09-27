@@ -51,6 +51,7 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.notificationRule, 'upsert');
     vi.spyOn(prisma.notificationRule, 'deleteMany');
     vi.spyOn(prisma.result, 'updateMany');
+    vi.spyOn(prisma.auditLog, 'findMany').mockResolvedValue([]);
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: no registrations anywhere (GET /olympiads enrichment counts
     // them) — schools have approved access (POST /rounds/:id/entrants gate).
@@ -316,6 +317,7 @@ describe('Rounds routes', () => {
     });
 
     it('creates round and returns 201', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({ id: '1', timezone: 'UTC' });
       prisma.round.create.mockResolvedValue({ id: '1', name: 'Round 1' });
       const res = await request(app).post('/api/rounds').send({
         olympiadId: '1',
@@ -336,6 +338,7 @@ describe('Rounds routes', () => {
     });
 
     it('creates round with a qualifyingThreshold when provided', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({ id: '1', timezone: 'UTC' });
       prisma.round.create.mockResolvedValue({ id: '1', name: 'Round 1', qualifyingThreshold: 60 });
       const res = await request(app).post('/api/rounds').send({
         olympiadId: '1',
@@ -392,6 +395,7 @@ describe('Rounds routes', () => {
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
       expect(prisma.round.findMany).toHaveBeenCalledWith({
+        where: {},
         include: { olympiad: true },
         orderBy: { openTime: 'asc' },
       });
@@ -855,6 +859,7 @@ describe('Rounds routes', () => {
 
   describe('GET /api/rounds/:id/entrants', () => {
     it('returns entrants for a round', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: '1', name: 'Round 1', olympiadId: 'oly-1' });
       prisma.roundEntrant.findMany.mockResolvedValue([
         { entrant: { id: 'e1', name: 'Alice' } },
         { Entrant: { id: 'e2', name: 'Bob' } },
@@ -1118,6 +1123,7 @@ describe('Rounds routes', () => {
 
   describe('GET /api/rounds/:id/submissions', () => {
     it('returns submissions for a round', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: '1', name: 'Round 1', olympiadId: 'oly-1' });
       prisma.submission.findMany.mockResolvedValue([{ id: 's1', result: { score: 80 } }]);
       const res = await request(app).get('/api/rounds/1/submissions');
       expect(res.status).toBe(200);
@@ -1251,6 +1257,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([]);
@@ -1265,6 +1272,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1299,6 +1307,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1341,6 +1350,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1384,6 +1394,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1419,6 +1430,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockRejectedValue(new Error('DB error'));
@@ -1444,6 +1456,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([]);
@@ -1458,6 +1471,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1507,6 +1521,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1551,6 +1566,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1597,6 +1613,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockRejectedValue(new Error('DB error'));

@@ -118,12 +118,16 @@ router.get('/rounds/:id/papers', async (req, res) => {
 // accessible to both organisers and educators.
 router.get('/papers/archive', async (req, res) => {
   try {
-    const papers = await prisma.paper.findMany({
-      where: {
-        round: {
-          state: { in: ['closed', 'released'] },
-        },
+    const { olympiadId } = req.query;
+    const where = {
+      round: {
+        state: { in: ['closed', 'released'] },
+        ...(olympiadId ? { olympiadId } : {}),
       },
+    };
+
+    const papers = await prisma.paper.findMany({
+      where,
       include: {
         round: {
           include: { olympiad: true },
