@@ -41,6 +41,7 @@ model Round {
   sittings               Sitting[]
   notificationLogs       NotificationLog[]
   notificationRules      NotificationRule[]
+  auditLogs              AuditLog[]
 }
 
 model User {
@@ -236,4 +237,16 @@ model NotificationRule {
   round         Round    @relation(fields: [roundId], references: [id])
 
   @@unique([roundId, triggerType])
+}
+
+// Records every automatic action the scheduler performs on a round
+// (open, close, auto-advance, notification send) so organisers can
+// audit what happened and when.
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String   // 'round_opened' | 'round_closed' | 'auto_advanced' | 'notification_sent'
+  timestamp DateTime @default(now())
+  roundId   String?
+  payload   Json?    // detail data, e.g. { entrantId, nextRoundId } for auto-advance
+  round     Round?   @relation(fields: [roundId], references: [id])
 }

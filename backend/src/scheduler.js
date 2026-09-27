@@ -26,14 +26,26 @@ const NOTIFY_BEFORE_CLOSE_MS = 60 * 60 * 1000; // 1 hour
 async function registerEntrantsForNewlyOpenRounds() {
   const openRounds = await prisma.round.findMany({
     where: { state: 'open' },
-    select: { id: true, prerequisiteRoundId: true, qualifyingThreshold: true },
+    select: { id: true, olympiadId: true, prerequisiteRoundId: true, qualifyingThreshold: true },
   });
   if (openRounds.length === 0) return;
 
-  const entrants = await prisma.entrant.findMany({ select: { id: true } });
-  if (entrants.length === 0) return;
-
   for (const round of openRounds) {
+    // Only register entrants from schools that have approved access to
+    // this round's olympiad — prevents cross-olympiad leakage.
+    const approvedSchools = await prisma.schoolOlympiad.findMany({
+      where: { olympiadId: round.olympiadId, status: 'approved' },
+      select: { schoolId: true },
+    });
+    const schoolIds = approvedSchools.map((s) => s.schoolId);
+    if (schoolIds.length === 0) continue;
+
+    const entrants = await prisma.entrant.findMany({
+      where: { schoolId: { in: schoolIds } },
+      select: { id: true },
+    });
+    if (entrants.length === 0) continue;
+
     const existing = await prisma.roundEntrant.findMany({
       where: { roundId: round.id },
       select: { entrantId: true },
@@ -65,6 +77,18 @@ function startScheduler() {
     });
     if (opened.count > 0) {
       console.log(`Opened ${opened.count} round(s) at ${now.toISOString()}`);
+      // Write audit log entries for each newly opened round
+      const justOpened = await prisma.round.findMany({
+        where: { state: 'open', openTime: { lte: now } },
+        select: { id: true },
+      });
+      await prisma.auditLog.createMany({
+        data: justOpened.map((r) => ({
+          action: 'round_opened',
+          roundId: r.id,
+          payload: { openedAt: now.toISOString() },
+        })),
+      });
       // Register all existing entrants for newly opened rounds
       await registerEntrantsForNewlyOpenRounds();
     }
@@ -75,6 +99,18 @@ function startScheduler() {
     });
     if (closed.count > 0) {
       console.log(`Closed ${closed.count} round(s) at ${now.toISOString()}`);
+      // Write audit log entries for each newly closed round
+      const justClosed = await prisma.round.findMany({
+        where: { state: 'closed', closeTime: { lte: now } },
+        select: { id: true },
+      });
+      await prisma.auditLog.createMany({
+        data: justClosed.map((r) => ({
+          action: 'round_closed',
+          roundId: r.id,
+          payload: { closedAt: now.toISOString() },
+        })),
+      });
     }
 
     await sendBeforeOpenNotifications(now);
@@ -115,7 +151,47 @@ async function processAutoAdvance() {
   });
 
   for (const round of roundsToProcess) {
-    await advanceQualifiedEntrantsForRound(round);
+    // Collect entrants before advance so we can audit-log them
+    const entrantsBefore = new Set(
+      round.roundEntrants.map((re) => re.entrant.id)
+    );
+
+    const registered = await advanceQualifiedEntrantsForRound(round);
+
+    // Write audit log entries for each entrant that was auto-advanced
+    if (registered > 0) {
+      const nextRound = await prisma.round.findFirst({
+        where: {
+          olympiadId: round.olympiadId,
+          openTime: { gt: round.openTime },
+        },
+        orderBy: { openTime: 'asc' },
+      });
+      if (nextRound) {
+        const advancedEntrants = round.roundEntrants
+          .map((re) => re.entrant)
+          .filter((entrant) => {
+            const submission = entrant.submissions.find((s) => s.roundId === round.id);
+            const score = submission?.result?.score;
+            return score !== undefined && score !== null && score >= round.qualifyingThreshold;
+          });
+
+        for (const entrant of advancedEntrants) {
+          await prisma.auditLog.create({
+            data: {
+              action: 'auto_advanced',
+              roundId: round.id,
+              payload: {
+                entrantId: entrant.id,
+                entrantName: entrant.name,
+                nextRoundId: nextRound.id,
+                score: entrant.submissions.find((s) => s.roundId === round.id)?.result?.score,
+              },
+            },
+          });
+        }
+      }
+    }
   }
 }
 
@@ -211,6 +287,13 @@ async function sendBeforeOpenNotifications(now) {
           roundName: round.name,
           opensAt: round.openTime.toISOString(),
         });
+        await prisma.auditLog.create({
+          data: {
+            action: 'notification_sent',
+            roundId: round.id,
+            payload: { triggerType: 'before_open', recipientEmail: email },
+          },
+        });
       }
     }
   }
@@ -244,6 +327,13 @@ async function sendBeforeCloseNotifications(now) {
           roundId: round.id,
           roundName: round.name,
           closesAt: round.closeTime.toISOString(),
+        });
+        await prisma.auditLog.create({
+          data: {
+            action: 'notification_sent',
+            roundId: round.id,
+            payload: { triggerType: 'before_close', recipientEmail: email },
+          },
         });
       }
     }
@@ -285,6 +375,13 @@ async function sendResultsReleasedNotifications() {
           toEmail: email,
           roundId: round.id,
           roundName: round.name,
+        });
+        await prisma.auditLog.create({
+          data: {
+            action: 'notification_sent',
+            roundId: round.id,
+            payload: { triggerType: 'results_released', recipientEmail: email },
+          },
         });
       }
     }
@@ -329,6 +426,17 @@ async function sendMissingSubmissionNotifications() {
             roundName: round.name,
             entrantName: entrant.name,
             entrantId: entrant.id,
+          });
+          await prisma.auditLog.create({
+            data: {
+              action: 'notification_sent',
+              roundId: round.id,
+              payload: {
+                triggerType: 'missing_submission',
+                recipientEmail: email,
+                entrantId: entrant.id,
+              },
+            },
           });
         }
       }

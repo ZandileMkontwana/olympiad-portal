@@ -37,6 +37,7 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.entrant, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.submission, 'findFirst');
+    vi.spyOn(prisma.schoolOlympiad, 'findUnique').mockResolvedValue({ status: 'approved' });
     vi.spyOn(console, 'error').mockImplementation(() => {});
     sgMail.send.mockResolvedValue({});
     prisma.markingTask.create.mockResolvedValue({
@@ -106,6 +107,7 @@ describe('Submissions routes', () => {
         state: 'closed',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
@@ -135,6 +137,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.submission.create.mockResolvedValue({
         id: 'sub-1',
@@ -173,6 +176,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: { memoAnswers: { q1: 'A', q2: 'B' } },
+        olympiadId: 'oly-1',
       });
       prisma.submission.create.mockResolvedValue({
         id: 'sub-1',
@@ -203,6 +207,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: { memoAnswers: { q1: 'A', q2: 'B' } },
+        olympiadId: 'oly-1',
       });
       prisma.submission.create.mockResolvedValue({
         id: 'sub-1',
@@ -229,6 +234,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
@@ -263,6 +269,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
@@ -291,6 +298,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       const submittedAt = new Date('2026-01-01');
       prisma.submission.create.mockResolvedValue({
@@ -321,6 +329,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue(null);
 
@@ -358,6 +367,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
@@ -383,6 +393,7 @@ describe('Submissions routes', () => {
         prerequisiteRoundId: 'round-0',
         qualifyingThreshold: 50,
         prerequisiteRound: { id: 'round-0', name: 'Round 1' },
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
@@ -409,6 +420,7 @@ describe('Submissions routes', () => {
         prerequisiteRoundId: 'round-0',
         qualifyingThreshold: 50,
         prerequisiteRound: { id: 'round-0', name: 'Round 1' },
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',

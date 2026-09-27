@@ -17,6 +17,8 @@ const {
   buildResultsReleasedMessage,
   buildMissingSubmissionMessage,
 } = require('../lib/email');
+const { requireOlympiadAccess } = require('../lib/authorization');
+const { toUTCDate } = require('../lib/timezone');
 
 const router = express.Router();
 
@@ -354,12 +356,20 @@ router.post('/rounds', async (req, res) => {
         .status(400)
         .json({ error: 'qualifyingThreshold must be a number between 0 and 100' });
     }
+
+    // Look up the olympiad's timezone so we can convert the organiser's
+    // local times to UTC for storage.
+    const olympiad = await prisma.olympiad.findUnique({ where: { id: olympiadId } });
+    if (!olympiad) {
+      return res.status(404).json({ error: 'Olympiad not found' });
+    }
+
     const round = await prisma.round.create({
       data: {
         olympiadId,
         name,
-        openTime: new Date(openTime),
-        closeTime: new Date(closeTime),
+        openTime: toUTCDate(openTime, olympiad.timezone),
+        closeTime: toUTCDate(closeTime, olympiad.timezone),
         qualifyingThreshold: qualifyingThreshold ?? null,
       },
     });
@@ -372,7 +382,10 @@ router.post('/rounds', async (req, res) => {
 
 router.get('/rounds', async (req, res) => {
   try {
+    const { olympiadId } = req.query;
+    const where = olympiadId ? { olympiadId } : {};
     const rounds = await prisma.round.findMany({
+      where,
       include: { olympiad: true },
       orderBy: { openTime: 'asc' },
     });
@@ -385,8 +398,21 @@ router.get('/rounds', async (req, res) => {
 
 router.get('/rounds/:id', async (req, res) => {
   try {
-    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
     if (!round) return res.status(404).json({ error: 'Round not found' });
+
+    // Educators must have approved school access to the round's olympiad
+    if (req.headers.authorization) {
+      const user = await loadOptionalUser(req);
+      if (user) {
+        const check = await requireOlympiadAccess(req, res, round, user);
+        if (!check) return;
+      }
+    }
+
     res.json(round);
   } catch (err) {
     console.error(err);
@@ -498,6 +524,14 @@ router.get('/rounds/:id/entrants', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Fetch the round to check olympiad access for educators
+    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    if (!round) return res.status(404).json({ error: 'Round not found' });
+    if (user.role !== 'organiser') {
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
+    }
+
     let schoolId = null;
     if (user.role !== 'organiser') {
       const educator = await prisma.educator.findUnique({
@@ -535,6 +569,14 @@ router.get('/rounds/:id/submissions', requireAuth, async (req, res) => {
     const user = await loadAuthUser(req);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Fetch the round to check olympiad access for educators
+    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    if (!round) return res.status(404).json({ error: 'Round not found' });
+    if (user.role !== 'organiser') {
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
     }
 
     let schoolId = null;
@@ -649,6 +691,12 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Round not found' });
     }
 
+    // Educators must have approved school access to the round's olympiad
+    if (user.role !== 'organiser') {
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
+    }
+
     // Non-organisers must have a linked school; otherwise return no data.
     if (user.role !== 'organiser' && !schoolId) return res.json([]);
 
@@ -718,6 +766,12 @@ router.get('/rounds/:id/standings/schools', requireAuth, async (req, res) => {
     const round = await prisma.round.findUnique({ where: { id: roundId } });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
+    }
+
+    // Educators must have approved school access to the round's olympiad
+    if (user.role !== 'organiser') {
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
     }
 
     // Non-organisers must have a linked school; otherwise return no data.
@@ -1115,5 +1169,115 @@ router.patch('/rounds/:id', ...requireRole('organiser'), async (req, res) => {
     res.status(500).json({ error: 'Could not update round settings' });
   }
 });
+
+// GET /rounds/:id/audit-log
+// Returns the audit trail of automatic actions the scheduler performed
+// on a round (open, close, auto-advance, notification sends).
+router.get('/rounds/:id/audit-log', requireAuth, async (req, res) => {
+  try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    // Educators must have approved school access to the round's olympiad
+    if (user.role !== 'organiser') {
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
+    }
+
+    const logs = await prisma.auditLog.findMany({
+      where: { roundId: req.params.id },
+      orderBy: { timestamp: 'desc' },
+    });
+
+    res.json(logs);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch audit log' });
+  }
+});
+
+// GET /rounds/:id/replay
+// Aggregates the round's audit log into a chronological timeline of
+// state transitions, auto-advances, and notification sends — useful
+// for organisers to review what happened during a round's lifecycle.
+router.get('/rounds/:id/replay', requireAuth, async (req, res) => {
+  try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    // Educators must have approved school access to the round's olympiad
+    if (user.role !== 'organiser') {
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
+    }
+
+    const logs = await prisma.auditLog.findMany({
+      where: { roundId: req.params.id },
+      orderBy: { timestamp: 'asc' },
+    });
+
+    // Build a timeline with enriched context
+    const timeline = logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      timestamp: log.timestamp,
+      roundId: log.roundId,
+      payload: log.payload,
+      summary: buildActionSummary(log),
+    }));
+
+    res.json({
+      round: {
+        id: round.id,
+        name: round.name,
+        olympiadName: round.olympiad.name,
+        state: round.state,
+        openTime: round.openTime,
+        closeTime: round.closeTime,
+      },
+      timeline,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to build round replay' });
+  }
+});
+
+// Human-readable summary for each audit action type
+function buildActionSummary(log) {
+  const p = log.payload || {};
+  switch (log.action) {
+    case 'round_opened':
+      return `Round opened at ${log.timestamp.toISOString()}`;
+    case 'round_closed':
+      return `Round closed at ${log.timestamp.toISOString()}`;
+    case 'auto_advanced':
+      return `Entrant ${p.entrantName || p.entrantId} advanced to round ${p.nextRoundId || '?'}`;
+    case 'notification_sent':
+      return `${p.triggerType} notification sent to ${p.recipientEmail || '?'}`;
+    default:
+      return `${log.action} at ${log.timestamp.toISOString()}`;
+  }
+};
 
 module.exports = router;
