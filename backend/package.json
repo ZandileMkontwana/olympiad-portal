@@ -10,7 +10,9 @@
     "start": "node src/index.js",
     "postinstall": "prisma generate",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "loadtest:submissions": "node loadtest/round-boundary-submissions.js",
+    "loadtest:sittings": "node loadtest/round-open-sittings.js"
   },
   "keywords": [],
   "author": "",

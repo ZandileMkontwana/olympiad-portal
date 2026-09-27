@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
+const { TRANSACTION_OPTIONS } = require('../lib/transactionOptions');
 const { sendSubmissionReceipt } = require('../lib/email');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 
@@ -119,7 +120,7 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
       }
 
       return { submission, result, markingTask };
-    });
+    }, TRANSACTION_OPTIONS);
 
     res.status(201).json({ submission, result, markingTask });
 

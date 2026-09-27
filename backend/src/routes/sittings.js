@@ -3,6 +3,7 @@ const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 const { getDbNow } = require('../lib/dbTime');
+const { TRANSACTION_OPTIONS } = require('../lib/transactionOptions');
 
 const router = express.Router();
 
@@ -81,7 +82,7 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
         create: { roundId, entrantId, expiresAt: freshRound.closeTime },
         update: {},
       });
-    });
+    }, TRANSACTION_OPTIONS);
 
     if (sitting.completedAt) {
       return res.status(403).json({ error: 'Test already completed for this round' });
@@ -260,7 +261,7 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
         });
 
         return created;
-      });
+      }, TRANSACTION_OPTIONS);
     } catch (err) {
       if (
         err.code === 'P2002' &&
