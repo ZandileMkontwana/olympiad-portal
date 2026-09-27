@@ -831,3 +831,21 @@ export function listAllOrganisers(token) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * Fetches the replay timeline for a round — the audit log entries
+ * enriched with human-readable summaries, in chronological order.
+ * Wired to GET /api/rounds/:id/replay (backend/src/routes/rounds.js).
+ *
+ * @param {string} roundId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   round: { id: string, name: string, olympiadName: string, state: string, openTime: string, closeTime: string },
+ *   timeline: Array<{ id: string, action: string, timestamp: string, roundId: string, payload: object, summary: string }>,
+ * }>}
+ */
+export function fetchRoundReplay(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/replay`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}

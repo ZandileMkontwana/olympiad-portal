@@ -306,6 +306,10 @@ export default function OrganiserDashboard() {
           Remarks
         </Link>
 
+        <Link href="/organiser/replay" className="button">
+          Replay
+        </Link>
+
         <button onClick={handleLogout} className="button">
           Log out
         </button>
