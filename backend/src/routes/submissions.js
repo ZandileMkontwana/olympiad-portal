@@ -131,27 +131,47 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
 });
 
 // POST /submissions/:id/remark
-// An educator requests a remark on a submission that's already been marked
-// (automarked or manually marked), explaining why in `reason`.
+// An educator requests a remark on a submission that has already been marked.
 router.post('/submissions/:id/remark', ...requireRole('educator'), async (req, res) => {
   const submissionId = req.params.id;
   const { reason } = req.body;
 
-  if (!reason) {
+  if (!reason || !reason.trim()) {
     return res.status(400).json({ error: 'reason is required' });
   }
 
   try {
-    const submission = await prisma.submission.findUnique({ where: { id: submissionId } });
+    const submission = await prisma.submission.findUnique({
+      where: { id: submissionId },
+      include: { result: true },
+    });
     if (!submission) {
       return res.status(404).json({ error: 'Submission not found' });
+    }
+
+    if (!submission.result) {
+      return res.status(400).json({
+        error: 'Cannot request a remark for a submission that has not been marked',
+      });
+    }
+
+    const existingActiveRequest = await prisma.remarkRequest.findFirst({
+      where: {
+        submissionId,
+        status: { in: ['pending', 'assigned'] },
+      },
+    });
+    if (existingActiveRequest) {
+      return res.status(409).json({
+        error: 'A remark request is already active for this submission',
+      });
     }
 
     const remarkRequest = await prisma.remarkRequest.create({
       data: {
         submissionId,
         requestedById: req.user.id,
-        reason,
+        reason: reason.trim(),
       },
     });
 

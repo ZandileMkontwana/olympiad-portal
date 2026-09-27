@@ -118,13 +118,20 @@ function RoundViewContent() {
 
   async function handleSubmitRemark(e) {
     e.preventDefault();
-    if (!remarkTargetId || !remarkReason.trim()) return;
+    const reason = remarkReason.trim();
+
+    if (!remarkTargetId) return;
+    if (!reason) {
+      setRemarkStatus('error');
+      setRemarkError('Enter a reason for the appeal.');
+      return;
+    }
 
     setRemarkStatus('submitting');
     setRemarkError('');
     try {
       const token = await getToken();
-      await requestRemark(remarkTargetId, remarkReason.trim(), token);
+      await requestRemark(remarkTargetId, reason, token);
       setRemarkTargetId(null);
       await loadSubmissions();
     } catch (err) {
@@ -454,9 +461,12 @@ function RoundViewContent() {
         {submissionsStatus === 'ready' && submissions.length > 0 && (
           <ul style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {submissions.map((submission) => {
-              const hasPendingRemark = (submission.remarkRequests || []).some(
-                (r) => r.status === 'pending'
+              const activeRemark = (submission.remarkRequests || []).find((remark) =>
+                ['pending', 'assigned'].includes(remark.status)
               );
+              const activeRemarkLabel =
+                activeRemark?.status === 'assigned' ? 'Remark under review' : 'Remark pending';
+
               return (
                 <li
                   key={submission.id}
@@ -474,10 +484,10 @@ function RoundViewContent() {
                     </p>
                     <p className="description" style={{ margin: '2px 0 0 0', fontSize: '0.85em' }}>
                       {submission.result ? `Score: ${submission.result.score}` : 'Not yet marked'}
-                      {hasPendingRemark && ' · Remark pending'}
+                      {activeRemark && ` · ${activeRemarkLabel}`}
                     </p>
                   </div>
-                  {submission.result && !hasPendingRemark && (
+                  {submission.result && !activeRemark && (
                     <button className="button" onClick={() => openRemarkForm(submission.id)}>
                       Request Remark
                     </button>
@@ -497,16 +507,29 @@ function RoundViewContent() {
             <textarea
               id="remark-reason"
               value={remarkReason}
-              onChange={(e) => setRemarkReason(e.target.value)}
+              onChange={(e) => {
+                setRemarkReason(e.target.value);
+                if (remarkStatus === 'error') {
+                  setRemarkStatus('idle');
+                  setRemarkError('');
+                }
+              }}
               rows={3}
               required
+              aria-describedby={remarkStatus === 'error' ? 'remark-error' : undefined}
               className="block rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
             />
             {remarkStatus === 'error' && (
-              <p style={{ color: 'red', fontSize: '0.9em' }}>{remarkError}</p>
+              <p id="remark-error" role="alert" style={{ color: 'red', fontSize: '0.9em' }}>
+                {remarkError}
+              </p>
             )}
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" disabled={remarkStatus === 'submitting'} className="button">
+              <button
+                type="submit"
+                disabled={remarkStatus === 'submitting' || !remarkReason.trim()}
+                className="button"
+              >
                 {remarkStatus === 'submitting' ? 'Submitting...' : 'Submit Remark Request'}
               </button>
               <button
