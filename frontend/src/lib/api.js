@@ -761,6 +761,23 @@ export function listRemarkQueue(token, { status, assignedTo } = {}) {
 }
 
 /**
+ * Routes a pending appeal to an organiser reviewer. Omitting assignedToId
+ * assigns the signed-in organiser as the reviewer.
+ * Wired to PATCH /api/remark/:id/assign (backend/src/routes/remark.js).
+ *
+ * @param {string} remarkRequestId
+ * @param {{assignedToId?: string}} [data] - omit to self-assign on the backend
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function assignRemarkRequest(remarkRequestId, { assignedToId } = {}, token) {
+  return requestJson(`/api/remark/${remarkRequestId}/assign`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(assignedToId ? { assignedToId } : {}),
+  });
+}
+
+/**
  * Approves or rejects a pending remark request. Approving requires newScore.
  * Wired to PATCH /api/remark/:id/review (backend/src/routes/remark.js).
  *
