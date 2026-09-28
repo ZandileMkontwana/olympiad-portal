@@ -287,6 +287,30 @@ describe('#176 – Timezone-aware scheduling', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/after openTime/);
   });
+
+  it('AC5: defaults olympiad timezone to UTC when not provided', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'org-1',
+      role: 'organiser',
+      email: 'org@test.com',
+      name: 'Organiser',
+    });
+    vi.spyOn(prisma.olympiad, 'create').mockResolvedValue({
+      id: 'oly-1',
+      name: 'Test Olympiad',
+      timezone: 'UTC',
+    });
+    vi.spyOn(prisma.olympiadOrganiser, 'create').mockResolvedValue({});
+
+    app = createRoundsApp('organiser', 'org-1');
+    const res = await request(app).post('/api/olympiads').send({
+      name: 'Test Olympiad',
+    });
+
+    expect(res.status).toBe(201);
+    const createCall = prisma.olympiad.create.mock.calls[0][0];
+    expect(createCall.data.timezone).toBe('UTC');
+  });
 });
 
 // ─── #181: Audit log ────────────────────────────────────────────────────────
@@ -307,7 +331,7 @@ describe('#181 – Audit log', () => {
     vi.restoreAllMocks();
   });
 
-  it('AC1: returns audit entries ordered by timestamp descending', async () => {
+  it('AC1: returns audit entries ordered by timestamp ascending (chronological)', async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 'org-1',
       role: 'organiser',
@@ -326,9 +350,9 @@ describe('#181 – Audit log', () => {
       olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
     });
     prisma.auditLog.findMany.mockResolvedValue([
-      { id: 'log-3', action: 'notification_sent', timestamp: new Date('2026-06-15T13:00:00Z'), roundId: 'r1', payload: {} },
-      { id: 'log-2', action: 'round_closed', timestamp: new Date('2026-06-15T12:00:00Z'), roundId: 'r1', payload: {} },
       { id: 'log-1', action: 'round_opened', timestamp: new Date('2026-06-15T08:00:00Z'), roundId: 'r1', payload: {} },
+      { id: 'log-2', action: 'round_closed', timestamp: new Date('2026-06-15T12:00:00Z'), roundId: 'r1', payload: {} },
+      { id: 'log-3', action: 'notification_sent', timestamp: new Date('2026-06-15T13:00:00Z'), roundId: 'r1', payload: {} },
     ]);
 
     app = createRoundsApp('organiser', 'org-1');
@@ -336,12 +360,12 @@ describe('#181 – Audit log', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(3);
-    expect(res.body[0].action).toBe('notification_sent');
+    expect(res.body[0].action).toBe('round_opened');
     expect(res.body[1].action).toBe('round_closed');
-    expect(res.body[2].action).toBe('round_opened');
+    expect(res.body[2].action).toBe('notification_sent');
     expect(prisma.auditLog.findMany).toHaveBeenCalledWith({
       where: { roundId: 'r1' },
-      orderBy: { timestamp: 'desc' },
+      orderBy: { timestamp: 'asc' },
     });
   });
 
@@ -604,6 +628,38 @@ describe('#186 – Round replay', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('AC6: returns empty state with message when no automatic actions exist', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'org-1',
+      role: 'organiser',
+      email: 'org@test.com',
+      name: 'Organiser',
+    });
+    prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+      id: 'oo-1',
+      olympiadId: 'oly-1',
+      organiserId: 'org-1',
+    });
+    prisma.round.findUnique.mockResolvedValue({
+      id: 'r1',
+      name: 'Round 1',
+      state: 'scheduled',
+      olympiadId: 'oly-1',
+      openTime: new Date('2026-06-15T08:00:00Z'),
+      closeTime: new Date('2026-06-15T12:00:00Z'),
+      olympiad: { id: 'oly-1', name: 'Test', timezone: 'UTC' },
+    });
+    prisma.auditLog.findMany.mockResolvedValue([]);
+
+    app = createRoundsApp('organiser', 'org-1');
+    const res = await request(app).get('/api/rounds/r1/replay');
+
+    expect(res.status).toBe(200);
+    expect(res.body.timeline).toEqual([]);
+    expect(res.body.isEmpty).toBe(true);
+    expect(res.body.message).toMatch(/no automatic actions/i);
+  });
 });
 
 // ─── #242: Co-organiser access ──────────────────────────────────────────────
@@ -620,6 +676,8 @@ describe('#242 – Co-organiser access', () => {
     vi.spyOn(prisma.olympiadOrganiser, 'findMany');
     vi.spyOn(prisma.olympiadOrganiser, 'create');
     vi.spyOn(prisma.olympiadOrganiser, 'delete');
+    vi.spyOn(prisma.olympiadOrganiser, 'deleteMany');
+    vi.spyOn(prisma.olympiad, 'delete');
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.user, 'findMany');
     vi.spyOn(prisma.auditLog, 'findMany');
@@ -848,6 +906,39 @@ describe('#242 – Co-organiser access', () => {
     const res = await request(organisersApp).delete(
       '/api/olympiads/oly-a/organisers/co-org-2'
     );
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/creator/i);
+  });
+
+  it('AC9: only creator can delete an olympiad', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'org-1',
+      role: 'organiser',
+      email: 'org@test.com',
+      name: 'Creator',
+    });
+    prisma.olympiad.findUnique.mockResolvedValue({ organiserId: 'org-1' });
+    prisma.olympiadOrganiser.deleteMany.mockResolvedValue({ count: 2 });
+    prisma.olympiad.delete.mockResolvedValue({});
+
+    roundsApp = createRoundsApp('organiser', 'org-1');
+    const res = await request(roundsApp).delete('/api/olympiads/oly-a');
+
+    expect(res.status).toBe(204);
+  });
+
+  it('AC10: non-creator cannot delete an olympiad', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'co-org-1',
+      role: 'organiser',
+      email: 'coorg@test.com',
+      name: 'Co-organiser',
+    });
+    prisma.olympiad.findUnique.mockResolvedValue({ organiserId: 'org-1' });
+
+    roundsApp = createRoundsApp('organiser', 'co-org-1');
+    const res = await request(roundsApp).delete('/api/olympiads/oly-a');
 
     expect(res.status).toBe(403);
     expect(res.body.error).toMatch(/creator/i);
