@@ -9,7 +9,7 @@ sidebar_position: 1
 
 | Component | URL |
 |---|---|
-| Backend API (Render) | <https://olympiad-portal.onrender.com> |
+| Backend API (Render) | <https://olympiad-portal-backend.onrender.com> |
 | Frontend (Vercel) | <https://frontend-two-ruby-25.vercel.app> |
 | Documentation (Netlify) | <https://olympiad-portal-docs.netlify.app> |
 
