@@ -745,6 +745,7 @@ describe('#242 – Co-organiser access', () => {
   });
 
   it('AC5: creator can add and remove co-organisers', async () => {
+    // --- Add ---
     prisma.user.findUnique
       .mockResolvedValueOnce({
         id: 'org-1',
@@ -774,12 +775,32 @@ describe('#242 – Co-organiser access', () => {
     });
 
     organisersApp = createOrganisersApp();
-    const res = await request(organisersApp)
+    const addRes = await request(organisersApp)
       .post('/api/olympiads/oly-a/organisers')
       .send({ organiserId: 'co-org-2' });
 
-    expect(res.status).toBe(201);
-    expect(res.body.organiserId).toBe('co-org-2');
+    expect(addRes.status).toBe(201);
+    expect(addRes.body.organiserId).toBe('co-org-2');
+
+    // --- Remove ---
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'org-1',
+      role: 'organiser',
+      email: 'org@test.com',
+      name: 'Creator',
+    });
+    prisma.olympiad.findUnique.mockResolvedValue({ id: 'oly-a', organiserId: 'org-1' });
+    prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+      id: 'oo-new',
+      olympiadId: 'oly-a',
+      organiserId: 'co-org-2',
+    });
+    prisma.olympiadOrganiser.delete.mockResolvedValue({});
+
+    const removeRes = await request(organisersApp).delete(
+      '/api/olympiads/oly-a/organisers/co-org-2'
+    );
+    expect(removeRes.status).toBe(204);
   });
 
   it('AC6: creator cannot be removed from olympiad', async () => {
@@ -788,11 +809,6 @@ describe('#242 – Co-organiser access', () => {
       role: 'organiser',
       email: 'org@test.com',
       name: 'Creator',
-    });
-    prisma.olympiadOrganiser.findUnique.mockResolvedValue({
-      id: 'oo-1',
-      olympiadId: 'oly-a',
-      organiserId: 'org-1',
     });
     prisma.olympiad.findUnique.mockResolvedValue({ organiserId: 'org-1' });
 
@@ -817,5 +833,23 @@ describe('#242 – Co-organiser access', () => {
       .send({ organiserId: 'co-org-2' });
 
     expect(res.status).toBe(403);
+  });
+
+  it('AC8: non-creator co-organiser cannot remove another co-organiser', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'co-org-1',
+      role: 'organiser',
+      email: 'coorg@test.com',
+      name: 'Co-organiser',
+    });
+    prisma.olympiad.findUnique.mockResolvedValue({ id: 'oly-a', organiserId: 'org-1' });
+
+    organisersApp = createOrganisersApp();
+    const res = await request(organisersApp).delete(
+      '/api/olympiads/oly-a/organisers/co-org-2'
+    );
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/creator/i);
   });
 });
