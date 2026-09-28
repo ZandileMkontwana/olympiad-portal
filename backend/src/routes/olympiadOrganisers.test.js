@@ -162,9 +162,7 @@ describe('Olympiad Organisers routes', () => {
     });
 
     it('returns 400 when organiserId is missing', async () => {
-      const res = await request(app)
-        .post('/api/olympiads/oly-1/organisers')
-        .send({});
+      const res = await request(app).post('/api/olympiads/oly-1/organisers').send({});
       expect(res.status).toBe(400);
     });
 

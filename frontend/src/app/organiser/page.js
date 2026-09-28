@@ -726,9 +726,7 @@ export default function OrganiserDashboard() {
                   <button
                     type="button"
                     onClick={() =>
-                      setShowAddOrganiser(
-                        showAddOrganiser === olympiad.id ? null : olympiad.id
-                      )
+                      setShowAddOrganiser(showAddOrganiser === olympiad.id ? null : olympiad.id)
                     }
                     className="button"
                     style={{ fontSize: '0.75em', padding: '3px 8px' }}

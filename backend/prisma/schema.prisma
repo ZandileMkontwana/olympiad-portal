@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Olympiad {
@@ -47,11 +48,16 @@ model Round {
   qualifyingThreshold    Float? // minimum score % (0-100) required to pass; null = no gate
   prerequisiteRoundId    String? // the round that must be passed first; null = no prerequisite
   autoAdvanceProcessedAt DateTime?
+  prerequisiteRoundId    String?
+  AuditLog               AuditLog[]
+  notificationLogs       NotificationLog[]
+  notificationRules      NotificationRule[]
   paper                  Paper?
   olympiad               Olympiad           @relation(fields: [olympiadId], references: [id])
   prerequisiteRound      Round?             @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
   dependentRounds        Round[]            @relation("RoundPrerequisites")
   roundEntrants          RoundEntrant[]
+  sittings               Sitting[]
   submissions            Submission[]
   sittings               Sitting[]
   notificationLogs       NotificationLog[]
@@ -90,20 +96,16 @@ model School {
   schoolOlympiads SchoolOlympiad[]
 }
 
-// A school's participation in an olympiad. Created as 'pending' when an
-// educator requests access and flipped to 'approved'/'declined' by the
-// organiser; only approved schools can register entrants into the
-// olympiad's rounds.
 model SchoolOlympiad {
   id            String    @id @default(uuid())
   schoolId      String
   olympiadId    String
-  status        String    @default("pending") // 'pending' | 'approved' | 'declined'
-  requestedById String? // User.id of the educator who requested
+  status        String    @default("pending")
+  requestedById String?
   requestedAt   DateTime  @default(now())
   decidedAt     DateTime?
-  school        School    @relation(fields: [schoolId], references: [id])
   olympiad      Olympiad  @relation(fields: [olympiadId], references: [id])
+  school        School    @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, olympiadId])
 }
@@ -124,10 +126,10 @@ model Entrant {
   userId           String?           @unique
   school           School            @relation(fields: [schoolId], references: [id])
   user             User?             @relation(fields: [userId], references: [id])
-  roundEntrants    RoundEntrant[]
-  submissions      Submission[]
-  sittings         Sitting[]
   notificationLogs NotificationLog[]
+  roundEntrants    RoundEntrant[]
+  sittings         Sitting[]
+  submissions      Submission[]
 }
 
 model Paper {
@@ -147,9 +149,9 @@ model Submission {
   answers        Json
   idempotencyKey String          @unique
   submittedAt    DateTime        @default(now())
-  result         Result?
   markingTask    MarkingTask?
   remarkRequests RemarkRequest[]
+  result         Result?
   entrant        Entrant         @relation(fields: [entrantId], references: [id])
   round          Round           @relation(fields: [roundId], references: [id])
 }
@@ -157,7 +159,7 @@ model Submission {
 model MarkingTask {
   id             String     @id @default(uuid())
   submissionId   String     @unique
-  status         String     @default("unassigned") // 'unassigned' | 'assigned' | 'marked' | 'moderated'
+  status         String     @default("unassigned")
   assignedToId   String?
   score          Float?
   breakdown      Json? // per-question partial credit, e.g. { "q1": 3, "q2": 5 }
@@ -166,9 +168,9 @@ model MarkingTask {
   moderatedScore Float?
   moderatedAt    DateTime?
   createdAt      DateTime   @default(now())
-  submission     Submission @relation(fields: [submissionId], references: [id])
   assignedTo     User?      @relation("AssignedMarkingTasks", fields: [assignedToId], references: [id])
   moderatedBy    User?      @relation("ModeratedMarkingTasks", fields: [moderatedById], references: [id])
+  submission     Submission @relation(fields: [submissionId], references: [id])
 }
 
 model Result {
@@ -210,9 +212,6 @@ model RoundEntrant {
   @@unique([roundId, entrantId])
 }
 
-// An online test-taking session for an entrant in a round.
-// One sitting per entrant per round — an in-progress sitting can be
-// resumed (A4) by POSTing to /rounds/:id/sittings again.
 model Sitting {
   id          String    @id @default(uuid())
   entrantId   String
@@ -231,13 +230,13 @@ model NotificationLog {
   id             String   @id @default(uuid())
   roundId        String
   entrantId      String?
-  triggerType    String // 'before_open' | 'before_close' | 'missing_submission' | 'results_released'
+  triggerType    String
   recipientEmail String
-  status         String   @default("sent") // 'sent' | 'failed'
+  status         String   @default("sent")
   error          String?
   sentAt         DateTime @default(now())
-  round          Round    @relation(fields: [roundId], references: [id])
   entrant        Entrant? @relation(fields: [entrantId], references: [id])
+  round          Round    @relation(fields: [roundId], references: [id])
 
   @@unique([roundId, triggerType, recipientEmail])
 }
@@ -245,9 +244,9 @@ model NotificationLog {
 model NotificationRule {
   id            String   @id @default(uuid())
   roundId       String
-  triggerType   String // 'before_open' | 'before_close' | 'missing_submission' | 'results_released'
+  triggerType   String
   enabled       Boolean  @default(true)
-  recipientRole String   @default("educator") // 'educator' | 'organiser' | 'all'
+  recipientRole String   @default("educator")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   round         Round    @relation(fields: [roundId], references: [id])

@@ -100,7 +100,6 @@ describe('Rounds routes', () => {
   }
 
   describe('POST /api/olympiads', () => {
-
     it('returns 401 when not authenticated (no Clerk session)', async () => {
       const unauthApp = createApp(false);
       const res = await request(unauthApp)
@@ -736,9 +735,7 @@ describe('Rounds routes', () => {
     it('lists pending requests with school, olympiad and requester details', async () => {
       signInAsOrganiser();
       // Mock the organiser's olympiad memberships
-      prisma.olympiadOrganiser.findMany.mockResolvedValue([
-        { olympiadId: 'olympiad-1' },
-      ]);
+      prisma.olympiadOrganiser.findMany.mockResolvedValue([{ olympiadId: 'olympiad-1' }]);
       prisma.schoolOlympiad.findMany.mockResolvedValue([
         {
           id: 'so-1',
@@ -852,7 +849,11 @@ describe('Rounds routes', () => {
 
     it('approves the request and stamps decidedAt', async () => {
       signInAsOrganiser();
-      prisma.schoolOlympiad.findUnique.mockResolvedValue({ id: 'so-1', status: 'pending', olympiadId: 'oly-1' });
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({
+        id: 'so-1',
+        status: 'pending',
+        olympiadId: 'oly-1',
+      });
       prisma.schoolOlympiad.update.mockResolvedValue({ id: 'so-1', status: 'approved' });
 
       const res = await request(app).post('/api/olympiads/access-requests/so-1/approve');
@@ -867,7 +868,11 @@ describe('Rounds routes', () => {
 
     it('declines the request and stamps decidedAt', async () => {
       signInAsOrganiser();
-      prisma.schoolOlympiad.findUnique.mockResolvedValue({ id: 'so-1', status: 'pending', olympiadId: 'oly-1' });
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({
+        id: 'so-1',
+        status: 'pending',
+        olympiadId: 'oly-1',
+      });
       prisma.schoolOlympiad.update.mockResolvedValue({ id: 'so-1', status: 'declined' });
 
       const res = await request(app).post('/api/olympiads/access-requests/so-1/decline');
@@ -882,7 +887,11 @@ describe('Rounds routes', () => {
 
     it('returns 500 on prisma error', async () => {
       signInAsOrganiser();
-      prisma.schoolOlympiad.findUnique.mockResolvedValue({ id: 'so-1', status: 'pending', olympiadId: 'oly-1' });
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({
+        id: 'so-1',
+        status: 'pending',
+        olympiadId: 'oly-1',
+      });
       prisma.schoolOlympiad.update.mockRejectedValue(new Error('DB error'));
       const res = await request(app).post('/api/olympiads/access-requests/so-1/approve');
       expect(res.status).toBe(500);

@@ -58,10 +58,27 @@ describe('GET /rounds/:id/audit-log', () => {
   });
 
   it('returns audit log entries for a round ordered by timestamp desc', async () => {
-    const mockRound = { id: 'r1', name: 'Round 1', olympiadId: 'oly-1', olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' } };
+    const mockRound = {
+      id: 'r1',
+      name: 'Round 1',
+      olympiadId: 'oly-1',
+      olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
+    };
     const mockLogs = [
-      { id: 'log-2', action: 'round_closed', timestamp: new Date('2026-06-15T12:00:00Z'), roundId: 'r1', payload: {} },
-      { id: 'log-1', action: 'round_opened', timestamp: new Date('2026-06-15T08:00:00Z'), roundId: 'r1', payload: {} },
+      {
+        id: 'log-2',
+        action: 'round_closed',
+        timestamp: new Date('2026-06-15T12:00:00Z'),
+        roundId: 'r1',
+        payload: {},
+      },
+      {
+        id: 'log-1',
+        action: 'round_opened',
+        timestamp: new Date('2026-06-15T08:00:00Z'),
+        roundId: 'r1',
+        payload: {},
+      },
     ];
 
     prisma.round.findUnique.mockResolvedValue(mockRound);
@@ -87,10 +104,19 @@ describe('GET /rounds/:id/audit-log', () => {
       role: 'educator',
       name: 'Educator',
     });
-    const mockRound = { id: 'r1', name: 'Round 1', olympiadId: 'oly-1', olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' } };
+    const mockRound = {
+      id: 'r1',
+      name: 'Round 1',
+      olympiadId: 'oly-1',
+      olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
+    };
 
     prisma.round.findUnique.mockResolvedValue(mockRound);
-    prisma.educator.findUnique.mockResolvedValue({ id: 'edu-1', schoolId: 'school-1', userId: 'user-1' });
+    prisma.educator.findUnique.mockResolvedValue({
+      id: 'edu-1',
+      schoolId: 'school-1',
+      userId: 'user-1',
+    });
     prisma.schoolOlympiad.findUnique.mockResolvedValue(null);
 
     const res = await request(app).get('/api/rounds/r1/audit-log');
@@ -147,9 +173,27 @@ describe('GET /rounds/:id/replay', () => {
       olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
     };
     const mockLogs = [
-      { id: 'log-1', action: 'round_opened', timestamp: new Date('2026-06-15T08:00:00Z'), roundId: 'r1', payload: { openedAt: '2026-06-15T08:00:00.000Z' } },
-      { id: 'log-3', action: 'round_closed', timestamp: new Date('2026-06-15T12:00:00Z'), roundId: 'r1', payload: { closedAt: '2026-06-15T12:00:00.000Z' } },
-      { id: 'log-2', action: 'auto_advanced', timestamp: new Date('2026-06-15T12:30:00Z'), roundId: 'r1', payload: { entrantId: 'e1', entrantName: 'Alice', nextRoundId: 'r2', score: 85 } },
+      {
+        id: 'log-1',
+        action: 'round_opened',
+        timestamp: new Date('2026-06-15T08:00:00Z'),
+        roundId: 'r1',
+        payload: { openedAt: '2026-06-15T08:00:00.000Z' },
+      },
+      {
+        id: 'log-3',
+        action: 'round_closed',
+        timestamp: new Date('2026-06-15T12:00:00Z'),
+        roundId: 'r1',
+        payload: { closedAt: '2026-06-15T12:00:00.000Z' },
+      },
+      {
+        id: 'log-2',
+        action: 'auto_advanced',
+        timestamp: new Date('2026-06-15T12:30:00Z'),
+        roundId: 'r1',
+        payload: { entrantId: 'e1', entrantName: 'Alice', nextRoundId: 'r2', score: 85 },
+      },
     ];
 
     prisma.round.findUnique.mockResolvedValue(mockRound);
@@ -178,10 +222,19 @@ describe('GET /rounds/:id/replay', () => {
       role: 'educator',
       name: 'Educator',
     });
-    const mockRound = { id: 'r1', name: 'Round 1', olympiadId: 'oly-1', olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' } };
+    const mockRound = {
+      id: 'r1',
+      name: 'Round 1',
+      olympiadId: 'oly-1',
+      olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
+    };
 
     prisma.round.findUnique.mockResolvedValue(mockRound);
-    prisma.educator.findUnique.mockResolvedValue({ id: 'edu-1', schoolId: 'school-1', userId: 'user-1' });
+    prisma.educator.findUnique.mockResolvedValue({
+      id: 'edu-1',
+      schoolId: 'school-1',
+      userId: 'user-1',
+    });
     prisma.schoolOlympiad.findUnique.mockResolvedValue(null);
 
     const res = await request(app).get('/api/rounds/r1/replay');

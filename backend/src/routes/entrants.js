@@ -56,7 +56,9 @@ router.post('/entrants', ...requireRole('educator'), async (req, res) => {
       return res.status(400).json({ error: 'name, email and grade are required' });
     }
     if (!olympiadId) {
-      return res.status(400).json({ error: 'olympiadId is required — select which olympiad to add the student under' });
+      return res
+        .status(400)
+        .json({ error: 'olympiadId is required — select which olympiad to add the student under' });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
@@ -119,7 +121,8 @@ router.post('/entrants', ...requireRole('educator'), async (req, res) => {
     });
     if (!access || access.status !== 'approved') {
       return res.status(403).json({
-        error: "Your school doesn't have access to this olympiad yet — request access from the organiser.",
+        error:
+          "Your school doesn't have access to this olympiad yet — request access from the organiser.",
       });
     }
     const openRounds = await prisma.round.findMany({

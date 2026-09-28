@@ -76,9 +76,7 @@ describe('Remark routes', () => {
       olympiadId: 'oly-1',
       organiserId: 'organiser-1',
     });
-    prisma.olympiadOrganiser.findMany.mockResolvedValue([
-      { olympiadId: 'oly-1' },
-    ]);
+    prisma.olympiadOrganiser.findMany.mockResolvedValue([{ olympiadId: 'oly-1' }]);
 
     app = createApp();
   });
@@ -635,7 +633,7 @@ describe('Remark routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('defaults to the owner\'s pending appeals', async () => {
+    it("defaults to the owner's pending appeals", async () => {
       prisma.remarkRequest.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/remark/queue');
@@ -663,15 +661,15 @@ describe('Remark routes', () => {
       );
     });
 
-    it('returns an assigned reviewer\'s work when assignedTo=me is passed', async () => {
+    it("returns an assigned reviewer's work when assignedTo=me is passed", async () => {
       prisma.user.findUnique.mockResolvedValueOnce(reviewer);
       // Mock that reviewer is a member of olympiad 'oly-1'
       prisma.olympiadOrganiser.findMany.mockResolvedValueOnce([{ olympiadId: 'oly-1' }]);
       prisma.remarkRequest.findMany.mockResolvedValue([]);
-    
+
       const reviewerApp = createApp(true, 'clerk-user-2');
       const res = await request(reviewerApp).get('/api/remark/queue?assignedTo=me');
-    
+
       expect(res.status).toBe(200);
       expect(prisma.remarkRequest.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

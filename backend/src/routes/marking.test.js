@@ -44,9 +44,7 @@ describe('Marking routes', () => {
       olympiadId: 'oly-1',
       organiserId: 'organiser-1',
     });
-    prisma.olympiadOrganiser.findMany.mockResolvedValue([
-      { olympiadId: 'oly-1' },
-    ]);
+    prisma.olympiadOrganiser.findMany.mockResolvedValue([{ olympiadId: 'oly-1' }]);
 
     app = createApp();
   });

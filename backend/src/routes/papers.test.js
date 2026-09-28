@@ -54,9 +54,7 @@ describe('Papers routes', () => {
       olympiadId: 'oly-1',
       organiserId: 'user-1',
     });
-    prisma.olympiadOrganiser.findMany.mockResolvedValue([
-      { olympiadId: 'oly-1' },
-    ]);
+    prisma.olympiadOrganiser.findMany.mockResolvedValue([{ olympiadId: 'oly-1' }]);
 
     // Default: round belongs to olympiad 'oly-1'
     prisma.round.findUnique.mockResolvedValue({ id: 'round-1', olympiadId: 'oly-1' });

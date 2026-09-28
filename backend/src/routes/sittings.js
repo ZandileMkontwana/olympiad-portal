@@ -2,6 +2,9 @@ const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
+const { getDbNow } = require('../lib/dbTime');
+const { TRANSACTION_OPTIONS } = require('../lib/transactionOptions');
+const { isDbBusyError, respondDbBusy } = require('../lib/dbErrors');
 
 const router = express.Router();
 
@@ -48,22 +51,39 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
       });
     }
 
-    // Ensure the entrant is registered for this round. If not already
-    // registered (e.g. the entrant was created before the round opened),
-    // create the RoundEntrant record on the fly so the student can start.
-    await prisma.roundEntrant.upsert({
-      where: { roundId_entrantId: { roundId, entrantId } },
-      create: { roundId, entrantId },
-      update: {},
-    });
+    // Everything from here down runs in a single transaction: the round's
+    // state is re-checked immediately next to the writes (instead of
+    // relying on the snapshot read above, taken before the prerequisite
+    // check's extra DB round-trip), and the two upserts happen atomically
+    // together.
+    const sitting = await prisma.$transaction(async (tx) => {
+      const freshRound = await tx.round.findUnique({ where: { id: roundId } });
 
-    // Upsert instead of findUnique + create to avoid a P2002 race when
-    // React Strict Mode or a double-click fires two requests in parallel.
-    const sitting = await prisma.sitting.upsert({
-      where: { roundId_entrantId: { roundId, entrantId } },
-      create: { roundId, entrantId, expiresAt: round.closeTime },
-      update: {},
-    });
+      if (!freshRound || freshRound.state !== 'open') {
+        const err = new Error(
+          `Test cannot be started - round is currently '${freshRound?.state ?? 'unknown'}'`
+        );
+        err.httpStatus = 403;
+        throw err;
+      }
+
+      // Ensure the entrant is registered for this round. If not already
+      // registered (e.g. the entrant was created before the round opened),
+      // create the RoundEntrant record on the fly so the student can start.
+      await tx.roundEntrant.upsert({
+        where: { roundId_entrantId: { roundId, entrantId } },
+        create: { roundId, entrantId },
+        update: {},
+      });
+
+      // Upsert instead of findUnique + create to avoid a P2002 race when
+      // React Strict Mode or a double-click fires two requests in parallel.
+      return tx.sitting.upsert({
+        where: { roundId_entrantId: { roundId, entrantId } },
+        create: { roundId, entrantId, expiresAt: freshRound.closeTime },
+        update: {},
+      });
+    }, TRANSACTION_OPTIONS);
 
     if (sitting.completedAt) {
       return res.status(403).json({ error: 'Test already completed for this round' });
@@ -71,7 +91,9 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 
     // The sitting expires when the round closes (the round's time limit).
     // An in-progress sitting past expiresAt can no longer be resumed.
-    if (new Date(sitting.expiresAt) < new Date()) {
+    // Using the database's own clock avoids app-server clock drift
+    // incorrectly allowing/blocking a resume near the boundary.
+    if (new Date(sitting.expiresAt) < (await getDbNow())) {
       return res.status(403).json({ error: 'Test expired - it can no longer be resumed' });
     }
 
@@ -100,6 +122,12 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
+    if (err.httpStatus) {
+      return res.status(err.httpStatus).json({ error: err.message });
+    }
+    if (isDbBusyError(err)) {
+      return respondDbBusy(req, res, err);
+    }
     console.error(err);
     res.status(500).json({ error: 'Could not start the test' });
   }
@@ -129,7 +157,7 @@ router.patch('/sittings/:id/answers', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Test already completed' });
     }
 
-    if (new Date(sitting.expiresAt) < new Date()) {
+    if (new Date(sitting.expiresAt) < (await getDbNow())) {
       return res.status(403).json({ error: 'Test expired - answers can no longer be saved' });
     }
 
@@ -152,6 +180,9 @@ router.patch('/sittings/:id/answers', requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
+    if (isDbBusyError(err)) {
+      return respondDbBusy(req, res, err);
+    }
     console.error(err);
     res.status(500).json({ error: 'Could not save answers' });
   }
@@ -187,7 +218,7 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Test already completed' });
     }
 
-    if (new Date(sitting.expiresAt) < new Date()) {
+    if (new Date(sitting.expiresAt) < (await getDbNow())) {
       return res.status(403).json({ error: 'Test expired - it can no longer be submitted' });
     }
 
@@ -211,24 +242,56 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
       resultData = { create: { score } };
     }
 
-    const submission = await prisma.submission.create({
-      data: {
-        roundId: sitting.roundId,
-        entrantId: sitting.entrantId,
-        answers,
-        idempotencyKey: `sitting:${sitting.id}`,
-        result: resultData,
-      },
-      include: { result: true },
-    });
+    // Wrapped in a transaction so the Submission and the sitting's
+    // completedAt flip are atomic together. If a concurrent duplicate
+    // submit races past the completedAt check above (e.g. a genuine
+    // double-click before either request has committed), both requests'
+    // idempotencyKey is identical (`sitting:${sitting.id}`), so the
+    // database's unique constraint rejects the second one - caught below
+    // and turned into the same 200 response the retried-request path
+    // already returns, instead of a confusing 500.
+    let submission;
+    try {
+      submission = await prisma.$transaction(async (tx) => {
+        const created = await tx.submission.create({
+          data: {
+            roundId: sitting.roundId,
+            entrantId: sitting.entrantId,
+            answers,
+            idempotencyKey: `sitting:${sitting.id}`,
+            result: resultData,
+          },
+          include: { result: true },
+        });
 
-    await prisma.sitting.update({
-      where: { id: sitting.id },
-      data: { completedAt: new Date() },
-    });
+        await tx.sitting.update({
+          where: { id: sitting.id },
+          data: { completedAt: new Date() },
+        });
+
+        return created;
+      }, TRANSACTION_OPTIONS);
+    } catch (err) {
+      if (
+        err.code === 'P2002' &&
+        err.meta &&
+        err.meta.target &&
+        err.meta.target.includes('idempotencyKey')
+      ) {
+        const existing = await prisma.submission.findUnique({
+          where: { idempotencyKey: `sitting:${sitting.id}` },
+          include: { result: true },
+        });
+        return res.status(200).json({ submission: existing, result: existing.result });
+      }
+      throw err;
+    }
 
     res.status(201).json({ submission, result: submission.result });
   } catch (err) {
+    if (isDbBusyError(err)) {
+      return respondDbBusy(req, res, err);
+    }
     // A concurrent duplicate submit can slip past the completedAt check above
     // and lose the create race on the unique idempotencyKey. Treat the P2002
     // as the idempotent retry it is and return the winner's submission.

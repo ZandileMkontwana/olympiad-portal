@@ -3,7 +3,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { fetchSchoolDashboard, createEntrant, resendEntrantInvite, deleteEntrant, listOlympiads } from '@/lib/api';
+import {
+  fetchSchoolDashboard,
+  createEntrant,
+  resendEntrantInvite,
+  deleteEntrant,
+  listOlympiads,
+} from '@/lib/api';
 import { GRADE_OPTIONS } from '@/lib/grade';
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
@@ -518,9 +524,7 @@ export default function SchoolDashboardPage() {
         ]);
         setDashboard(dashData);
         // Only show olympiads the school has approved access to
-        setOlympiads(
-          olymData.filter((o) => o.schoolAccess === 'approved')
-        );
+        setOlympiads(olymData.filter((o) => o.schoolAccess === 'approved'));
         setStatus('ready');
       } catch (err) {
         setStatus('error');
@@ -636,7 +640,12 @@ export default function SchoolDashboardPage() {
     try {
       const token = await getToken();
       const result = await createEntrant(
-        { name: newName.trim(), email: newEmail.trim(), grade: newGrade.trim(), olympiadId: selectedOlympiadId },
+        {
+          name: newName.trim(),
+          email: newEmail.trim(),
+          grade: newGrade.trim(),
+          olympiadId: selectedOlympiadId,
+        },
         token
       );
       const registeredInto = (result.registeredRounds || [])
@@ -1478,7 +1487,9 @@ export default function SchoolDashboardPage() {
                       >
                         {entrant.email || 'No account yet'}
                       </p>
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}>
+                      <div
+                        style={{ display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}
+                      >
                         <span
                           style={{
                             padding: '2px 8px',
@@ -1560,7 +1571,9 @@ export default function SchoolDashboardPage() {
                           </span>
                         )}
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                      <div
+                        style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}
+                      >
                         {entrant.accountStatus !== 'active' && (
                           <button
                             type="button"

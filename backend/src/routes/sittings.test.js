@@ -50,6 +50,8 @@ describe('Sittings routes', () => {
     vi.spyOn(prisma.submission, 'findUnique');
     vi.spyOn(prisma.submission, 'findFirst');
     vi.spyOn(prisma.submission, 'create');
+    vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ now: new Date() }]);
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => callback(prisma));
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     // Defaults: round is open with a paper, entrant is registered,
@@ -377,6 +379,63 @@ describe('Sittings routes', () => {
 
       expect(res.status).toBe(500);
       expect(res.body.error).toMatch(/Could not save answers/);
+    });
+  });
+
+  describe('resilience to clock skew between the app server and the database', () => {
+    // These tests deliberately set the app server's system clock (via
+    // vi.setSystemTime) to a wildly different time than the database's
+    // clock (via the prisma.$queryRaw mock, which stands in for
+    // getDbNow()). If the expiry check ever accidentally used
+    // new Date() / Date.now() instead of getDbNow(), the skewed system
+    // clock would produce the wrong expired/not-expired decision here -
+    // proving the fix from #191 actually holds for sittings, not just
+    // that getDbNow() itself works in isolation (see lib/dbTime.test.js).
+    const sittingExpiringAt2030 = {
+      id: 'sitting-1',
+      entrantId: 'entrant-1',
+      roundId: 'round-1',
+      answers: { 1: 'A' },
+      startedAt: new Date('2026-01-01T00:00:00.000Z'),
+      expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+      completedAt: null,
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('accepts a save based on the database clock, even when the app server clock is far in the future (past expiresAt)', async () => {
+      vi.useFakeTimers();
+      // The app server's own clock thinks it's already past expiresAt...
+      vi.setSystemTime(new Date('2099-01-01T00:00:00.000Z'));
+      // ...but the database says it's still well before expiresAt.
+      prisma.$queryRaw.mockResolvedValue([{ now: new Date('2026-06-15T12:00:00.000Z') }]);
+      prisma.sitting.findUnique.mockResolvedValue(sittingExpiringAt2030);
+
+      const res = await request(app)
+        .patch('/api/sittings/sitting-1/answers')
+        .send({ answers: { 2: 'B' } });
+
+      expect(res.status).toBe(200);
+      expect(prisma.sitting.update).toHaveBeenCalled();
+    });
+
+    it('rejects a save based on the database clock, even when the app server clock is far in the past (before expiresAt)', async () => {
+      vi.useFakeTimers();
+      // The app server's own clock thinks expiresAt hasn't arrived yet...
+      vi.setSystemTime(new Date('2000-01-01T00:00:00.000Z'));
+      // ...but the database says it's actually well after expiresAt.
+      prisma.$queryRaw.mockResolvedValue([{ now: new Date('2031-01-01T00:00:00.000Z') }]);
+      prisma.sitting.findUnique.mockResolvedValue(sittingExpiringAt2030);
+
+      const res = await request(app)
+        .patch('/api/sittings/sitting-1/answers')
+        .send({ answers: { 2: 'B' } });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/expired/);
+      expect(prisma.sitting.update).not.toHaveBeenCalled();
     });
   });
 

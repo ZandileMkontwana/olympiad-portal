@@ -1,10 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole, requireAuth, loadAuthUser, loadOptionalUser } = require('../middleware/auth');
-const {
-  hasQualifiedForRound,
-  prerequisiteFailureMessage,
-} = require('../lib/qualification');
+const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 const {
   getRecipientsForRound,
   isTriggerEnabled,
@@ -104,9 +101,7 @@ router.get('/olympiads', async (req, res) => {
     // act on them and the team wants to keep the list tidy. Past papers
     // remain available in the archive.
     const now = new Date();
-    const activeOlympiads = olympiads.filter(
-      (o) => !o.endDate || new Date(o.endDate) >= now
-    );
+    const activeOlympiads = olympiads.filter((o) => !o.endDate || new Date(o.endDate) >= now);
 
     const educator = await prisma.educator.findUnique({ where: { userId: user.id } });
     if (!educator) {
@@ -1226,8 +1221,7 @@ router.patch('/rounds/:id', ...requireRole('organiser'), async (req, res) => {
 
     const data = {};
     if (qualifyingThreshold !== undefined) {
-      data.qualifyingThreshold =
-        qualifyingThreshold === null ? null : Number(qualifyingThreshold);
+      data.qualifyingThreshold = qualifyingThreshold === null ? null : Number(qualifyingThreshold);
     }
     if (prerequisiteRoundId !== undefined) {
       data.prerequisiteRoundId = prerequisiteRoundId;
@@ -1353,6 +1347,6 @@ function buildActionSummary(log) {
     default:
       return `${log.action} at ${log.timestamp.toISOString()}`;
   }
-};
+}
 
 module.exports = router;

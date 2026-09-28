@@ -37,6 +37,7 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.entrant, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.submission, 'findFirst');
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => callback(prisma));
     vi.spyOn(prisma.schoolOlympiad, 'findUnique').mockResolvedValue({ status: 'approved' });
     vi.spyOn(console, 'error').mockImplementation(() => {});
     sgMail.send.mockResolvedValue({});

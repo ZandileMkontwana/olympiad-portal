@@ -144,13 +144,8 @@ export default function ReplayPage() {
       {status === 'ready' && replay && (
         <div>
           {/* Round info header */}
-          <div
-            className="card"
-            style={{ padding: '16px', marginBottom: '20px' }}
-          >
-            <h2 style={{ margin: '0 0 8px 0', fontSize: '1.15em' }}>
-              {replay.round.name}
-            </h2>
+          <div className="card" style={{ padding: '16px', marginBottom: '20px' }}>
+            <h2 style={{ margin: '0 0 8px 0', fontSize: '1.15em' }}>{replay.round.name}</h2>
             <p className="description" style={{ margin: '0 0 4px', fontSize: '0.85em' }}>
               <strong>Olympiad:</strong> {replay.round.olympiadName}
             </p>

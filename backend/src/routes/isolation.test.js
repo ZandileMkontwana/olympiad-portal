@@ -8,7 +8,7 @@ const roundsRouter = require('./rounds');
  * Isolation tests: verify that two olympiads (A and B) are properly
  * isolated. An educator whose school has access to olympiad A must
  * NOT be able to see data from olympiad B's rounds.
- * 
+ *
  * Also verifies that organisers must be members of the specific olympiad
  * they're trying to access (no cross-olympiad access for organisers).
  */

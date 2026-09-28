@@ -130,7 +130,9 @@ describe('Entrants routes', () => {
     });
 
     it('returns 400 when fields are missing', async () => {
-      const res = await request(app).post('/api/entrants').send({ name: 'Alice', grade: '10', olympiadId: 'olympiad-1' });
+      const res = await request(app)
+        .post('/api/entrants')
+        .send({ name: 'Alice', grade: '10', olympiadId: 'olympiad-1' });
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/name, email and grade are required/);
     });
@@ -228,7 +230,12 @@ describe('Entrants routes', () => {
       prisma.round.findMany.mockResolvedValue([]);
       const res = await request(app)
         .post('/api/entrants')
-        .send({ name: ' Alice ', email: 'Alice@School.com', grade: '10', olympiadId: 'olympiad-1' });
+        .send({
+          name: ' Alice ',
+          email: 'Alice@School.com',
+          grade: '10',
+          olympiadId: 'olympiad-1',
+        });
 
       expect(res.status).toBe(201);
       expect(res.body.name).toBe('Alice');

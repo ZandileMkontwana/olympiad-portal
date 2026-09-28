@@ -88,11 +88,7 @@ async function requireOlympiadAccess(req, res, round, user) {
     return null;
   }
 
-  const access = await getSchoolOlympiadAccess(
-    educator.schoolId,
-    round.olympiadId,
-    u.role
-  );
+  const access = await getSchoolOlympiadAccess(educator.schoolId, round.olympiadId, u.role);
   if (!access) {
     res.status(403).json({
       error:

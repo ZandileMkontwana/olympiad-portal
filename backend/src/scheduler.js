@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const prisma = require('./lib/prisma');
+const { getDbNow } = require('./lib/dbTime');
 const {
   sendRoundOpeningNotification,
   sendRoundClosingNotification,
@@ -69,7 +70,9 @@ async function registerEntrantsForNewlyOpenRounds() {
 
 function startScheduler() {
   cron.schedule('*/30 * * * * *', async () => {
-    const now = new Date();
+    // Use the database's own clock, not this app server's local clock -
+    // see lib/dbTime.js for why that distinction matters here.
+    const now = await getDbNow();
 
     const opened = await prisma.round.updateMany({
       where: { state: 'scheduled', openTime: { lte: now } },
@@ -152,9 +155,7 @@ async function processAutoAdvance() {
 
   for (const round of roundsToProcess) {
     // Collect entrants before advance so we can audit-log them
-    const _entrantsBefore = new Set(
-      round.roundEntrants.map((re) => re.entrant.id)
-    );
+    const _entrantsBefore = new Set(round.roundEntrants.map((re) => re.entrant.id));
 
     const registered = await advanceQualifiedEntrantsForRound(round);
 
