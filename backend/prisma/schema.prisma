@@ -51,6 +51,7 @@ model Round {
 
   notificationLogs       NotificationLog[]
   notificationRules      NotificationRule[]
+  auditLogs              AuditLog[]
   paper                  Paper?
   olympiad               Olympiad           @relation(fields: [olympiadId], references: [id])
   prerequisiteRound      Round?             @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
