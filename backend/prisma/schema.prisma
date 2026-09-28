@@ -59,7 +59,6 @@ model Round {
   roundEntrants          RoundEntrant[]
   sittings               Sitting[]
   submissions            Submission[]
-  auditLogs              AuditLog[]
 }
 
 model User {
