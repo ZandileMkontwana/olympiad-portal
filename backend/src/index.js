@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const { isDbBusyError, respondDbBusy } = require('./lib/dbErrors');
 require('dotenv').config();
 const papersRouter = require('./routes/papers');
 const roundsRouter = require('./routes/rounds');
@@ -53,6 +54,9 @@ app.use('/api', (req, res) => {
 // Global error handler — always returns JSON
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
+  if (isDbBusyError(err)) {
+    return respondDbBusy(req, res, err);
+  }
   console.error('Unhandled error:', err);
   res.status(500).json({ error: err.message || 'Internal server error' });
 });

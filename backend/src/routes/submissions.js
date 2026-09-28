@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
 const { TRANSACTION_OPTIONS } = require('../lib/transactionOptions');
+const { isDbBusyError, respondDbBusy } = require('../lib/dbErrors');
 const { sendSubmissionReceipt } = require('../lib/email');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 
@@ -154,6 +155,9 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
         .status(200)
         .json({ submission: existing, result: existing.result, markingTask: existing.markingTask });
     }
+    if (isDbBusyError(err)) {
+      return respondDbBusy(req, res, err);
+    }
     console.error(err);
     res.status(500).json({ error: 'Could not save submission' });
   }
@@ -186,6 +190,9 @@ router.post('/submissions/:id/remark', ...requireRole('educator'), async (req, r
 
     res.status(201).json(remarkRequest);
   } catch (err) {
+    if (isDbBusyError(err)) {
+      return respondDbBusy(req, res, err);
+    }
     console.error(err);
     res.status(500).json({ error: 'Could not create remark request' });
   }

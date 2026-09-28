@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 const { getDbNow } = require('../lib/dbTime');
 const { TRANSACTION_OPTIONS } = require('../lib/transactionOptions');
+const { isDbBusyError, respondDbBusy } = require('../lib/dbErrors');
 
 const router = express.Router();
 
@@ -124,6 +125,9 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
     if (err.httpStatus) {
       return res.status(err.httpStatus).json({ error: err.message });
     }
+    if (isDbBusyError(err)) {
+      return respondDbBusy(req, res, err);
+    }
     console.error(err);
     res.status(500).json({ error: 'Could not start the test' });
   }
@@ -176,6 +180,9 @@ router.patch('/sittings/:id/answers', requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
+    if (isDbBusyError(err)) {
+      return respondDbBusy(req, res, err);
+    }
     console.error(err);
     res.status(500).json({ error: 'Could not save answers' });
   }
@@ -280,6 +287,9 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
 
     res.status(201).json({ submission, result: submission.result });
   } catch (err) {
+    if (isDbBusyError(err)) {
+      return respondDbBusy(req, res, err);
+    }
     console.error(err);
     res.status(500).json({ error: 'Could not submit the test' });
   }
