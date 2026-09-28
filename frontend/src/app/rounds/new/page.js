@@ -135,13 +135,17 @@ function NewRoundForm() {
 
     setRoundStatus('submitting');
     try {
-      const round = await createRound({
-        olympiadId: olympiad.id,
-        name: roundName.trim(),
-        openTime: new Date(openTime).toISOString(),
-        closeTime: new Date(closeTime).toISOString(),
-        qualifyingThreshold: qualifyingThreshold.trim() ? Number(qualifyingThreshold) : null,
-      });
+      const token = await getToken();
+      const round = await createRound(
+        {
+          olympiadId: olympiad.id,
+          name: roundName.trim(),
+          openTime: new Date(openTime).toISOString(),
+          closeTime: new Date(closeTime).toISOString(),
+          qualifyingThreshold: qualifyingThreshold.trim() ? Number(qualifyingThreshold) : null,
+        },
+        token
+      );
       setCreatedRound(round);
       setRoundStatus('success');
     } catch (err) {

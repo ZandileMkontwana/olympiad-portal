@@ -155,9 +155,17 @@ export function declineAccessRequest(requestId, token) {
   });
 }
 
-export function createRound({ olympiadId, name, openTime, closeTime, qualifyingThreshold }) {
+/**
+ * Creates a new round for an olympiad. Organisers only.
+ *
+ * @param {{olympiadId: string, name: string, openTime: string, closeTime: string, qualifyingThreshold?: number}} payload
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function createRound({ olympiadId, name, openTime, closeTime, qualifyingThreshold }, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
   return requestJson('/api/rounds', {
     method: 'POST',
+    headers,
     body: JSON.stringify({
       olympiadId,
       name,
