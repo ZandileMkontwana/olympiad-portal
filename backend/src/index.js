@@ -25,10 +25,11 @@ const app = express();
 // cors + cookieParser must come BEFORE the routers, or requests never reach them
 app.use(
   cors({
-    origin: ['http://localhost:3000', 'https://frontend-two-ruby-25.vercel.app'],
+    origin: ['http://localhost:3000', process.env.FRONTEND_URL],
     credentials: true,
   })
 );
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(clerkMiddleware());
