@@ -64,10 +64,7 @@ export function listOlympiads(token) {
  * @param {{name: string, timezone: string, description?: string, grades?: string, startDate?: string, endDate?: string}} payload
  * @param {string} token - Clerk JWT for the Authorization header
  */
-export function createOlympiad(
-  { name, timezone, description, grades, startDate, endDate },
-  token
-) {
+export function createOlympiad({ name, timezone, description, grades, startDate, endDate }, token) {
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
   return requestJson('/api/olympiads', {
     method: 'POST',
@@ -217,18 +214,19 @@ export function listSchoolEntrants(token) {
 /**
  * Registers a student at the signed-in educator's school: creates the
  * entrant record AND their student account, then emails them an
- * invitation to set a password.
+ * invitation to set a password. The educator must select which olympiad
+ * the student is being added under.
  * Wired to POST /api/entrants (backend/src/routes/entrants.js).
  *
- * @param {{name: string, email: string, grade: string}} entrant
+ * @param {{name: string, email: string, grade: string, olympiadId: string}} entrant
  * @param {string} token - Clerk JWT for the Authorization header
  * @returns {Promise<{id: string, name: string, grade: string, schoolId: string, email: string, accountStatus: string, invitationSent: boolean}>}
  */
-export function createEntrant({ name, email, grade }, token) {
+export function createEntrant({ name, email, grade, olympiadId }, token) {
   return requestJson('/api/entrants', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name, email, grade }),
+    body: JSON.stringify({ name, email, grade, olympiadId }),
   });
 }
 
@@ -736,14 +734,19 @@ export function requestRemark(submissionId, reason, token) {
 }
 
 /**
- * Lists remark requests for organisers to review.
+ * Lists remark requests visible to an organiser.
  * Wired to GET /api/remark/queue (backend/src/routes/remark.js).
  *
  * @param {string} token - Clerk JWT for the Authorization header
- * @param {string} [status] - 'pending' (default), 'approved', 'rejected', or 'all'
+ * @param {{status?: string, assignedTo?: 'me'}} [options] - Queue filters. Passing
+ *   assignedTo: 'me' returns only work assigned to the signed-in reviewer.
  */
-export function listRemarkQueue(token, status) {
-  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+export function listRemarkQueue(token, { status, assignedTo } = {}) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (assignedTo) params.set('assignedTo', assignedTo);
+  const query = params.size ? `?${params.toString()}` : '';
+
   return requestJson(`/api/remark/queue${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -762,5 +765,87 @@ export function reviewRemarkRequest(remarkRequestId, { status, newScore, reviewN
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ status, newScore, reviewNotes }),
+  });
+}
+
+/**
+ * Lists the organisers (creator + co-organisers) for an olympiad.
+ * Wired to GET /api/olympiads/:id/organisers (backend/src/routes/olympiadOrganisers.js).
+ *
+ * @param {string} olympiadId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<Array<{
+ *   id: string,
+ *   organiserId: string,
+ *   name: string,
+ *   email: string,
+ *   addedAt: string,
+ *   isCreator: boolean,
+ * }>>}
+ */
+export function listOlympiadOrganisers(olympiadId, token) {
+  return requestJson(`/api/olympiads/${olympiadId}/organisers`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Adds an organiser to an olympiad. Only existing organisers may call this.
+ * Wired to POST /api/olympiads/:id/organisers (backend/src/routes/olympiadOrganisers.js).
+ *
+ * @param {string} olympiadId
+ * @param {string} organiserId - User.id of the organiser to add
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function addOlympiadOrganiser(olympiadId, organiserId, token) {
+  return requestJson(`/api/olympiads/${olympiadId}/organisers`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ organiserId }),
+  });
+}
+
+/**
+ * Removes a co-organiser from an olympiad. The creator cannot be removed.
+ * Wired to DELETE /api/olympiads/:id/organisers/:organiserId.
+ *
+ * @param {string} olympiadId
+ * @param {string} organiserId
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function removeOlympiadOrganiser(olympiadId, organiserId, token) {
+  return requestJson(`/api/olympiads/${olympiadId}/organisers/${organiserId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Lists all users with role 'organiser' — used by the "Add organiser"
+ * dropdown to pick a co-organiser.
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function listAllOrganisers(token) {
+  return requestJson('/api/organisers', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Fetches the replay timeline for a round — the audit log entries
+ * enriched with human-readable summaries, in chronological order.
+ * Wired to GET /api/rounds/:id/replay (backend/src/routes/rounds.js).
+ *
+ * @param {string} roundId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   round: { id: string, name: string, olympiadName: string, state: string, openTime: string, closeTime: string },
+ *   timeline: Array<{ id: string, action: string, timestamp: string, roundId: string, payload: object, summary: string }>,
+ * }>}
+ */
+export function fetchRoundReplay(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/replay`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
 }

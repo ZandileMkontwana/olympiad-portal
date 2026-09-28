@@ -29,6 +29,8 @@ erDiagram
   OLYMPIAD ||--o{ SCHOOLOLYMPIAD : "is joined by"
   SCHOOL ||--o{ SCHOOLOLYMPIAD : "joins"
   USER |o--o{ SCHOOLOLYMPIAD : "requested by"
+  OLYMPIAD ||--o{ OLYMPIADORGANISER : "managed by"
+  USER ||--o{ OLYMPIADORGANISER : "organises"
 
   OLYMPIAD {
     string id PK
@@ -134,6 +136,12 @@ erDiagram
     string error "optional"
     datetime sentAt
   }
+  OLYMPIADORGANISER {
+    string id PK
+    string olympiadId FK
+    string organiserId FK
+    datetime addedAt
+  }
 ```
 
 ## Tables
@@ -181,6 +189,31 @@ A per-round toggle for each of the four notification triggers (`before_open`, `b
 
 ### NotificationLog
 The delivery record that makes each notification exactly-once per recipient. Before sending, the scheduler checks for a log row with the same `(roundId, triggerType, recipientEmail)` — the table's unique constraint — and skips if one exists. That is what stops a scheduler ticking every 30 seconds from re-sending the same reminder, and what makes re-running after a crash safe. `status` records `sent` or `failed` with the error message kept for debugging; `entrantId` is set only on `missing_submission` logs, to identify whose submission is missing.
+
+### OlympiadOrganiser
+A join table that records which organisers have access to which olympiads. Every organiser — including the creator — gets a row here so that access checks go through a single membership lookup instead of a mix of `organiserId` comparisons and role checks. A unique constraint on `(olympiadId, organiserId)` keeps one row per pair.
+
+**Access rules:**
+- **Adding:** Any existing organiser of an olympiad can add another user with role `organiser` as a co-organiser.
+- **Removing:** Any existing organiser can remove a co-organiser, but the **creator** (the user referenced by `Olympiad.organiserId`) is never removable — not even by themselves.
+- **Backfill:** The migration that introduced this table inserted a row for every existing `Olympiad.organiserId`, so no creator lost access.
+- **Creation flow:** When a new olympiad is created, the creator is automatically added to this table.
+
+## Co-organiser model
+
+The co-organiser model lets multiple organisers share management of an olympiad. Before this feature, only the creator (via `Olympiad.organiserId`) could manage an olympiad. Now, any user listed in the `OlympiadOrganiser` table for an olympiad can:
+
+- Edit the olympiad's details (name, dates, description)
+- Create and manage rounds
+- Upload papers and configure notifications
+- View all entrant data, submissions, standings, audit logs, and replay timelines
+- Add or remove other co-organisers (except the creator)
+- Approve or decline school access requests
+- Manage remark requests and marking tasks for the olympiad
+
+**Authorization:** All routes that operate on olympiad-scoped resources (rounds, papers, submissions, standings, audit logs, replay, notifications, remark requests, marking tasks) check `OlympiadOrganiser` membership before granting access. This prevents cross-olympiad access — an organiser of Olympiad A cannot view or modify data from Olympiad B unless they are also listed as an organiser of Olympiad B.
+
+The `GET /api/olympiads` endpoint returns olympiads where the authenticated organiser is either the creator or listed in `OlympiadOrganiser`. The `PUT /api/olympiads/:id` endpoint checks membership before allowing edits. Similarly, all round-level operations verify that the organiser is a member of the round's parent olympiad.
 
 ## Deliberate omissions
 

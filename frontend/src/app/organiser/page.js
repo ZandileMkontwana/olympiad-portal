@@ -11,6 +11,10 @@ import {
   fetchAccessRequests,
   approveAccessRequest,
   declineAccessRequest,
+  listOlympiadOrganisers,
+  addOlympiadOrganiser,
+  removeOlympiadOrganiser,
+  listAllOrganisers,
   ApiError,
 } from '@/lib/api';
 
@@ -56,6 +60,14 @@ export default function OrganiserDashboard() {
   const [decidingId, setDecidingId] = useState(null);
   const [decisionError, setDecisionError] = useState('');
 
+  // Co-organiser management: per-olympiad organiser lists and add/remove.
+  const [organisersByOlympiad, setOrganisersByOlympiad] = useState({});
+  const [showAddOrganiser, setShowAddOrganiser] = useState(null); // olympiadId
+  const [selectedOrganiserId, setSelectedOrganiserId] = useState('');
+  const [allOrganisers, setAllOrganisers] = useState([]);
+  const [organiserStatus, setOrganiserStatus] = useState('idle');
+  const [organiserError, setOrganiserError] = useState('');
+
   useEffect(() => {
     if (checking) return;
 
@@ -89,6 +101,42 @@ export default function OrganiserDashboard() {
     }
 
     loadAccessRequests();
+  }, [checking, getToken]);
+
+  // Load co-organisers for each olympiad once the olympiad list is ready.
+  useEffect(() => {
+    if (olympiads.length === 0) return;
+
+    async function loadOrganisers() {
+      const token = await getToken();
+      const map = {};
+      for (const olympiad of olympiads) {
+        try {
+          const organisers = await listOlympiadOrganisers(olympiad.id, token);
+          map[olympiad.id] = organisers;
+        } catch {
+          map[olympiad.id] = [];
+        }
+      }
+      setOrganisersByOlympiad(map);
+    }
+
+    loadOrganisers();
+  }, [olympiads, getToken]);
+
+  // Load all organiser-role users for the "Add organiser" dropdown.
+  useEffect(() => {
+    async function loadAllOrganisers() {
+      try {
+        const token = await getToken();
+        const data = await listAllOrganisers(token);
+        setAllOrganisers(data);
+      } catch {
+        // Non-critical — the dropdown will just be empty.
+      }
+    }
+    if (checking) return;
+    loadAllOrganisers();
   }, [checking, getToken]);
 
   async function handleCreateOlympiad(e) {
@@ -194,6 +242,43 @@ export default function OrganiserDashboard() {
     }
   }
 
+  async function handleAddOrganiser(e, olympiadId) {
+    e.preventDefault();
+    if (!selectedOrganiserId) return;
+
+    setOrganiserStatus('submitting');
+    setOrganiserError('');
+
+    try {
+      const token = await getToken();
+      const added = await addOlympiadOrganiser(olympiadId, selectedOrganiserId, token);
+      setOrganisersByOlympiad((prev) => ({
+        ...prev,
+        [olympiadId]: [...(prev[olympiadId] || []), added],
+      }));
+      setShowAddOrganiser(null);
+      setSelectedOrganiserId('');
+      setOrganiserStatus('idle');
+    } catch (err) {
+      setOrganiserStatus('error');
+      setOrganiserError(err instanceof ApiError ? err.message : 'Something went wrong.');
+    }
+  }
+
+  async function handleRemoveOrganiser(olympiadId, organiserId) {
+    setOrganiserError('');
+    try {
+      const token = await getToken();
+      await removeOlympiadOrganiser(olympiadId, organiserId, token);
+      setOrganisersByOlympiad((prev) => ({
+        ...prev,
+        [olympiadId]: (prev[olympiadId] || []).filter((o) => o.organiserId !== organiserId),
+      }));
+    } catch (err) {
+      setOrganiserError(err instanceof ApiError ? err.message : 'Something went wrong.');
+    }
+  }
+
   if (checking) {
     return (
       <main className="round-page">
@@ -219,6 +304,10 @@ export default function OrganiserDashboard() {
 
         <Link href="/organiser/remarks" className="button">
           Remarks
+        </Link>
+
+        <Link href="/organiser/replay" className="button">
+          Replay
         </Link>
 
         <button onClick={handleLogout} className="button">
@@ -622,6 +711,138 @@ export default function OrganiserDashboard() {
                   })}
                 </ul>
               )}
+
+              {/* Co-organisers section */}
+              <div style={{ marginTop: '12px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '6px',
+                  }}
+                >
+                  <strong style={{ fontSize: '0.9em' }}>Co-organisers</strong>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowAddOrganiser(showAddOrganiser === olympiad.id ? null : olympiad.id)
+                    }
+                    className="button"
+                    style={{ fontSize: '0.75em', padding: '3px 8px' }}
+                  >
+                    {showAddOrganiser === olympiad.id ? 'Cancel' : '+ Add organiser'}
+                  </button>
+                </div>
+
+                {(organisersByOlympiad[olympiad.id] || []).length === 0 ? (
+                  <p
+                    className="description"
+                    style={{ fontSize: '0.8em', fontStyle: 'italic', margin: '4px 0' }}
+                  >
+                    No organisers yet.
+                  </p>
+                ) : (
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 4px 0' }}>
+                    {(organisersByOlympiad[olympiad.id] || []).map((org) => (
+                      <li
+                        key={org.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '4px 0',
+                          fontSize: '0.85em',
+                          borderBottom: '1px solid rgba(139, 92, 246, 0.1)',
+                        }}
+                      >
+                        <span>
+                          {org.name} ({org.email})
+                          {org.isCreator && (
+                            <span
+                              style={{
+                                marginLeft: '6px',
+                                fontSize: '0.8em',
+                                color: 'rgba(139, 92, 246, 0.7)',
+                              }}
+                            >
+                              creator
+                            </span>
+                          )}
+                        </span>
+                        {!org.isCreator && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveOrganiser(olympiad.id, org.organiserId)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'red',
+                              cursor: 'pointer',
+                              fontSize: '0.85em',
+                            }}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {showAddOrganiser === olympiad.id && (
+                  <form
+                    onSubmit={(e) => handleAddOrganiser(e, olympiad.id)}
+                    style={{
+                      display: 'flex',
+                      gap: '8px',
+                      alignItems: 'center',
+                      marginTop: '6px',
+                    }}
+                  >
+                    <select
+                      value={selectedOrganiserId}
+                      onChange={(e) => setSelectedOrganiserId(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                        fontSize: '0.85em',
+                      }}
+                      required
+                    >
+                      <option value="">Select an organiser...</option>
+                      {allOrganisers
+                        .filter(
+                          (o) =>
+                            !(organisersByOlympiad[olympiad.id] || []).some(
+                              (existing) => existing.organiserId === o.id
+                            )
+                        )
+                        .map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name} ({o.email})
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={organiserStatus === 'submitting'}
+                      className="button"
+                      style={{ fontSize: '0.8em', padding: '4px 10px' }}
+                    >
+                      {organiserStatus === 'submitting' ? 'Adding...' : 'Add'}
+                    </button>
+                  </form>
+                )}
+
+                {organiserError && (
+                  <p style={{ color: 'red', fontSize: '0.8em', margin: '4px 0' }}>
+                    {organiserError}
+                  </p>
+                )}
+              </div>
             </li>
           ))}
         </ul>

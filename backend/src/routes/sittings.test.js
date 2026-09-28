@@ -46,6 +46,7 @@ describe('Sittings routes', () => {
     vi.spyOn(prisma.sitting, 'findUnique');
     vi.spyOn(prisma.sitting, 'create');
     vi.spyOn(prisma.sitting, 'update');
+    vi.spyOn(prisma.sitting, 'updateMany').mockResolvedValue({ count: 1 });
     vi.spyOn(prisma.submission, 'findUnique');
     vi.spyOn(prisma.submission, 'findFirst');
     vi.spyOn(prisma.submission, 'create');
@@ -559,6 +560,64 @@ describe('Sittings routes', () => {
       expect(res.body.submission.id).toBe('sub-1');
       expect(res.body.result.score).toBe(50);
       expect(prisma.submission.create).not.toHaveBeenCalled();
+    });
+
+    it("returns the winner's submission (200) when a concurrent duplicate loses the idempotency race", async () => {
+      // Both requests passed the completedAt check; the winner created the
+      // submission first and the loser got a P2002 on the unique key.
+      prisma.sitting.findUnique.mockResolvedValue(submittableSitting());
+      prisma.submission.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), {
+          code: 'P2002',
+          meta: { target: ['idempotencyKey'] },
+        })
+      );
+      const existing = createdSubmission({ id: 'result-1', submissionId: 'sub-1', score: 50 });
+      prisma.submission.findUnique.mockResolvedValue(existing);
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(200);
+      expect(res.body.submission.id).toBe('sub-1');
+      expect(res.body.result.score).toBe(50);
+      // The loser never writes via create/update; it only stamps completion
+      // with a status-guarded updateMany so the winner's stamp is preserved.
+      expect(prisma.sitting.update).not.toHaveBeenCalled();
+      expect(prisma.sitting.updateMany).toHaveBeenCalledWith({
+        where: { id: 'sitting-1', completedAt: null },
+        data: { completedAt: expect.any(Date) },
+      });
+    });
+
+    it('returns 500 when a P2002 loser finds no submission under its idempotency key', async () => {
+      prisma.sitting.findUnique.mockResolvedValue(submittableSitting());
+      prisma.submission.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), {
+          code: 'P2002',
+          meta: { target: ['idempotencyKey'] },
+        })
+      );
+      prisma.submission.findUnique.mockResolvedValue(null);
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(500);
+      expect(prisma.sitting.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 on a unique violation outside the idempotency key', async () => {
+      prisma.sitting.findUnique.mockResolvedValue(submittableSitting());
+      prisma.submission.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), {
+          code: 'P2002',
+          meta: { target: ['someOtherField'] },
+        })
+      );
+
+      const res = await request(app).post('/api/sittings/sitting-1/submit');
+
+      expect(res.status).toBe(500);
+      expect(prisma.submission.findUnique).not.toHaveBeenCalled();
     });
 
     it('returns 403 when the sitting has expired', async () => {

@@ -85,11 +85,12 @@ vi.mock('@/lib/api', () => ({
   createEntrant: vi.fn(),
   resendEntrantInvite: vi.fn(),
   deleteEntrant: vi.fn(),
+  listOlympiads: vi.fn(),
 }));
 
 import SchoolDashboardPage from './page';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { fetchSchoolDashboard, createEntrant, resendEntrantInvite, deleteEntrant } from '@/lib/api';
+import { fetchSchoolDashboard, createEntrant, resendEntrantInvite, deleteEntrant, listOlympiads } from '@/lib/api';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -111,6 +112,7 @@ describe('School Dashboard Page', () => {
     );
     vi.clearAllMocks();
     fetchSchoolDashboard.mockResolvedValue(mockDashboard);
+    listOlympiads.mockResolvedValue([]);
     setupUser();
   });
 
@@ -278,7 +280,7 @@ describe('School Dashboard Page', () => {
   it('shows the entrant count in the All Entrants heading', async () => {
     render(<SchoolDashboardPage />);
     await waitFor(() => {
-      expect(screen.getByText('All Entrants (3)')).toBeTruthy();
+      expect(screen.getByText('Students by Olympiad (3)')).toBeTruthy();
     });
   });
 
@@ -402,6 +404,9 @@ describe('School Dashboard Page', () => {
         { id: 'round-1', name: 'Round One', olympiadName: 'Maths Olympiad' },
       ],
     });
+    listOlympiads.mockResolvedValue([
+      { id: 'oly-1', name: 'Maths Olympiad', schoolAccess: 'approved', rounds: [] },
+    ]);
     fetchSchoolDashboard.mockResolvedValue({
       school: { id: 'school-1', name: 'Testville High' },
       entrantCount: 0,
@@ -418,14 +423,15 @@ describe('School Dashboard Page', () => {
       target: { value: 'newkid@school.com' },
     });
     fireEvent.change(screen.getByDisplayValue('Grade'), { target: { value: '10' } });
+    fireEvent.change(screen.getByDisplayValue('Select Olympiad'), { target: { value: 'oly-1' } });
     fireEvent.click(screen.getByText('Add Student'));
 
     expect(global.confirm).toHaveBeenCalledWith(
-      'Add "New Kid" (newkid@school.com, Grade 10) to your school? They\'ll be emailed a link to set their password.'
+      'Add "New Kid" (newkid@school.com, Grade 10) under the selected Olympiad? They\'ll be emailed a link to set their password.'
     );
     await waitFor(() => {
       expect(createEntrant).toHaveBeenCalledWith(
-        { name: 'New Kid', email: 'newkid@school.com', grade: '10' },
+        { name: 'New Kid', email: 'newkid@school.com', grade: '10', olympiadId: 'oly-1' },
         'mock-token'
       );
     });
@@ -447,6 +453,9 @@ describe('School Dashboard Page', () => {
       invitationSent: true,
       registeredRounds: [],
     });
+    listOlympiads.mockResolvedValue([
+      { id: 'oly-1', name: 'Maths Olympiad', schoolAccess: 'approved', rounds: [] },
+    ]);
     fetchSchoolDashboard.mockResolvedValue({
       school: { id: 'school-1', name: 'Testville High' },
       entrantCount: 0,
@@ -463,6 +472,7 @@ describe('School Dashboard Page', () => {
       target: { value: 'newkid@school.com' },
     });
     fireEvent.change(screen.getByDisplayValue('Grade'), { target: { value: '10' } });
+    fireEvent.change(screen.getByDisplayValue('Select Olympiad'), { target: { value: 'oly-1' } });
     fireEvent.click(screen.getByText('Add Student'));
 
     await waitFor(() => {
@@ -526,17 +536,17 @@ describe('School Dashboard Page', () => {
     });
   });
 
-  it('shows which olympiads each student is registered under', async () => {
+  it('shows which olympiads each student is grouped under', async () => {
     render(<SchoolDashboardPage />);
     await waitFor(() => {
       expect(screen.getByText('Alice Alpha')).toBeTruthy();
     });
 
-    // Alice is under both olympiads, Carol under one
-    expect(screen.getAllByText('Maths Olympiad')).toHaveLength(2);
-    expect(screen.getByText('Science Olympiad')).toBeTruthy();
-    // Bob has no round registrations, so his card says so
-    expect(screen.getByText('No olympiad yet')).toBeTruthy();
+    // Group headers show the olympiad names
+    expect(screen.getByText(/Maths Olympiad/)).toBeTruthy();
+    expect(screen.getByText(/No Olympiad/)).toBeTruthy();
+    // Bob has no olympiad, so he is under the "No Olympiad" group
+    expect(screen.getByText('Bob Beta')).toBeTruthy();
   });
 
   it('shows resend invite only for pending or account-less entrants', async () => {

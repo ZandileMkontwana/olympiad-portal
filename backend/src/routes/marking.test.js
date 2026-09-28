@@ -26,6 +26,8 @@ describe('Marking routes', () => {
     vi.spyOn(prisma.markingTask, 'findUnique');
     vi.spyOn(prisma.markingTask, 'update');
     vi.spyOn(prisma.user, 'findUnique');
+    vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    vi.spyOn(prisma.olympiadOrganiser, 'findMany');
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     // Default: the Clerk user maps to an organiser
@@ -35,6 +37,14 @@ describe('Marking routes', () => {
       role: 'organiser',
       name: 'Marker One',
     });
+
+    // Default: organiser is a member of olympiad 'oly-1'
+    prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+      id: 'oo-1',
+      olympiadId: 'oly-1',
+      organiserId: 'organiser-1',
+    });
+    prisma.olympiadOrganiser.findMany.mockResolvedValue([{ olympiadId: 'oly-1' }]);
 
     app = createApp();
   });
@@ -49,7 +59,9 @@ describe('Marking routes', () => {
       const res = await request(app).get('/api/marking/queue');
       expect(res.status).toBe(200);
       expect(prisma.markingTask.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { status: 'unassigned' } })
+        expect.objectContaining({
+          where: expect.objectContaining({ status: 'unassigned' }),
+        })
       );
     });
 
@@ -58,7 +70,9 @@ describe('Marking routes', () => {
       const res = await request(app).get('/api/marking/queue?status=all');
       expect(res.status).toBe(200);
       expect(prisma.markingTask.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: {} })
+        expect.objectContaining({
+          where: expect.objectContaining({}),
+        })
       );
     });
 
@@ -77,7 +91,11 @@ describe('Marking routes', () => {
     });
 
     it('assigns to the requester when no assignedToId is given', async () => {
-      prisma.markingTask.findUnique.mockResolvedValue({ id: 'task-1', status: 'unassigned' });
+      prisma.markingTask.findUnique.mockResolvedValue({
+        id: 'task-1',
+        status: 'unassigned',
+        submission: { round: { olympiadId: 'oly-1' } },
+      });
       prisma.user.findUnique
         .mockResolvedValueOnce({ id: 'organiser-1', role: 'organiser', name: 'Marker One' }) // role check
         .mockResolvedValueOnce({ id: 'organiser-1', name: 'Marker One' }); // assignee lookup
@@ -96,7 +114,11 @@ describe('Marking routes', () => {
     });
 
     it('returns 400 when assignedToId does not match a user', async () => {
-      prisma.markingTask.findUnique.mockResolvedValue({ id: 'task-1', status: 'unassigned' });
+      prisma.markingTask.findUnique.mockResolvedValue({
+        id: 'task-1',
+        status: 'unassigned',
+        submission: { round: { olympiadId: 'oly-1' } },
+      });
       prisma.user.findUnique
         .mockResolvedValueOnce({ id: 'organiser-1', role: 'organiser', name: 'Marker One' }) // role check
         .mockResolvedValueOnce(null); // assignee lookup fails
@@ -115,7 +137,11 @@ describe('Marking routes', () => {
     });
 
     it('records score, breakdown, and marks task as marked', async () => {
-      prisma.markingTask.findUnique.mockResolvedValue({ id: 'task-1', status: 'assigned' });
+      prisma.markingTask.findUnique.mockResolvedValue({
+        id: 'task-1',
+        status: 'assigned',
+        submission: { round: { olympiadId: 'oly-1' } },
+      });
       prisma.markingTask.update.mockResolvedValue({
         id: 'task-1',
         status: 'marked',
@@ -151,7 +177,11 @@ describe('Marking routes', () => {
     });
 
     it('returns 403 when task has not been marked yet', async () => {
-      prisma.markingTask.findUnique.mockResolvedValue({ id: 'task-1', status: 'unassigned' });
+      prisma.markingTask.findUnique.mockResolvedValue({
+        id: 'task-1',
+        status: 'unassigned',
+        submission: { round: { olympiadId: 'oly-1' } },
+      });
       const res = await request(app)
         .patch('/api/marking/task-1/moderate')
         .send({ moderatedScore: 9 });
@@ -159,7 +189,11 @@ describe('Marking routes', () => {
     });
 
     it('records moderated score and marks task as moderated', async () => {
-      prisma.markingTask.findUnique.mockResolvedValue({ id: 'task-1', status: 'marked' });
+      prisma.markingTask.findUnique.mockResolvedValue({
+        id: 'task-1',
+        status: 'marked',
+        submission: { round: { olympiadId: 'oly-1' } },
+      });
       prisma.markingTask.update.mockResolvedValue({
         id: 'task-1',
         status: 'moderated',

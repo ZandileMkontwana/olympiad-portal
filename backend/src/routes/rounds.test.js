@@ -12,8 +12,14 @@ function createApp(authenticated = true) {
   const app = express();
   app.use(express.json());
   if (authenticated) {
-    app.use((req, _res, next) => {
+    app.use(async (req, _res, next) => {
       req.auth = () => ({ userId: 'clerk-user-1' });
+      // Load the user from the mock and set req.user
+      // The mock returns a user with id 'user-1' (or 'organiser-1' when signInAsOrganiser is called)
+      const user = await prisma.user.findUnique({ where: { id: 'user-1' } });
+      if (user) {
+        req.user = user;
+      }
       next();
     });
   }
@@ -51,6 +57,15 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.notificationRule, 'upsert');
     vi.spyOn(prisma.notificationRule, 'deleteMany');
     vi.spyOn(prisma.result, 'updateMany');
+    vi.spyOn(prisma.auditLog, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.olympiadOrganiser, 'findMany').mockResolvedValue([]);
+    // Default: organiser is a member of any olympiad they try to access
+    vi.spyOn(prisma.olympiadOrganiser, 'findUnique').mockResolvedValue({
+      id: 'oo-1',
+      olympiadId: 'oly-1',
+      organiserId: 'organiser-1',
+    });
+    vi.spyOn(prisma.olympiadOrganiser, 'create').mockResolvedValue({});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: no registrations anywhere (GET /olympiads enrichment counts
     // them) — schools have approved access (POST /rounds/:id/entrants gate).
@@ -74,18 +89,17 @@ describe('Rounds routes', () => {
     vi.restoreAllMocks();
   });
 
-  describe('POST /api/olympiads', () => {
-    // Overrides the default educator mock: creating olympiads is
-    // organiser-only and the creator becomes the owner.
-    function signInAsOrganiser() {
-      prisma.user.findUnique.mockResolvedValue({
-        id: 'organiser-1',
-        email: 'organiser@olympiad.com',
-        role: 'organiser',
-        name: 'Organiser One',
-      });
-    }
+  // Helper to sign in as an organiser (available to all tests in this describe block)
+  function signInAsOrganiser() {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'organiser-1',
+      email: 'organiser@olympiad.com',
+      role: 'organiser',
+      name: 'Organiser One',
+    });
+  }
 
+  describe('POST /api/olympiads', () => {
     it('returns 401 when not authenticated (no Clerk session)', async () => {
       const unauthApp = createApp(false);
       const res = await request(unauthApp)
@@ -287,7 +301,9 @@ describe('Rounds routes', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual([{ id: '3', name: 'Mine', rounds: [] }]);
       expect(prisma.olympiad.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { organiserId: 'user-1' } })
+        expect.objectContaining({
+          where: { OR: [{ organiserId: 'user-1' }, { id: { in: [] } }] },
+        })
       );
     });
 
@@ -316,6 +332,7 @@ describe('Rounds routes', () => {
     });
 
     it('creates round and returns 201', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({ id: '1', timezone: 'UTC' });
       prisma.round.create.mockResolvedValue({ id: '1', name: 'Round 1' });
       const res = await request(app).post('/api/rounds').send({
         olympiadId: '1',
@@ -336,6 +353,7 @@ describe('Rounds routes', () => {
     });
 
     it('creates round with a qualifyingThreshold when provided', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({ id: '1', timezone: 'UTC' });
       prisma.round.create.mockResolvedValue({ id: '1', name: 'Round 1', qualifyingThreshold: 60 });
       const res = await request(app).post('/api/rounds').send({
         olympiadId: '1',
@@ -392,6 +410,7 @@ describe('Rounds routes', () => {
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
       expect(prisma.round.findMany).toHaveBeenCalledWith({
+        where: {},
         include: { olympiad: true },
         orderBy: { openTime: 'asc' },
       });
@@ -448,6 +467,12 @@ describe('Rounds routes', () => {
         email: 'organiser@olympiad.com',
         role: 'organiser',
         name: 'Organiser One',
+      });
+      // The organiser is a member of the olympiad via the join table.
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+        id: 'oo-1',
+        olympiadId: 'olympiad-1',
+        organiserId: 'user-1',
       });
     });
 
@@ -708,6 +733,9 @@ describe('Rounds routes', () => {
     });
 
     it('lists pending requests with school, olympiad and requester details', async () => {
+      signInAsOrganiser();
+      // Mock the organiser's olympiad memberships
+      prisma.olympiadOrganiser.findMany.mockResolvedValue([{ olympiadId: 'olympiad-1' }]);
       prisma.schoolOlympiad.findMany.mockResolvedValue([
         {
           id: 'so-1',
@@ -726,7 +754,10 @@ describe('Rounds routes', () => {
 
       expect(res.status).toBe(200);
       expect(prisma.schoolOlympiad.findMany).toHaveBeenCalledWith({
-        where: { status: 'pending' },
+        where: {
+          status: 'pending',
+          olympiadId: { in: ['olympiad-1'] },
+        },
         include: {
           school: { select: { id: true, name: true } },
           olympiad: { select: { id: true, name: true } },
@@ -817,7 +848,12 @@ describe('Rounds routes', () => {
     });
 
     it('approves the request and stamps decidedAt', async () => {
-      prisma.schoolOlympiad.findUnique.mockResolvedValue({ id: 'so-1', status: 'pending' });
+      signInAsOrganiser();
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({
+        id: 'so-1',
+        status: 'pending',
+        olympiadId: 'oly-1',
+      });
       prisma.schoolOlympiad.update.mockResolvedValue({ id: 'so-1', status: 'approved' });
 
       const res = await request(app).post('/api/olympiads/access-requests/so-1/approve');
@@ -831,7 +867,12 @@ describe('Rounds routes', () => {
     });
 
     it('declines the request and stamps decidedAt', async () => {
-      prisma.schoolOlympiad.findUnique.mockResolvedValue({ id: 'so-1', status: 'pending' });
+      signInAsOrganiser();
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({
+        id: 'so-1',
+        status: 'pending',
+        olympiadId: 'oly-1',
+      });
       prisma.schoolOlympiad.update.mockResolvedValue({ id: 'so-1', status: 'declined' });
 
       const res = await request(app).post('/api/olympiads/access-requests/so-1/decline');
@@ -845,7 +886,12 @@ describe('Rounds routes', () => {
     });
 
     it('returns 500 on prisma error', async () => {
-      prisma.schoolOlympiad.findUnique.mockResolvedValue({ id: 'so-1', status: 'pending' });
+      signInAsOrganiser();
+      prisma.schoolOlympiad.findUnique.mockResolvedValue({
+        id: 'so-1',
+        status: 'pending',
+        olympiadId: 'oly-1',
+      });
       prisma.schoolOlympiad.update.mockRejectedValue(new Error('DB error'));
       const res = await request(app).post('/api/olympiads/access-requests/so-1/approve');
       expect(res.status).toBe(500);
@@ -855,6 +901,7 @@ describe('Rounds routes', () => {
 
   describe('GET /api/rounds/:id/entrants', () => {
     it('returns entrants for a round', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: '1', name: 'Round 1', olympiadId: 'oly-1' });
       prisma.roundEntrant.findMany.mockResolvedValue([
         { entrant: { id: 'e1', name: 'Alice' } },
         { Entrant: { id: 'e2', name: 'Bob' } },
@@ -1118,6 +1165,7 @@ describe('Rounds routes', () => {
 
   describe('GET /api/rounds/:id/submissions', () => {
     it('returns submissions for a round', async () => {
+      prisma.round.findUnique.mockResolvedValue({ id: '1', name: 'Round 1', olympiadId: 'oly-1' });
       prisma.submission.findMany.mockResolvedValue([{ id: 's1', result: { score: 80 } }]);
       const res = await request(app).get('/api/rounds/1/submissions');
       expect(res.status).toBe(200);
@@ -1251,6 +1299,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([]);
@@ -1265,6 +1314,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1299,6 +1349,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1337,10 +1388,57 @@ describe('Rounds routes', () => {
       });
     });
 
+    it('reflects a score amended by an approved appeal when standings are re-fetched', async () => {
+      // An appeal approval updates Result.score in place (routes/remark.js);
+      // standings always read the live result row — no cached ranking exists
+      // — so the amended score and its new rank appear on the next fetch.
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+        olympiadId: 'oly-1',
+      });
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: {
+            id: 'entrant-1',
+            name: 'Thabo',
+            school: { name: 'Wits High School' },
+          },
+          result: { score: 95 }, // amended up from 50 by an approved appeal
+          submittedAt: '2026-09-12T20:00:00.000Z',
+        },
+        {
+          entrant: {
+            id: 'entrant-2',
+            name: 'Naledi',
+            school: { name: "St Mary's" },
+          },
+          result: { score: 60 },
+          submittedAt: '2026-09-12T20:10:00.000Z',
+        },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0]).toMatchObject({
+        rank: 1,
+        entrantName: 'Thabo',
+        score: 95,
+      });
+      expect(res.body[1]).toMatchObject({
+        rank: 2,
+        entrantName: 'Naledi',
+        score: 60,
+      });
+    });
+
     it('gives tied scores the same rank, and skips the next rank accordingly', async () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1384,6 +1482,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1419,6 +1518,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockRejectedValue(new Error('DB error'));
@@ -1444,6 +1544,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([]);
@@ -1458,6 +1559,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1507,6 +1609,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1551,6 +1654,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockResolvedValue([
@@ -1597,6 +1701,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round 1',
+        olympiadId: 'oly-1',
       });
 
       prisma.submission.findMany.mockRejectedValue(new Error('DB error'));
@@ -1648,8 +1753,10 @@ describe('Rounds routes', () => {
     });
 
     it('returns all 4 trigger types with defaults when none are configured', async () => {
+      signInAsOrganiser();
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
+        olympiadId: 'oly-1',
       });
 
       prisma.notificationRule.findMany.mockResolvedValue([]);
@@ -1667,8 +1774,10 @@ describe('Rounds routes', () => {
     });
 
     it('merges configured rules with defaults for unconfigured trigger types', async () => {
+      signInAsOrganiser();
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
+        olympiadId: 'oly-1',
       });
 
       prisma.notificationRule.findMany.mockResolvedValue([
@@ -1700,8 +1809,10 @@ describe('Rounds routes', () => {
     });
 
     it('returns 500 on prisma error', async () => {
+      signInAsOrganiser();
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
+        olympiadId: 'oly-1',
       });
 
       prisma.notificationRule.findMany.mockRejectedValue(new Error('DB error'));
@@ -1778,6 +1889,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round One',
+        olympiadId: 'oly-1',
         state: 'scheduled',
         openTime: new Date('2026-01-01T10:00:00Z'),
         closeTime: new Date('2026-01-02T10:00:00Z'),
@@ -1848,6 +1960,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round One',
+        olympiadId: 'oly-1',
         state: 'open',
         openTime: new Date('2026-01-01T10:00:00Z'),
         closeTime: new Date('2026-01-02T10:00:00Z'),
@@ -1875,6 +1988,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round One',
+        olympiadId: 'oly-1',
         state: 'open',
         openTime: new Date('2026-01-01T10:00:00Z'),
         closeTime: new Date('2026-01-02T10:00:00Z'),
@@ -1904,6 +2018,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round One',
+        olympiadId: 'oly-1',
         state: 'closed',
         openTime: new Date('2026-01-01T10:00:00Z'),
         closeTime: new Date('2026-01-02T10:00:00Z'),
@@ -1994,6 +2109,7 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         name: 'Round One',
+        olympiadId: 'oly-1',
         state: 'closed',
         openTime: new Date('2026-01-01T10:00:00Z'),
         closeTime: new Date('2026-01-02T10:00:00Z'),

@@ -1,10 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole, requireAuth, loadAuthUser, loadOptionalUser } = require('../middleware/auth');
-const {
-  hasQualifiedForRound,
-  prerequisiteFailureMessage,
-} = require('../lib/qualification');
+const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 const {
   getRecipientsForRound,
   isTriggerEnabled,
@@ -17,6 +14,8 @@ const {
   buildResultsReleasedMessage,
   buildMissingSubmissionMessage,
 } = require('../lib/email');
+const { requireOlympiadAccess, isOlympiadOrganiser } = require('../lib/authorization');
+const { toUTCDate } = require('../lib/timezone');
 
 const router = express.Router();
 
@@ -50,6 +49,11 @@ router.post('/olympiads', ...requireRole('organiser'), async (req, res) => {
         organiserId: req.user.id,
       },
     });
+    // Backfill the creator into the OlympiadOrganiser join table so
+    // membership-based access checks work uniformly.
+    await prisma.olympiadOrganiser.create({
+      data: { olympiadId: olympiad.id, organiserId: req.user.id },
+    });
     res.status(201).json(olympiad);
   } catch (err) {
     console.error(err);
@@ -58,11 +62,21 @@ router.post('/olympiads', ...requireRole('organiser'), async (req, res) => {
 });
 
 // GET /olympiads — public so educators/students can browse rounds, but
-// organisers are scoped to the olympiads they created themselves.
+// organisers are scoped to the olympiads they created or co-organise
+// (via the OlympiadOrganiser join table).
 router.get('/olympiads', async (req, res) => {
   try {
     const user = await loadOptionalUser(req);
-    const where = user && user.role === 'organiser' ? { organiserId: user.id } : {};
+    let where = {};
+    if (user && user.role === 'organiser') {
+      // Organisers see olympiads they created OR co-organise.
+      const organiserIds = await prisma.olympiadOrganiser.findMany({
+        where: { organiserId: user.id },
+        select: { olympiadId: true },
+      });
+      const organisedIds = organiserIds.map((o) => o.olympiadId);
+      where = { OR: [{ organiserId: user.id }, { id: { in: organisedIds } }] };
+    }
 
     const olympiads = await prisma.olympiad.findMany({
       where,
@@ -83,9 +97,15 @@ router.get('/olympiads', async (req, res) => {
       return res.json(olympiads);
     }
 
+    // Hide olympiads whose end date has already passed — educators can't
+    // act on them and the team wants to keep the list tidy. Past papers
+    // remain available in the archive.
+    const now = new Date();
+    const activeOlympiads = olympiads.filter((o) => !o.endDate || new Date(o.endDate) >= now);
+
     const educator = await prisma.educator.findUnique({ where: { userId: user.id } });
     if (!educator) {
-      return res.json(olympiads);
+      return res.json(activeOlympiads);
     }
 
     const [accessRows, registrations] = await Promise.all([
@@ -125,7 +145,7 @@ router.get('/olympiads', async (req, res) => {
     }
 
     res.json(
-      olympiads.map((olympiad) => ({
+      activeOlympiads.map((olympiad) => ({
         ...olympiad,
         schoolAccess: accessByOlympiad.get(olympiad.id) || 'none',
         schoolEntrantCounts: Array.from(countsByOlympiad.get(olympiad.id) || new Map())
@@ -151,6 +171,11 @@ router.put('/olympiads/:id', ...requireRole('organiser'), async (req, res) => {
     const existing = await prisma.olympiad.findUnique({ where: { id: req.params.id } });
     if (!existing) {
       return res.status(404).json({ error: 'Olympiad not found' });
+    }
+
+    // Only organisers of this specific olympiad may edit it.
+    if (!(await isOlympiadOrganiser(req.user.id, req.params.id))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 
     if (name !== undefined && !name) {
@@ -194,6 +219,11 @@ router.post('/olympiads/:id/request-access', ...requireRole('educator'), async (
     const olympiad = await prisma.olympiad.findUnique({ where: { id: req.params.id } });
     if (!olympiad) {
       return res.status(404).json({ error: 'Olympiad not found' });
+    }
+
+    // Block access requests for olympiads that have already closed.
+    if (olympiad.endDate && new Date(olympiad.endDate) < new Date()) {
+      return res.status(403).json({ error: 'This olympiad has closed' });
     }
 
     const educator = await prisma.educator.findUnique({ where: { userId: req.user.id } });
@@ -243,8 +273,18 @@ router.post('/olympiads/:id/request-access', ...requireRole('educator'), async (
 // school, olympiad and requesting educator's details.
 router.get('/olympiads/access-requests', ...requireRole('organiser'), async (req, res) => {
   try {
+    // Scope to pending requests for olympiads the caller organises.
+    const organiserRows = await prisma.olympiadOrganiser.findMany({
+      where: { organiserId: req.user.id },
+      select: { olympiadId: true },
+    });
+    const organisedOlympiadIds = organiserRows.map((r) => r.olympiadId);
+
     const requests = await prisma.schoolOlympiad.findMany({
-      where: { status: 'pending' },
+      where: {
+        status: 'pending',
+        olympiadId: { in: organisedOlympiadIds },
+      },
       include: {
         school: { select: { id: true, name: true } },
         olympiad: { select: { id: true, name: true } },
@@ -284,6 +324,11 @@ async function decideAccessRequest(req, res, status) {
   const existing = await prisma.schoolOlympiad.findUnique({ where: { id: req.params.id } });
   if (!existing) {
     return res.status(404).json({ error: 'Access request not found' });
+  }
+
+  // Only organisers of this specific olympiad may approve/decline requests.
+  if (!(await isOlympiadOrganiser(req.user.id, existing.olympiadId))) {
+    return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
   }
 
   const updated = await prisma.schoolOlympiad.update({
@@ -341,12 +386,26 @@ router.post('/rounds', async (req, res) => {
         .status(400)
         .json({ error: 'qualifyingThreshold must be a number between 0 and 100' });
     }
+
+    // Look up the olympiad's timezone so we can convert the organiser's
+    // local times to UTC for storage.
+    const olympiad = await prisma.olympiad.findUnique({ where: { id: olympiadId } });
+    if (!olympiad) {
+      return res.status(404).json({ error: 'Olympiad not found' });
+    }
+
+    // Only organisers of this specific olympiad may create rounds for it.
+    // Check req.user exists (set by auth middleware) and is an organiser of this olympiad.
+    if (!req.user || !(await isOlympiadOrganiser(req.user.id, olympiadId))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
+    }
+
     const round = await prisma.round.create({
       data: {
         olympiadId,
         name,
-        openTime: new Date(openTime),
-        closeTime: new Date(closeTime),
+        openTime: toUTCDate(openTime, olympiad.timezone),
+        closeTime: toUTCDate(closeTime, olympiad.timezone),
         qualifyingThreshold: qualifyingThreshold ?? null,
       },
     });
@@ -359,7 +418,10 @@ router.post('/rounds', async (req, res) => {
 
 router.get('/rounds', async (req, res) => {
   try {
+    const { olympiadId } = req.query;
+    const where = olympiadId ? { olympiadId } : {};
     const rounds = await prisma.round.findMany({
+      where,
       include: { olympiad: true },
       orderBy: { openTime: 'asc' },
     });
@@ -372,8 +434,21 @@ router.get('/rounds', async (req, res) => {
 
 router.get('/rounds/:id', async (req, res) => {
   try {
-    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
     if (!round) return res.status(404).json({ error: 'Round not found' });
+
+    // Educators must have approved school access to the round's olympiad
+    if (req.headers.authorization) {
+      const user = await loadOptionalUser(req);
+      if (user) {
+        const check = await requireOlympiadAccess(req, res, round, user);
+        if (!check) return;
+      }
+    }
+
     res.json(round);
   } catch (err) {
     console.error(err);
@@ -485,6 +560,16 @@ router.get('/rounds/:id/entrants', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Fetch the round to check olympiad access
+    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    if (!round) return res.status(404).json({ error: 'Round not found' });
+
+    // All users (organisers and educators) must have access to this olympiad.
+    // requireOlympiadAccess checks OlympiadOrganiser membership for organisers
+    // and SchoolOlympiad access for educators.
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
+
     let schoolId = null;
     if (user.role !== 'organiser') {
       const educator = await prisma.educator.findUnique({
@@ -523,6 +608,16 @@ router.get('/rounds/:id/submissions', requireAuth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    // Fetch the round to check olympiad access
+    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    if (!round) return res.status(404).json({ error: 'Round not found' });
+
+    // All users (organisers and educators) must have access to this olympiad.
+    // requireOlympiadAccess checks OlympiadOrganiser membership for organisers
+    // and SchoolOlympiad access for educators.
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
 
     let schoolId = null;
     if (user.role !== 'organiser') {
@@ -636,6 +731,12 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Round not found' });
     }
 
+    // All users (organisers and educators) must have access to this olympiad.
+    // requireOlympiadAccess checks OlympiadOrganiser membership for organisers
+    // and SchoolOlympiad access for educators.
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
+
     // Non-organisers must have a linked school; otherwise return no data.
     if (user.role !== 'organiser' && !schoolId) return res.json([]);
 
@@ -706,6 +807,12 @@ router.get('/rounds/:id/standings/schools', requireAuth, async (req, res) => {
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
+
+    // All users (organisers and educators) must have access to this olympiad.
+    // requireOlympiadAccess checks OlympiadOrganiser membership for organisers
+    // and SchoolOlympiad access for educators.
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
 
     // Non-organisers must have a linked school; otherwise return no data.
     if (user.role !== 'organiser' && !schoolId) return res.json([]);
@@ -852,6 +959,11 @@ router.get('/rounds/:id/notifications', ...requireRole('organiser'), async (req,
       return res.status(404).json({ error: 'Round not found' });
     }
 
+    // Only organisers of this specific olympiad may view notification rules.
+    if (!(await isOlympiadOrganiser(req.user.id, round.olympiadId))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
+    }
+
     const existingRules = await prisma.notificationRule.findMany({
       where: { roundId },
     });
@@ -899,6 +1011,11 @@ router.put(
         return res.status(404).json({ error: 'Round not found' });
       }
 
+      // Only organisers of this specific olympiad may update notification rules.
+      if (!(await isOlympiadOrganiser(req.user.id, round.olympiadId))) {
+        return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
+      }
+
       const rule = await prisma.notificationRule.upsert({
         where: { roundId_triggerType: { roundId, triggerType } },
         create: {
@@ -929,6 +1046,16 @@ router.delete(
     try {
       const roundId = req.params.id;
       const { triggerType } = req.params;
+
+      const round = await prisma.round.findUnique({ where: { id: roundId } });
+      if (!round) {
+        return res.status(404).json({ error: 'Round not found' });
+      }
+
+      // Only organisers of this specific olympiad may delete notification rules.
+      if (!(await isOlympiadOrganiser(req.user.id, round.olympiadId))) {
+        return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
+      }
 
       await prisma.notificationRule.deleteMany({
         where: { roundId, triggerType },
@@ -961,6 +1088,11 @@ router.post('/rounds/:id/notifications/test', ...requireRole('organiser'), async
     });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
+    }
+
+    // Only organisers of this specific olympiad may run notification dry-runs.
+    if (!(await isOlympiadOrganiser(req.user.id, round.olympiadId))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 
     const enabled = await isTriggerEnabled(roundId, triggerType);
@@ -1069,6 +1201,11 @@ router.patch('/rounds/:id', ...requireRole('organiser'), async (req, res) => {
       return res.status(404).json({ error: 'Round not found' });
     }
 
+    // Only organisers of this specific olympiad may update round settings.
+    if (!(await isOlympiadOrganiser(req.user.id, round.olympiadId))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
+    }
+
     // If setting a prerequisite, verify the referenced round exists
     if (prerequisiteRoundId !== undefined && prerequisiteRoundId !== null) {
       const prereq = await prisma.round.findUnique({
@@ -1084,8 +1221,7 @@ router.patch('/rounds/:id', ...requireRole('organiser'), async (req, res) => {
 
     const data = {};
     if (qualifyingThreshold !== undefined) {
-      data.qualifyingThreshold =
-        qualifyingThreshold === null ? null : Number(qualifyingThreshold);
+      data.qualifyingThreshold = qualifyingThreshold === null ? null : Number(qualifyingThreshold);
     }
     if (prerequisiteRoundId !== undefined) {
       data.prerequisiteRoundId = prerequisiteRoundId;
@@ -1102,5 +1238,115 @@ router.patch('/rounds/:id', ...requireRole('organiser'), async (req, res) => {
     res.status(500).json({ error: 'Could not update round settings' });
   }
 });
+
+// GET /rounds/:id/audit-log
+// Returns the audit trail of automatic actions the scheduler performed
+// on a round (open, close, auto-advance, notification sends).
+router.get('/rounds/:id/audit-log', requireAuth, async (req, res) => {
+  try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    // All users (organisers and educators) must have access to this olympiad.
+    // requireOlympiadAccess checks OlympiadOrganiser membership for organisers
+    // and SchoolOlympiad access for educators.
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
+
+    const logs = await prisma.auditLog.findMany({
+      where: { roundId: req.params.id },
+      orderBy: { timestamp: 'desc' },
+    });
+
+    res.json(logs);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch audit log' });
+  }
+});
+
+// GET /rounds/:id/replay
+// Aggregates the round's audit log into a chronological timeline of
+// state transitions, auto-advances, and notification sends — useful
+// for organisers to review what happened during a round's lifecycle.
+router.get('/rounds/:id/replay', requireAuth, async (req, res) => {
+  try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    // All users (organisers and educators) must have access to this olympiad.
+    // requireOlympiadAccess checks OlympiadOrganiser membership for organisers
+    // and SchoolOlympiad access for educators.
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
+
+    const logs = await prisma.auditLog.findMany({
+      where: { roundId: req.params.id },
+      orderBy: { timestamp: 'asc' },
+    });
+
+    // Build a timeline with enriched context
+    const timeline = logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      timestamp: log.timestamp,
+      roundId: log.roundId,
+      payload: log.payload,
+      summary: buildActionSummary(log),
+    }));
+
+    res.json({
+      round: {
+        id: round.id,
+        name: round.name,
+        olympiadName: round.olympiad.name,
+        state: round.state,
+        openTime: round.openTime,
+        closeTime: round.closeTime,
+      },
+      timeline,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to build round replay' });
+  }
+});
+
+// Human-readable summary for each audit action type
+function buildActionSummary(log) {
+  const p = log.payload || {};
+  switch (log.action) {
+    case 'round_opened':
+      return `Round opened at ${log.timestamp.toISOString()}`;
+    case 'round_closed':
+      return `Round closed at ${log.timestamp.toISOString()}`;
+    case 'auto_advanced':
+      return `Entrant ${p.entrantName || p.entrantId} advanced to round ${p.nextRoundId || '?'}`;
+    case 'notification_sent':
+      return `${p.triggerType} notification sent to ${p.recipientEmail || '?'}`;
+    default:
+      return `${log.action} at ${log.timestamp.toISOString()}`;
+  }
+}
 
 module.exports = router;

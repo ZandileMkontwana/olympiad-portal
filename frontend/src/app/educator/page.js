@@ -185,12 +185,26 @@ function NextUpCard({ round, olympiadName }) {
 
 /* ── Olympiad accordion ────────────────────────────────────────────────── */
 
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('en-ZA', {
+function formatDate(iso, tz) {
+  const opts = {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  });
+  };
+  if (tz) opts.timeZone = tz;
+  return new Date(iso).toLocaleDateString('en-ZA', opts);
+}
+
+function formatDateTime(iso, tz) {
+  const opts = {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  };
+  if (tz) opts.timeZone = tz;
+  return new Date(iso).toLocaleString('en-ZA', opts);
 }
 
 const ACCESS_BADGES = {
@@ -271,8 +285,9 @@ function RoundRow({ round }) {
 // the access-request controls.
 function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
   const counts = olympiad.schoolEntrantCounts || [];
-  const start = olympiad.startDate ? formatDate(olympiad.startDate) : null;
-  const end = olympiad.endDate ? formatDate(olympiad.endDate) : null;
+  const tz = olympiad.timezone || null;
+  const start = olympiad.startDate ? formatDate(olympiad.startDate, tz) : null;
+  const end = olympiad.endDate ? formatDate(olympiad.endDate, tz) : null;
   const dateRange = start && end ? `${start} → ${end}` : start || end || 'TBC';
   const declined = olympiad.schoolAccess === 'declined';
 
@@ -398,6 +413,18 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
   const badge = ACCESS_BADGES[olympiad.schoolAccess];
   // An unknown access state (enrichment unavailable) keeps the old rounds view.
   const showsRounds = !olympiad.schoolAccess || olympiad.schoolAccess === 'approved';
+  const tz = olympiad.timezone || null;
+
+  const start = olympiad.startDate ? formatDate(olympiad.startDate, tz) : null;
+  const end = olympiad.endDate ? formatDate(olympiad.endDate, tz) : null;
+  const dateRange = start && end ? `${start} → ${end}` : start || end || null;
+  const now = new Date();
+  const isUpcoming = olympiad.startDate && new Date(olympiad.startDate) > now;
+  const isOngoing =
+    olympiad.startDate &&
+    new Date(olympiad.startDate) <= now &&
+    olympiad.endDate &&
+    new Date(olympiad.endDate) >= now;
 
   return (
     <div
@@ -442,10 +469,42 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
           🏆
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: '#2d2640' }}>
-            {olympiad.name}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: '#2d2640' }}>
+              {olympiad.name}
+            </p>
+            {isUpcoming && (
+              <span
+                style={{
+                  background: 'rgba(245,158,11,0.1)',
+                  color: '#b45309',
+                  padding: '1px 8px',
+                  borderRadius: '10px',
+                  fontSize: '0.65em',
+                  fontWeight: 700,
+                }}
+              >
+                Upcoming
+              </span>
+            )}
+            {isOngoing && (
+              <span
+                style={{
+                  background: 'rgba(63,174,122,0.1)',
+                  color: '#2d8a5e',
+                  padding: '1px 8px',
+                  borderRadius: '10px',
+                  fontSize: '0.65em',
+                  fontWeight: 700,
+                }}
+              >
+                Active
+              </span>
+            )}
+          </div>
           <p style={{ margin: '2px 0 0', fontSize: '0.78em', color: '#8b7fa8' }}>
+            {dateRange ? `📅 ${dateRange}` : '📅 Dates TBC'}
+            {' · '}
             {rounds.length} round{rounds.length !== 1 ? 's' : ''}
             {openCount > 0 && ` · ${openCount} open`}
             {scheduledCount > 0 && ` · ${scheduledCount} scheduled`}

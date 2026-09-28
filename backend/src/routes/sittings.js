@@ -193,7 +193,9 @@ router.patch('/sittings/:id/answers', requireAuth, async (req, res) => {
 // automarked immediately against the paper's memo answer key when one
 // exists, and the sitting is marked completed. The idempotencyKey is
 // derived from the sitting ID, so a retried request after a lost response
-// returns the existing submission instead of creating a duplicate.
+// returns the existing submission instead of creating a duplicate — and a
+// concurrent duplicate that loses the create race (P2002) also returns the
+// winner's submission instead of failing.
 router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
   try {
     const sitting = await prisma.sitting.findUnique({
@@ -290,6 +292,33 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
     if (isDbBusyError(err)) {
       return respondDbBusy(req, res, err);
     }
+    // A concurrent duplicate submit can slip past the completedAt check above
+    // and lose the create race on the unique idempotencyKey. Treat the P2002
+    // as the idempotent retry it is and return the winner's submission.
+    if (
+      err.code === 'P2002' &&
+      err.meta &&
+      err.meta.target &&
+      err.meta.target.includes('idempotencyKey')
+    ) {
+      const existing = await prisma.submission.findUnique({
+        where: { idempotencyKey: `sitting:${req.params.id}` },
+        include: { result: true },
+      });
+
+      if (existing) {
+        // Guarded so the winner's stamp is never overwritten; also covers the
+        // narrow window where the winner created the row but crashed before
+        // stamping the sitting.
+        await prisma.sitting.updateMany({
+          where: { id: req.params.id, completedAt: null },
+          data: { completedAt: new Date() },
+        });
+
+        return res.status(200).json({ submission: existing, result: existing.result });
+      }
+    }
+
     console.error(err);
     res.status(500).json({ error: 'Could not submit the test' });
   }

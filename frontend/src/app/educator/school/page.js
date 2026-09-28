@@ -3,7 +3,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { fetchSchoolDashboard, createEntrant, resendEntrantInvite, deleteEntrant } from '@/lib/api';
+import {
+  fetchSchoolDashboard,
+  createEntrant,
+  resendEntrantInvite,
+  deleteEntrant,
+  listOlympiads,
+} from '@/lib/api';
 import { GRADE_OPTIONS } from '@/lib/grade';
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
@@ -28,6 +34,24 @@ function scoreLabel(score) {
   if (score >= 50) return 'Good';
   if (score >= 25) return 'Developing';
   return 'Needs support';
+}
+
+function formatDate(iso, tz) {
+  const opts = {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  };
+  if (tz) opts.timeZone = tz;
+  return new Date(iso).toLocaleDateString('en-ZA', opts);
+}
+
+function olympiadLabel(o) {
+  const tz = o.timezone || null;
+  const start = o.startDate ? formatDate(o.startDate, tz) : null;
+  const end = o.endDate ? formatDate(o.endDate, tz) : null;
+  const range = start && end ? `${start} → ${end}` : start || end || null;
+  return range ? `${o.name} (${range})` : o.name;
 }
 
 /* ── Score ring ───────────────────────────────────────────────────────── */
@@ -481,6 +505,9 @@ export default function SchoolDashboardPage() {
   const [resendingId, setResendingId] = useState(null);
   const [resendMessage, setResendMessage] = useState(null);
   const [removingId, setRemovingId] = useState(null);
+  const [olympiads, setOlympiads] = useState([]);
+  const [selectedOlympiadId, setSelectedOlympiadId] = useState('');
+  const [olympiadFilter, setOlympiadFilter] = useState('all');
 
   const noSchool = !checking && user && !(user.school && user.school.id);
 
@@ -491,8 +518,13 @@ export default function SchoolDashboardPage() {
     async function load() {
       try {
         const token = await getToken();
-        const data = await fetchSchoolDashboard(schoolId, token);
-        setDashboard(data);
+        const [dashData, olymData] = await Promise.all([
+          fetchSchoolDashboard(schoolId, token),
+          listOlympiads(token),
+        ]);
+        setDashboard(dashData);
+        // Only show olympiads the school has approved access to
+        setOlympiads(olymData.filter((o) => o.schoolAccess === 'approved'));
         setStatus('ready');
       } catch (err) {
         setStatus('error');
@@ -515,13 +547,44 @@ export default function SchoolDashboardPage() {
     if (!dashboard) return [];
     let result = dashboard.entrants
       .filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
-      .filter((e) => gradeFilter === 'all' || e.grade === gradeFilter);
+      .filter((e) => gradeFilter === 'all' || e.grade === gradeFilter)
+      .filter((e) => {
+        if (olympiadFilter === 'all') return true;
+        return (e.olympiads || []).some((o) => o.id === olympiadFilter);
+      });
     if (sortOption === 'name') result = [...result].sort((a, b) => a.name.localeCompare(b.name));
     else if (sortOption === 'submissions')
       result = [...result].sort((a, b) => b.submissionCount - a.submissionCount);
     else result = [...result].sort((a, b) => (b.averageScore ?? -1) - (a.averageScore ?? -1));
     return result;
-  }, [dashboard, search, gradeFilter, sortOption]);
+  }, [dashboard, search, gradeFilter, sortOption, olympiadFilter]);
+
+  // Group entrants by olympiad for the grouped view
+  // Each entrant appears in exactly one group (under their first olympiad)
+  const entrantsByOlympiad = useMemo(() => {
+    if (!dashboard) return [];
+    const groups = new Map();
+    const seen = new Set();
+    for (const e of filteredEntrants) {
+      if (seen.has(e.id)) continue;
+      seen.add(e.id);
+      const olympiads = e.olympiads || [];
+      if (olympiads.length === 0) {
+        const key = '__none__';
+        if (!groups.has(key)) groups.set(key, { olympiadName: 'No Olympiad', entrants: [] });
+        groups.get(key).entrants.push(e);
+      } else {
+        const o = olympiads[0];
+        if (!groups.has(o.id)) groups.set(o.id, { olympiadName: o.name, entrants: [] });
+        groups.get(o.id).entrants.push(e);
+      }
+    }
+    return Array.from(groups.values()).sort((a, b) => {
+      if (a.olympiadName === 'No Olympiad') return 1;
+      if (b.olympiadName === 'No Olympiad') return -1;
+      return a.olympiadName.localeCompare(b.olympiadName);
+    });
+  }, [filteredEntrants]);
 
   const schoolAverage = useMemo(() => {
     if (!dashboard) return null;
@@ -544,8 +607,12 @@ export default function SchoolDashboardPage() {
     try {
       const token = await getToken();
       const schoolId = user.school && user.school.id;
-      const data = await fetchSchoolDashboard(schoolId, token);
-      setDashboard(data);
+      const [dashData, olymData] = await Promise.all([
+        fetchSchoolDashboard(schoolId, token),
+        listOlympiads(token),
+      ]);
+      setDashboard(dashData);
+      setOlympiads(olymData.filter((o) => o.schoolAccess === 'approved'));
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -559,9 +626,13 @@ export default function SchoolDashboardPage() {
       setAddMessage({ type: 'error', text: 'Name, email and grade are required.' });
       return;
     }
+    if (!selectedOlympiadId) {
+      setAddMessage({ type: 'error', text: 'Please select an Olympiad to add the student under.' });
+      return;
+    }
     if (
       !window.confirm(
-        `Add "${newName.trim()}" (${newEmail.trim()}, Grade ${newGrade.trim()}) to your school? They'll be emailed a link to set their password.`
+        `Add "${newName.trim()}" (${newEmail.trim()}, Grade ${newGrade.trim()}) under the selected Olympiad? They'll be emailed a link to set their password.`
       )
     )
       return;
@@ -569,7 +640,12 @@ export default function SchoolDashboardPage() {
     try {
       const token = await getToken();
       const result = await createEntrant(
-        { name: newName.trim(), email: newEmail.trim(), grade: newGrade.trim() },
+        {
+          name: newName.trim(),
+          email: newEmail.trim(),
+          grade: newGrade.trim(),
+          olympiadId: selectedOlympiadId,
+        },
         token
       );
       const registeredInto = (result.registeredRounds || [])
@@ -660,10 +736,11 @@ export default function SchoolDashboardPage() {
   }
 
   function handleClearFilters() {
-    if (search || gradeFilter !== 'all') {
+    if (search || gradeFilter !== 'all' || olympiadFilter !== 'all') {
       if (window.confirm('Clear all filters?')) {
         setSearch('');
         setGradeFilter('all');
+        setOlympiadFilter('all');
       }
     }
   }
@@ -940,6 +1017,27 @@ export default function SchoolDashboardPage() {
                 </option>
               ))}
             </select>
+            <select
+              value={selectedOlympiadId}
+              onChange={(e) => setSelectedOlympiadId(e.target.value)}
+              style={{
+                flex: '1 1 180px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: '1px solid rgba(139,92,246,0.25)',
+                fontSize: '0.88em',
+                background: 'white',
+              }}
+            >
+              <option value="" disabled>
+                Select Olympiad
+              </option>
+              {olympiads.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {olympiadLabel(o)}
+                </option>
+              ))}
+            </select>
             <button
               type="submit"
               disabled={adding}
@@ -1011,7 +1109,7 @@ export default function SchoolDashboardPage() {
             }}
           >
             <h3 style={{ margin: 0, fontSize: '1.1em', fontWeight: 700, color: '#2d2640' }}>
-              All Entrants ({filteredEntrants.length})
+              Students by Olympiad ({filteredEntrants.length})
             </h3>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
               <button
@@ -1059,6 +1157,24 @@ export default function SchoolDashboardPage() {
                 {grades.map((g) => (
                   <option key={g} value={g}>
                     Grade {g}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={olympiadFilter}
+                onChange={(e) => setOlympiadFilter(e.target.value)}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(139,92,246,0.25)',
+                  fontSize: '0.88em',
+                  background: 'white',
+                }}
+              >
+                <option value="all">All Olympiads</option>
+                {olympiads.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {olympiadLabel(o)}
                   </option>
                 ))}
               </select>
@@ -1169,6 +1285,27 @@ export default function SchoolDashboardPage() {
                     </option>
                   ))}
                 </select>
+                <select
+                  value={selectedOlympiadId}
+                  onChange={(e) => setSelectedOlympiadId(e.target.value)}
+                  style={{
+                    flex: '1 1 180px',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(139,92,246,0.25)',
+                    fontSize: '0.88em',
+                    background: 'white',
+                  }}
+                >
+                  <option value="" disabled>
+                    Select Olympiad
+                  </option>
+                  {olympiads.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {olympiadLabel(o)}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="submit"
                   disabled={adding}
@@ -1252,239 +1389,239 @@ export default function SchoolDashboardPage() {
               {resendMessage.text}
             </p>
           )}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '14px',
-              marginTop: '16px',
-            }}
-          >
-            {filteredEntrants.map((entrant) => (
-              <div
-                key={entrant.id}
+          {entrantsByOlympiad.map((group) => (
+            <div key={group.olympiadName} style={{ marginTop: '20px' }}>
+              <h4
                 style={{
-                  background: 'white',
-                  borderRadius: '16px',
-                  padding: '16px 18px',
-                  border: '1px solid rgba(139,92,246,0.08)',
-                  boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
+                  margin: '0 0 10px',
+                  fontSize: '0.95em',
+                  fontWeight: 700,
+                  color: group.olympiadName === 'No Olympiad' ? '#8b7fa8' : '#6d3fd1',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '14px',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 18px rgba(139,92,246,0.14)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 10px rgba(139,92,246,0.06)';
+                  gap: '8px',
                 }}
               >
-                <div
+                <span
                   style={{
-                    width: '44px',
-                    height: '44px',
+                    width: '8px',
+                    height: '8px',
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '0.85em',
+                    background: group.olympiadName === 'No Olympiad' ? '#a89fc9' : '#8b5cf6',
                     flexShrink: 0,
                   }}
-                >
-                  {initials(entrant.name)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p
+                />
+                {group.olympiadName} ({group.entrants.length})
+              </h4>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                  gap: '14px',
+                }}
+              >
+                {group.entrants.map((entrant) => (
+                  <div
+                    key={entrant.id}
                     style={{
-                      margin: 0,
-                      fontWeight: 600,
-                      color: '#2d2640',
-                      fontSize: '0.92em',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      background: 'white',
+                      borderRadius: '16px',
+                      padding: '16px 18px',
+                      border: '1px solid rgba(139,92,246,0.08)',
+                      boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 18px rgba(139,92,246,0.14)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 10px rgba(139,92,246,0.06)';
                     }}
                   >
-                    {entrant.name}
-                  </p>
-                  <p
-                    title={entrant.email || 'No account yet'}
-                    style={{
-                      margin: '2px 0 0',
-                      fontSize: '0.72em',
-                      color: '#a89fc9',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {entrant.email || 'No account yet'}
-                  </p>
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}>
-                    {(entrant.olympiads || []).map((olympiad) => (
-                      <span
-                        key={olympiad.id}
-                        style={{
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.68em',
-                          fontWeight: 600,
-                          background: 'rgba(56,142,204,0.12)',
-                          color: '#2c6cb0',
-                        }}
-                      >
-                        {olympiad.name}
-                      </span>
-                    ))}
-                    {(!entrant.olympiads || entrant.olympiads.length === 0) && (
-                      <span
-                        style={{
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.68em',
-                          fontWeight: 600,
-                          background: 'rgba(139,92,246,0.05)',
-                          color: '#8b7fa8',
-                        }}
-                      >
-                        No olympiad yet
-                      </span>
-                    )}
-                    <span
+                    <div
                       style={{
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        fontSize: '0.68em',
-                        fontWeight: 600,
-                        background: 'rgba(139,92,246,0.08)',
-                        color: '#6d3fd1',
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: '0.85em',
+                        flexShrink: 0,
                       }}
                     >
-                      Grade {entrant.grade}
-                    </span>
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        fontSize: '0.68em',
-                        fontWeight: 600,
-                        background: 'rgba(139,92,246,0.05)',
-                        color: '#8b7fa8',
-                      }}
-                    >
-                      {entrant.submissionCount} sub{entrant.submissionCount !== 1 ? 's' : ''}
-                    </span>
-                    {entrant.averageScore !== null && (
-                      <span
+                      {initials(entrant.name)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p
                         style={{
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.68em',
+                          margin: 0,
                           fontWeight: 600,
-                          background: `${scoreColor(entrant.averageScore)}18`,
-                          color: scoreColor(entrant.averageScore),
+                          color: '#2d2640',
+                          fontSize: '0.92em',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        {scoreLabel(entrant.averageScore)}
-                      </span>
-                    )}
-                    {entrant.accountStatus === 'active' && (
-                      <span
+                        {entrant.name}
+                      </p>
+                      <p
+                        title={entrant.email || 'No account yet'}
                         style={{
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.68em',
-                          fontWeight: 600,
-                          background: 'rgba(63,174,122,0.12)',
-                          color: '#2d8a5e',
-                        }}
-                      >
-                        Active
-                      </span>
-                    )}
-                    {entrant.accountStatus === 'invite_pending' && (
-                      <span
-                        style={{
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.68em',
-                          fontWeight: 600,
-                          background: 'rgba(224,168,62,0.15)',
-                          color: '#b07d1e',
-                        }}
-                      >
-                        Invite pending
-                      </span>
-                    )}
-                    {entrant.accountStatus == null && (
-                      <span
-                        style={{
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.68em',
-                          fontWeight: 600,
-                          background: 'rgba(139,92,246,0.05)',
-                          color: '#8b7fa8',
-                        }}
-                      >
-                        No account
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                    {entrant.accountStatus !== 'active' && (
-                      <button
-                        type="button"
-                        onClick={() => handleResendInvite(entrant)}
-                        disabled={resendingId === entrant.id || removingId === entrant.id}
-                        style={{
-                          padding: '5px 12px',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(139,92,246,0.3)',
-                          background: 'rgba(139,92,246,0.06)',
-                          color: '#6d3fd1',
-                          fontWeight: 600,
+                          margin: '2px 0 0',
                           fontSize: '0.72em',
-                          cursor: resendingId === entrant.id ? 'wait' : 'pointer',
+                          color: '#a89fc9',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        {resendingId === entrant.id
-                          ? 'Sending…'
-                          : entrant.accountStatus === 'invite_pending'
-                            ? 'Resend invite'
-                            : 'Send invite'}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveEntrant(entrant)}
-                      disabled={removingId === entrant.id || resendingId === entrant.id}
-                      style={{
-                        padding: '5px 12px',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(224,97,95,0.35)',
-                        background: 'rgba(224,97,95,0.06)',
-                        color: '#e0615f',
-                        fontWeight: 600,
-                        fontSize: '0.72em',
-                        cursor: removingId === entrant.id ? 'wait' : 'pointer',
-                      }}
-                    >
-                      {removingId === entrant.id ? 'Removing…' : 'Remove'}
-                    </button>
+                        {entrant.email || 'No account yet'}
+                      </p>
+                      <div
+                        style={{ display: 'flex', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}
+                      >
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.68em',
+                            fontWeight: 600,
+                            background: 'rgba(139,92,246,0.08)',
+                            color: '#6d3fd1',
+                          }}
+                        >
+                          Grade {entrant.grade}
+                        </span>
+                        <span
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.68em',
+                            fontWeight: 600,
+                            background: 'rgba(139,92,246,0.05)',
+                            color: '#8b7fa8',
+                          }}
+                        >
+                          {entrant.submissionCount} sub{entrant.submissionCount !== 1 ? 's' : ''}
+                        </span>
+                        {entrant.averageScore !== null && (
+                          <span
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.68em',
+                              fontWeight: 600,
+                              background: `${scoreColor(entrant.averageScore)}18`,
+                              color: scoreColor(entrant.averageScore),
+                            }}
+                          >
+                            {scoreLabel(entrant.averageScore)}
+                          </span>
+                        )}
+                        {entrant.accountStatus === 'active' && (
+                          <span
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.68em',
+                              fontWeight: 600,
+                              background: 'rgba(63,174,122,0.12)',
+                              color: '#2d8a5e',
+                            }}
+                          >
+                            Active
+                          </span>
+                        )}
+                        {entrant.accountStatus === 'invite_pending' && (
+                          <span
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.68em',
+                              fontWeight: 600,
+                              background: 'rgba(224,168,62,0.15)',
+                              color: '#b07d1e',
+                            }}
+                          >
+                            Invite pending
+                          </span>
+                        )}
+                        {entrant.accountStatus == null && (
+                          <span
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.68em',
+                              fontWeight: 600,
+                              background: 'rgba(139,92,246,0.05)',
+                              color: '#8b7fa8',
+                            }}
+                          >
+                            No account
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}
+                      >
+                        {entrant.accountStatus !== 'active' && (
+                          <button
+                            type="button"
+                            onClick={() => handleResendInvite(entrant)}
+                            disabled={resendingId === entrant.id || removingId === entrant.id}
+                            style={{
+                              padding: '5px 12px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(139,92,246,0.3)',
+                              background: 'rgba(139,92,246,0.06)',
+                              color: '#6d3fd1',
+                              fontWeight: 600,
+                              fontSize: '0.72em',
+                              cursor: resendingId === entrant.id ? 'wait' : 'pointer',
+                            }}
+                          >
+                            {resendingId === entrant.id
+                              ? 'Sending\u2026'
+                              : entrant.accountStatus === 'invite_pending'
+                                ? 'Resend invite'
+                                : 'Send invite'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEntrant(entrant)}
+                          disabled={removingId === entrant.id || resendingId === entrant.id}
+                          style={{
+                            padding: '5px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(224,97,95,0.35)',
+                            background: 'rgba(224,97,95,0.06)',
+                            color: '#e0615f',
+                            fontWeight: 600,
+                            fontSize: '0.72em',
+                            cursor: removingId === entrant.id ? 'wait' : 'pointer',
+                          }}
+                        >
+                          {removingId === entrant.id ? 'Removing\u2026' : 'Remove'}
+                        </button>
+                      </div>
+                    </div>
+                    <ScoreRing score={entrant.averageScore} />
                   </div>
-                </div>
-                <ScoreRing score={entrant.averageScore} />
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </>
       )}
     </>

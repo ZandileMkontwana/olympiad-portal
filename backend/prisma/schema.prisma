@@ -10,17 +10,32 @@ datasource db {
 }
 
 model Olympiad {
-  id           String           @id @default(uuid())
+  id           String              @id @default(uuid())
   name         String
   timezone     String
-  description  String?
-  grades       String?
-  startDate    DateTime?
+  description  String? // organiser-written blurb shown to educators requesting access
+  grades       String? // target learner grades, e.g. "Grade 8-12"
+  startDate    DateTime? // olympiad run dates, organiser-set
   endDate      DateTime?
-  organiserId  String?
-  organiser    User?            @relation(fields: [organiserId], references: [id])
+  organiserId  String? // the organiser who created it; null = legacy/unowned
   rounds       Round[]
   schoolAccess SchoolOlympiad[]
+  organiser    User?               @relation(fields: [organiserId], references: [id])
+  organisers   OlympiadOrganiser[]
+}
+
+// A co-organiser's access to an olympiad. The creator (Olympiad.organiserId)
+// is backfilled here so all access checks go through this single table.
+// The creator is not removable — see removal rules in the routes.
+model OlympiadOrganiser {
+  id          String   @id @default(uuid())
+  olympiadId  String
+  organiserId String
+  addedAt     DateTime @default(now())
+  olympiad    Olympiad @relation(fields: [olympiadId], references: [id])
+  organiser   User     @relation(fields: [organiserId], references: [id])
+
+  @@unique([olympiadId, organiserId])
 }
 
 model Round {
@@ -30,7 +45,8 @@ model Round {
   openTime               DateTime
   closeTime              DateTime
   state                  String             @default("scheduled")
-  qualifyingThreshold    Float?
+  qualifyingThreshold    Float? // minimum score % (0-100) required to pass; null = no gate
+  prerequisiteRoundId    String? // the round that must be passed first; null = no prerequisite
   autoAdvanceProcessedAt DateTime?
   prerequisiteRoundId    String?
   AuditLog               AuditLog[]
@@ -43,26 +59,31 @@ model Round {
   roundEntrants          RoundEntrant[]
   sittings               Sitting[]
   submissions            Submission[]
+  sittings               Sitting[]
+  notificationLogs       NotificationLog[]
+  notificationRules      NotificationRule[]
+  auditLogs              AuditLog[]
 }
 
 model User {
-  id                                             String          @id @default(uuid())
-  email                                          String          @unique
-  role                                           String
-  createdAt                                      DateTime        @default(now())
-  name                                           String
-  clerkUserId                                    String?         @unique
-  invitationExpiresAt                            DateTime?
-  invitationToken                                String?         @unique
-  passwordHash                                   String?
-  educator                                       Educator?
-  entrant                                        Entrant?
-  assignedMarkingTasks                           MarkingTask[]   @relation("AssignedMarkingTasks")
-  moderatedMarkingTasks                          MarkingTask[]   @relation("ModeratedMarkingTasks")
-  olympiads                                      Olympiad[]
-  RemarkRequest_RemarkRequest_assignedToIdToUser RemarkRequest[] @relation("RemarkRequest_assignedToIdToUser")
-  requestedRemarks                               RemarkRequest[] @relation("RequestedRemarks")
-  reviewedRemarks                                RemarkRequest[] @relation("ReviewedRemarks")
+  id                    String          @id @default(uuid())
+  clerkUserId           String?         @unique
+  email                 String          @unique
+  role                  String
+  createdAt             DateTime        @default(now())
+  name                  String
+  passwordHash          String?
+  invitationToken       String?         @unique
+  invitationExpiresAt   DateTime?
+  educator              Educator?
+  entrant               Entrant?
+  olympiads             Olympiad[]
+  organisedOlympiads    OlympiadOrganiser[]
+  assignedMarkingTasks  MarkingTask[]   @relation("AssignedMarkingTasks")
+  moderatedMarkingTasks MarkingTask[]   @relation("ModeratedMarkingTasks")
+  requestedRemarks      RemarkRequest[] @relation("RequestedRemarks")
+  assignedRemarks       RemarkRequest[] @relation("AssignedRemarkRequests")
+  reviewedRemarks       RemarkRequest[] @relation("ReviewedRemarks")
 }
 
 model School {
@@ -141,7 +162,7 @@ model MarkingTask {
   status         String     @default("unassigned")
   assignedToId   String?
   score          Float?
-  breakdown      Json?
+  breakdown      Json? // per-question partial credit, e.g. { "q1": 3, "q2": 5 }
   markedAt       DateTime?
   moderatedById  String?
   moderatedScore Float?
@@ -161,21 +182,21 @@ model Result {
 }
 
 model RemarkRequest {
-  id                                    String     @id @default(uuid())
-  submissionId                          String
-  requestedById                         String
-  reason                                String
-  status                                String     @default("pending")
-  newScore                              Float?
-  reviewedById                          String?
-  reviewNotes                           String?
-  createdAt                             DateTime   @default(now())
-  reviewedAt                            DateTime?
-  assignedToId                          String?
-  User_RemarkRequest_assignedToIdToUser User?      @relation("RemarkRequest_assignedToIdToUser", fields: [assignedToId], references: [id])
-  requestedBy                           User       @relation("RequestedRemarks", fields: [requestedById], references: [id])
-  reviewedBy                            User?      @relation("ReviewedRemarks", fields: [reviewedById], references: [id])
-  submission                            Submission @relation(fields: [submissionId], references: [id])
+  id            String     @id @default(uuid())
+  submissionId  String
+  requestedById String
+  reason        String
+  status        String     @default("pending") // 'pending' | 'assigned' | 'approved' | 'rejected'
+  assignedToId  String?
+  newScore      Float? // updated score, set when approved
+  reviewedById  String?
+  reviewNotes   String?
+  createdAt     DateTime   @default(now())
+  reviewedAt    DateTime?
+  submission    Submission @relation(fields: [submissionId], references: [id])
+  requestedBy   User       @relation("RequestedRemarks", fields: [requestedById], references: [id])
+  assignedTo    User?      @relation("AssignedRemarkRequests", fields: [assignedToId], references: [id])
+  reviewedBy    User?      @relation("ReviewedRemarks", fields: [reviewedById], references: [id])
 
   @@index([assignedToId, status])
 }
@@ -233,11 +254,14 @@ model NotificationRule {
   @@unique([roundId, triggerType])
 }
 
+// Records every automatic action the scheduler performs on a round
+// (open, close, auto-advance, notification send) so organisers can
+// audit what happened and when.
 model AuditLog {
-  id        String   @id
-  action    String
+  id        String   @id @default(uuid())
+  action    String   // 'round_opened' | 'round_closed' | 'auto_advanced' | 'notification_sent'
   timestamp DateTime @default(now())
   roundId   String?
-  payload   Json?
-  Round     Round?   @relation(fields: [roundId], references: [id])
+  payload   Json?    // detail data, e.g. { entrantId, nextRoundId } for auto-advance
+  round     Round?   @relation(fields: [roundId], references: [id])
 }

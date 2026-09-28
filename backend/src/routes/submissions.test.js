@@ -32,11 +32,13 @@ describe('Submissions routes', () => {
     vi.spyOn(prisma.result, 'create');
     vi.spyOn(prisma.markingTask, 'create');
     vi.spyOn(prisma.remarkRequest, 'create');
+    vi.spyOn(prisma.remarkRequest, 'findFirst');
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.submission, 'findFirst');
     vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => callback(prisma));
+    vi.spyOn(prisma.schoolOlympiad, 'findUnique').mockResolvedValue({ status: 'approved' });
     vi.spyOn(console, 'error').mockImplementation(() => {});
     sgMail.send.mockResolvedValue({});
     prisma.markingTask.create.mockResolvedValue({
@@ -106,6 +108,7 @@ describe('Submissions routes', () => {
         state: 'closed',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       const res = await request(app)
         .post('/api/rounds/round-1/submissions')
@@ -135,6 +138,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.submission.create.mockResolvedValue({
         id: 'sub-1',
@@ -173,6 +177,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: { memoAnswers: { q1: 'A', q2: 'B' } },
+        olympiadId: 'oly-1',
       });
       prisma.submission.create.mockResolvedValue({
         id: 'sub-1',
@@ -203,6 +208,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: { memoAnswers: { q1: 'A', q2: 'B' } },
+        olympiadId: 'oly-1',
       });
       prisma.submission.create.mockResolvedValue({
         id: 'sub-1',
@@ -229,6 +235,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
@@ -263,6 +270,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
@@ -291,6 +299,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       const submittedAt = new Date('2026-01-01');
       prisma.submission.create.mockResolvedValue({
@@ -321,6 +330,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue(null);
 
@@ -358,6 +368,7 @@ describe('Submissions routes', () => {
         state: 'open',
         name: 'Round 1',
         paper: null,
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
@@ -383,6 +394,7 @@ describe('Submissions routes', () => {
         prerequisiteRoundId: 'round-0',
         qualifyingThreshold: 50,
         prerequisiteRound: { id: 'round-0', name: 'Round 1' },
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
@@ -409,6 +421,7 @@ describe('Submissions routes', () => {
         prerequisiteRoundId: 'round-0',
         qualifyingThreshold: 50,
         prerequisiteRound: { id: 'round-0', name: 'Round 1' },
+        olympiadId: 'oly-1',
       });
       prisma.entrant.findUnique.mockResolvedValue({
         id: 'e1',
@@ -435,30 +448,83 @@ describe('Submissions routes', () => {
   });
 
   describe('POST /submissions/:id/remark', () => {
+    const endpoint = '/api/submissions/sub-1/remark';
+
     it('returns 401 when not authenticated', async () => {
       const unauthApp = createApp(false);
       const res = await request(unauthApp)
-        .post('/api/submissions/sub-1/remark')
+        .post(endpoint)
         .send({ reason: 'Question 3 was marked wrong' });
+
       expect(res.status).toBe(401);
+      expect(prisma.submission.findUnique).not.toHaveBeenCalled();
+      expect(prisma.remarkRequest.create).not.toHaveBeenCalled();
     });
 
     it('returns 400 when reason is missing', async () => {
-      const res = await request(app).post('/api/submissions/sub-1/remark').send({});
+      const res = await request(app).post(endpoint).send({});
+
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/reason/);
+      expect(prisma.submission.findUnique).not.toHaveBeenCalled();
+    });
+
+    it.each(['', '   '])('returns 400 when reason is blank or whitespace-only', async (reason) => {
+      const res = await request(app).post(endpoint).send({ reason });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/reason/);
+      expect(prisma.submission.findUnique).not.toHaveBeenCalled();
     });
 
     it('returns 404 when submission does not exist', async () => {
       prisma.submission.findUnique.mockResolvedValue(null);
-      const res = await request(app)
-        .post('/api/submissions/sub-1/remark')
-        .send({ reason: 'Question 3 was marked wrong' });
+
+      const res = await request(app).post(endpoint).send({ reason: 'Question 3 was marked wrong' });
+
       expect(res.status).toBe(404);
+      expect(prisma.submission.findUnique).toHaveBeenCalledWith({
+        where: { id: 'sub-1' },
+        include: { result: true },
+      });
+      expect(prisma.remarkRequest.findFirst).not.toHaveBeenCalled();
+      expect(prisma.remarkRequest.create).not.toHaveBeenCalled();
     });
 
-    it('creates a remark request tied to the requesting educator', async () => {
-      prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1' });
+    it('returns 400 when the submission has not been marked', async () => {
+      prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1', result: null });
+
+      const res = await request(app).post(endpoint).send({ reason: 'Please review question 3' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/has not been marked/);
+      expect(prisma.remarkRequest.findFirst).not.toHaveBeenCalled();
+      expect(prisma.remarkRequest.create).not.toHaveBeenCalled();
+    });
+
+    it.each(['pending', 'assigned'])(
+      'returns 409 when a %s appeal is already active',
+      async (status) => {
+        prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1', result: { score: 7 } });
+        prisma.remarkRequest.findFirst.mockResolvedValue({ id: 'remark-1', status });
+
+        const res = await request(app).post(endpoint).send({ reason: 'Please review question 3' });
+
+        expect(res.status).toBe(409);
+        expect(res.body.error).toMatch(/already active/);
+        expect(prisma.remarkRequest.findFirst).toHaveBeenCalledWith({
+          where: {
+            submissionId: 'sub-1',
+            status: { in: ['pending', 'assigned'] },
+          },
+        });
+        expect(prisma.remarkRequest.create).not.toHaveBeenCalled();
+      }
+    );
+
+    it('creates a pending appeal for the requesting educator with a trimmed reason', async () => {
+      prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1', result: { score: 7 } });
+      prisma.remarkRequest.findFirst.mockResolvedValue(null);
       prisma.remarkRequest.create.mockResolvedValue({
         id: 'remark-1',
         submissionId: 'sub-1',
@@ -468,11 +534,16 @@ describe('Submissions routes', () => {
       });
 
       const res = await request(app)
-        .post('/api/submissions/sub-1/remark')
-        .send({ reason: 'Question 3 was marked wrong' });
+        .post(endpoint)
+        .send({ reason: '  Question 3 was marked wrong  ' });
 
       expect(res.status).toBe(201);
-      expect(res.body.status).toBe('pending');
+      expect(res.body).toMatchObject({
+        id: 'remark-1',
+        requestedById: 'user-1',
+        reason: 'Question 3 was marked wrong',
+        status: 'pending',
+      });
       expect(prisma.remarkRequest.create).toHaveBeenCalledWith({
         data: {
           submissionId: 'sub-1',
@@ -482,15 +553,15 @@ describe('Submissions routes', () => {
       });
     });
 
-    it('returns 500 on unexpected error', async () => {
-      prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1' });
+    it('returns 500 when persistence fails unexpectedly', async () => {
+      prisma.submission.findUnique.mockResolvedValue({ id: 'sub-1', result: { score: 7 } });
+      prisma.remarkRequest.findFirst.mockResolvedValue(null);
       prisma.remarkRequest.create.mockRejectedValue(new Error('Unexpected'));
 
-      const res = await request(app)
-        .post('/api/submissions/sub-1/remark')
-        .send({ reason: 'Question 3 was marked wrong' });
+      const res = await request(app).post(endpoint).send({ reason: 'Please review question 3' });
 
       expect(res.status).toBe(500);
+      expect(res.body.error).toBe('Could not create remark request');
     });
   });
 });

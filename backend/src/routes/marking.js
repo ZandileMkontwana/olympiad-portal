@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
+const { isOlympiadOrganiser } = require('../lib/authorization');
 
 const router = express.Router();
 
@@ -18,8 +19,22 @@ router.get('/marking/queue', ...requireRole('organiser'), async (req, res) => {
           ? {}
           : { status };
 
+    // Scope to marking tasks for olympiads the caller organises.
+    const organiserRows = await prisma.olympiadOrganiser.findMany({
+      where: { organiserId: req.user.id },
+      select: { olympiadId: true },
+    });
+    const organisedOlympiadIds = organiserRows.map((r) => r.olympiadId);
+
     const tasks = await prisma.markingTask.findMany({
-      where,
+      where: {
+        ...where,
+        submission: {
+          round: {
+            olympiadId: { in: organisedOlympiadIds },
+          },
+        },
+      },
       include: {
         submission: {
           include: {
@@ -45,9 +60,18 @@ router.get('/marking/queue', ...requireRole('organiser'), async (req, res) => {
 // the body, the task is assigned to the requester themselves.
 router.patch('/marking/:id/assign', ...requireRole('organiser'), async (req, res) => {
   try {
-    const task = await prisma.markingTask.findUnique({ where: { id: req.params.id } });
+    const task = await prisma.markingTask.findUnique({
+      where: { id: req.params.id },
+      include: { submission: { select: { round: { select: { olympiadId: true } } } } },
+    });
     if (!task) {
       return res.status(404).json({ error: 'Marking task not found' });
+    }
+
+    // Only organisers of this specific olympiad may assign marking tasks.
+    const olympiadId = task.submission.round.olympiadId;
+    if (!(await isOlympiadOrganiser(req.user.id, olympiadId))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 
     const assignedToId = req.body.assignedToId || req.user.id;
@@ -80,9 +104,18 @@ router.patch('/marking/:id', ...requireRole('organiser'), async (req, res) => {
       return res.status(400).json({ error: 'score (number) is required' });
     }
 
-    const task = await prisma.markingTask.findUnique({ where: { id: req.params.id } });
+    const task = await prisma.markingTask.findUnique({
+      where: { id: req.params.id },
+      include: { submission: { select: { round: { select: { olympiadId: true } } } } },
+    });
     if (!task) {
       return res.status(404).json({ error: 'Marking task not found' });
+    }
+
+    // Only organisers of this specific olympiad may record marking.
+    const olympiadId = task.submission.round.olympiadId;
+    if (!(await isOlympiadOrganiser(req.user.id, olympiadId))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 
     const updated = await prisma.markingTask.update({
@@ -113,9 +146,18 @@ router.patch('/marking/:id/moderate', ...requireRole('organiser'), async (req, r
       return res.status(400).json({ error: 'moderatedScore (number) is required' });
     }
 
-    const task = await prisma.markingTask.findUnique({ where: { id: req.params.id } });
+    const task = await prisma.markingTask.findUnique({
+      where: { id: req.params.id },
+      include: { submission: { select: { round: { select: { olympiadId: true } } } } },
+    });
     if (!task) {
       return res.status(404).json({ error: 'Marking task not found' });
+    }
+
+    // Only organisers of this specific olympiad may moderate marking.
+    const olympiadId = task.submission.round.olympiadId;
+    if (!(await isOlympiadOrganiser(req.user.id, olympiadId))) {
+      return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 
     if (task.status !== 'marked') {

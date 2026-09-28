@@ -42,9 +42,22 @@ describe('Papers routes', () => {
     vi.spyOn(prisma.paper, 'upsert');
     vi.spyOn(prisma.paper, 'findMany');
     vi.spyOn(prisma.round, 'findUnique');
+    vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    vi.spyOn(prisma.olympiadOrganiser, 'findMany');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: user is an organiser
     prisma.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'organiser' });
+
+    // Default: organiser is a member of olympiad 'oly-1'
+    prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+      id: 'oo-1',
+      olympiadId: 'oly-1',
+      organiserId: 'user-1',
+    });
+    prisma.olympiadOrganiser.findMany.mockResolvedValue([{ olympiadId: 'oly-1' }]);
+
+    // Default: round belongs to olympiad 'oly-1'
+    prisma.round.findUnique.mockResolvedValue({ id: 'round-1', olympiadId: 'oly-1' });
 
     // Default Supabase mock: uploads succeed, returns public URL
     mockUpload = vi.fn().mockResolvedValue({ error: null });

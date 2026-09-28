@@ -15,17 +15,23 @@ router.post('/educators/complete-profile', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'name and schoolName are required' });
   }
 
-  const existing = await prisma.user.findUnique({ where: { clerkUserId } });
-  if (existing) {
+  const existingByClerkId = await prisma.user.findUnique({ where: { clerkUserId } });
+  if (existingByClerkId) {
     return res.status(409).json({ error: 'Profile already completed for this account' });
   }
 
-  // Get the user's email from Clerk itself, since we don't collect it ourselves anymore
   const clerkUser = await clerkClient.users.getUser(clerkUserId);
   const email = clerkUser.emailAddresses[0] && clerkUser.emailAddresses[0].emailAddress;
 
   if (!email) {
     return res.status(400).json({ error: 'No email found on Clerk account' });
+  }
+
+  const existingByEmail = await prisma.user.findUnique({ where: { email } });
+  if (existingByEmail) {
+    return res.status(409).json({
+      error: 'An account with this email already exists. Try signing in instead.',
+    });
   }
 
   let school = await prisma.school.findFirst({
@@ -43,9 +49,7 @@ router.post('/educators/complete-profile', requireAuth, async (req, res) => {
       email,
       role: 'educator',
       name,
-      educator: {
-        create: { schoolId: school.id },
-      },
+      educator: { create: { schoolId: school.id } },
     },
     include: { educator: { include: { school: true } } },
   });
