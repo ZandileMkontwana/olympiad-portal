@@ -9,6 +9,9 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
 
+  // The landing page renders its own header — don't stack a second one.
+  if (pathname === '/') return null;
+
   const headerClass = 'bg-lavender-deep';
 
   return (
