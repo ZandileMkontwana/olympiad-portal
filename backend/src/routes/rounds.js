@@ -364,7 +364,7 @@ router.post(
   }
 );
 
-router.post('/rounds', async (req, res) => {
+router.post('/rounds', ...requireRole('organiser'), async (req, res) => {
   try {
     const { olympiadId, name, openTime, closeTime, qualifyingThreshold } = req.body;
     if (!olympiadId || !name || !openTime || !closeTime) {
