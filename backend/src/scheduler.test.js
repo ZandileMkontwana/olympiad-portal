@@ -138,6 +138,7 @@ describe('startScheduler', () => {
       return {
         entrant: {
           id: entrantId,
+          name: 'Test Entrant',
           submissions:
             score === undefined
               ? []
@@ -471,6 +472,245 @@ describe('startScheduler', () => {
     expect(prisma.roundEntrant.createMany).toHaveBeenCalledWith({
       data: [{ roundId: 'round-2', entrantId: 'entrant-1' }],
       skipDuplicates: true,
+    });
+  });
+
+  describe('audit log entries for automatic actions', () => {
+    it('writes round_opened audit entries when rounds are opened', async () => {
+      startScheduler();
+
+      prisma.round.updateMany.mockResolvedValueOnce({ count: 2 }).mockResolvedValueOnce({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([{ id: 'round-1' }, { id: 'round-2' }]) // justOpened
+        .mockResolvedValueOnce([{ id: 'round-1', olympiadId: 'oly-1' }]) // registerEntrants
+        .mockResolvedValueOnce([]); // notification queries
+
+      prisma.schoolOlympiad.findMany.mockResolvedValueOnce([]);
+
+      await scheduledCallback();
+
+      expect(prisma.auditLog.createMany).toHaveBeenCalledWith({
+        data: [
+          { action: 'round_opened', roundId: 'round-1', payload: expect.objectContaining({ openedAt: expect.any(String) }) },
+          { action: 'round_opened', roundId: 'round-2', payload: expect.objectContaining({ openedAt: expect.any(String) }) },
+        ],
+      });
+    });
+
+    it('writes round_closed audit entries when rounds are closed', async () => {
+      startScheduler();
+
+      prisma.round.updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+      prisma.round.findMany.mockResolvedValueOnce([{ id: 'round-3' }]); // justClosed
+
+      await scheduledCallback();
+
+      expect(prisma.auditLog.createMany).toHaveBeenCalledWith({
+        data: [
+          { action: 'round_closed', roundId: 'round-3', payload: expect.objectContaining({ closedAt: expect.any(String) }) },
+        ],
+      });
+    });
+
+    it('writes auto_advanced audit entries when entrants are advanced', async () => {
+      function closedRound(overrides = {}) {
+        return {
+          id: 'round-1',
+          olympiadId: 'oly-1',
+          state: 'closed',
+          openTime: new Date('2026-01-01'),
+          qualifyingThreshold: 50,
+          roundEntrants: [],
+          ...overrides,
+        };
+      }
+
+      function roundEntrantWithScore(score, { entrantId = 'entrant-1', roundId = 'round-1' } = {}) {
+        return {
+          entrant: {
+            id: entrantId,
+            name: 'Test Entrant',
+            submissions: score === undefined
+              ? []
+              : [{ roundId, result: score === null ? null : { score } }],
+          },
+        };
+      }
+
+      startScheduler();
+
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findFirst.mockResolvedValue({
+        id: 'round-2',
+        openTime: new Date('2026-02-01'),
+        state: 'open',
+      });
+      prisma.roundEntrant.createMany.mockResolvedValue({ count: 1 });
+
+      prisma.round.findMany
+        .mockResolvedValueOnce([]) // before_open
+        .mockResolvedValueOnce([]) // before_close
+        .mockResolvedValueOnce([]) // results_released
+        .mockResolvedValueOnce([]) // missing_submission
+        .mockResolvedValueOnce([closedRound({ roundEntrants: [roundEntrantWithScore(80)] })]) // auto-advance
+        .mockResolvedValueOnce([]); // justOpened in registerEntrants (not reached since count=0)
+
+      await scheduledCallback();
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          action: 'auto_advanced',
+          roundId: 'round-1',
+          payload: {
+            entrantId: 'entrant-1',
+            entrantName: 'Test Entrant',
+            nextRoundId: 'round-2',
+            score: 80,
+          },
+        },
+      });
+    });
+
+    it('writes notification_sent audit entries for before-open notifications', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany.mockResolvedValueOnce([
+        {
+          id: 'round-1',
+          name: 'Round One',
+          openTime: new Date(Date.now() + 30 * 60 * 1000),
+          roundEntrants: [
+            {
+              entrant: {
+                school: {
+                  educators: [{ user: { email: 'educator@school.com' } }],
+                },
+              },
+            },
+          ],
+        },
+      ]);
+      prisma.notificationLog.findUnique.mockResolvedValue(null);
+
+      await scheduledCallback();
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          action: 'notification_sent',
+          roundId: 'round-1',
+          payload: { triggerType: 'before_open', recipientEmail: 'educator@school.com' },
+        },
+      });
+    });
+
+    it('writes notification_sent audit entries for before-close notifications', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: 'round-1',
+            name: 'Round One',
+            closeTime: new Date(Date.now() + 30 * 60 * 1000),
+            roundEntrants: [
+              {
+                entrant: {
+                  school: {
+                    educators: [{ user: { email: 'educator@school.com' } }],
+                  },
+                },
+              },
+            ],
+          },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      await scheduledCallback();
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          action: 'notification_sent',
+          roundId: 'round-1',
+          payload: { triggerType: 'before_close', recipientEmail: 'educator@school.com' },
+        },
+      });
+    });
+
+    it('writes notification_sent audit entries for results-released notifications', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: 'round-1',
+            name: 'Round One',
+            roundEntrants: [
+              {
+                entrant: {
+                  school: {
+                    educators: [{ user: { email: 'educator@school.com' } }],
+                  },
+                },
+              },
+            ],
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      await scheduledCallback();
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          action: 'notification_sent',
+          roundId: 'round-1',
+          payload: { triggerType: 'results_released', recipientEmail: 'educator@school.com' },
+        },
+      });
+    });
+
+    it('writes notification_sent audit entries for missing-submission notifications', async () => {
+      startScheduler();
+      prisma.round.updateMany.mockResolvedValue({ count: 0 });
+      prisma.round.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: 'round-1',
+            name: 'Round One',
+            roundEntrants: [
+              {
+                entrant: {
+                  id: 'entrant-1',
+                  name: 'Alice',
+                  school: {
+                    educators: [{ user: { email: 'educator@school.com' } }],
+                  },
+                  submissions: [],
+                },
+              },
+            ],
+          },
+        ]);
+
+      await scheduledCallback();
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          action: 'notification_sent',
+          roundId: 'round-1',
+          payload: {
+            triggerType: 'missing_submission',
+            recipientEmail: 'educator@school.com',
+            entrantId: 'entrant-1',
+          },
+        },
+      });
     });
   });
 
