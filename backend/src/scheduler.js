@@ -64,6 +64,13 @@ async function registerEntrantsForNewlyOpenRounds() {
         data: toCreate,
         skipDuplicates: true,
       });
+      await prisma.auditLog.create({
+        data: {
+          action: 'entrants_registered',
+          roundId: round.id,
+          payload: { count: toCreate.length },
+        },
+      });
     }
   }
 }

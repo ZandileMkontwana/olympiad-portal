@@ -63,7 +63,7 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique').mockResolvedValue({
       id: 'oo-1',
       olympiadId: 'oly-1',
-      organiserId: 'organiser-1',
+      organiserId: 'user-1',
     });
     vi.spyOn(prisma.olympiadOrganiser, 'create').mockResolvedValue({});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -92,7 +92,7 @@ describe('Rounds routes', () => {
   // Helper to sign in as an organiser (available to all tests in this describe block)
   function signInAsOrganiser() {
     prisma.user.findUnique.mockResolvedValue({
-      id: 'organiser-1',
+      id: 'user-1',
       email: 'organiser@olympiad.com',
       role: 'organiser',
       name: 'Organiser One',
@@ -118,7 +118,7 @@ describe('Rounds routes', () => {
 
     it('returns 400 when fields are missing', async () => {
       signInAsOrganiser();
-      const res = await request(app).post('/api/olympiads').send({ name: 'Test' });
+      const res = await request(app).post('/api/olympiads').send({});
       expect(res.status).toBe(400);
       expect(res.body.error).toMatch(/required/);
     });
@@ -137,7 +137,7 @@ describe('Rounds routes', () => {
           grades: null,
           startDate: null,
           endDate: null,
-          organiserId: 'organiser-1',
+          organiserId: 'user-1',
         },
       });
     });
@@ -170,7 +170,7 @@ describe('Rounds routes', () => {
           grades: 'Grade 8–12',
           startDate: new Date('2026-02-01T00:00:00Z'),
           endDate: new Date('2026-03-01T00:00:00Z'),
-          organiserId: 'organiser-1',
+          organiserId: 'user-1',
         },
       });
     });
@@ -188,7 +188,7 @@ describe('Rounds routes', () => {
           grades: null,
           startDate: null,
           endDate: null,
-          organiserId: 'organiser-1',
+          organiserId: 'user-1',
         },
       });
     });
@@ -315,6 +315,10 @@ describe('Rounds routes', () => {
   });
 
   describe('POST /api/rounds', () => {
+    beforeEach(() => {
+      signInAsOrganiser();
+    });
+
     it('returns 400 when fields are missing', async () => {
       const res = await request(app).post('/api/rounds').send({ name: 'Round 1' });
       expect(res.status).toBe(400);
@@ -1184,6 +1188,15 @@ describe('Rounds routes', () => {
     });
   });
   describe('GET /api/rounds/:id/progression', () => {
+    beforeEach(() => {
+      signInAsOrganiser();
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+        id: 'oo-1',
+        olympiadId: 'oly-1',
+        organiserId: 'user-1',
+      });
+    });
+
     it('returns 404 when the round does not exist', async () => {
       prisma.round.findUnique.mockResolvedValue(null);
 
@@ -1196,6 +1209,8 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         qualifyingThreshold: null,
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
         roundEntrants: [],
       });
 
@@ -1210,6 +1225,8 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         qualifyingThreshold: 50,
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
         roundEntrants: [
           {
             entrant: {
@@ -1252,6 +1269,8 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         qualifyingThreshold: 50,
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
         roundEntrants: [
           {
             entrant: {
@@ -2154,10 +2173,21 @@ describe('Rounds routes', () => {
   });
 
   describe('POST /api/rounds/:id/release-results', () => {
+    beforeEach(() => {
+      signInAsOrganiser();
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+        id: 'oo-1',
+        olympiadId: 'oly-1',
+        organiserId: 'user-1',
+      });
+    });
+
     it('releases all unreleased results for a closed round', async () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'r1',
         state: 'closed',
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
       });
 
       prisma.result.updateMany.mockResolvedValue({
@@ -2188,7 +2218,12 @@ describe('Rounds routes', () => {
     });
 
     it('flips the round to released even when no results were pending', async () => {
-      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'closed' });
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'r1',
+        state: 'closed',
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
+      });
       prisma.result.updateMany.mockResolvedValue({ count: 0 });
 
       const res = await request(app).post('/api/rounds/r1/release-results');
@@ -2201,7 +2236,12 @@ describe('Rounds routes', () => {
     });
 
     it('returns 409 when the round state changed concurrently', async () => {
-      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'closed' });
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'r1',
+        state: 'closed',
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
+      });
       prisma.result.updateMany.mockResolvedValue({ count: 2 });
       prisma.round.updateMany.mockResolvedValue({ count: 0 });
 
@@ -2223,6 +2263,8 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'r1',
         state: 'open',
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
       });
 
       const res = await request(app).post('/api/rounds/r1/release-results');
@@ -2236,6 +2278,8 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'r1',
         state: 'closed',
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
       });
 
       prisma.result.updateMany.mockRejectedValue(new Error('DB error'));
@@ -2247,7 +2291,12 @@ describe('Rounds routes', () => {
     });
 
     it('returns 500 when the round state update fails', async () => {
-      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'closed' });
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'r1',
+        state: 'closed',
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
+      });
       prisma.result.updateMany.mockResolvedValue({ count: 5 });
       prisma.round.updateMany.mockRejectedValue(new Error('DB error'));
 
@@ -2258,10 +2307,21 @@ describe('Rounds routes', () => {
   });
 
   describe('POST /api/rounds/:id/unrelease-results', () => {
+    beforeEach(() => {
+      signInAsOrganiser();
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+        id: 'oo-1',
+        olympiadId: 'oly-1',
+        organiserId: 'user-1',
+      });
+    });
+
     it('unreleases all released results for a round', async () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'r1',
         state: 'closed',
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
       });
 
       prisma.result.updateMany.mockResolvedValue({
@@ -2288,7 +2348,12 @@ describe('Rounds routes', () => {
     });
 
     it('reverts a released round back to closed', async () => {
-      prisma.round.findUnique.mockResolvedValue({ id: 'r1', state: 'released' });
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'r1',
+        state: 'released',
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
+      });
       prisma.result.updateMany.mockResolvedValue({ count: 3 });
 
       const res = await request(app).post('/api/rounds/r1/unrelease-results');
@@ -2311,6 +2376,8 @@ describe('Rounds routes', () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'r1',
         state: 'closed',
+        olympiadId: 'oly-1',
+        olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
       });
 
       prisma.result.updateMany.mockRejectedValue(new Error('DB error'));
