@@ -48,10 +48,9 @@ model Round {
   qualifyingThreshold    Float? // minimum score % (0-100) required to pass; null = no gate
   prerequisiteRoundId    String? // the round that must be passed first; null = no prerequisite
   autoAdvanceProcessedAt DateTime?
-  prerequisiteRoundId    String?
-  AuditLog               AuditLog[]
   notificationLogs       NotificationLog[]
   notificationRules      NotificationRule[]
+  auditLogs              AuditLog[]
   paper                  Paper?
   olympiad               Olympiad           @relation(fields: [olympiadId], references: [id])
   prerequisiteRound      Round?             @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
@@ -59,10 +58,6 @@ model Round {
   roundEntrants          RoundEntrant[]
   sittings               Sitting[]
   submissions            Submission[]
-  sittings               Sitting[]
-  notificationLogs       NotificationLog[]
-  notificationRules      NotificationRule[]
-  auditLogs              AuditLog[]
 }
 
 model User {
