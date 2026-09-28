@@ -261,3 +261,4 @@ model AuditLog {
   payload   Json?    // detail data, e.g. { entrantId, nextRoundId } for auto-advance
   round     Round?   @relation(fields: [roundId], references: [id])
 }
+
