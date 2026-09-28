@@ -118,3 +118,60 @@ My main contribution was investigating and improving the reliability of the port
 One of the most valuable outcomes was learning that improving application reliability is not only about changing application code. **Database configuration, transaction behaviour, testing methodology, deployment environment, and documentation all affect how confidently the system can be evaluated.**
 
 For the next sprint, I would focus on making the concurrency-testing process more structured, keeping the database and Prisma configuration consistent across branches and environments, and ensuring that every test result is clearly connected to the specific system behaviour or backlog item it was intended to validate.
+
+---
+
+# Sprint Retrospective – Mlungisi (Ronnie)
+
+## What Went Well
+
+This sprint was my most productive yet. I completed **25 tasks across 5 user stories**, covering multi-olympiad isolation, timezone-aware scheduling, audit logging, round replay, and co-organiser access. The breadth of work gave me a strong understanding of how different parts of the system interact.
+
+The **multi-olympiad isolation** work (#171) was particularly satisfying. I audited the schema for olympiad-scoping gaps, added enforcement across all relevant queries and routes, implemented authorization checks to prevent cross-olympiad access, and wrote isolation tests verifying that two olympiads cannot leak data into each other. This was foundational work that made the other features possible.
+
+The **timezone-aware scheduling** (#176) required careful thinking about where time comparisons happen. Adding the timezone field to the Olympiad model, updating the scheduler to store and compare in UTC, and updating the frontend to render times in the viewer's or olympiad's timezone was a good exercise in tracing data flow from database to UI. Writing tests for timezone conversion and boundary correctness gave confidence that the implementation handles edge cases.
+
+The **audit log** (#181) and **round replay** (#186) features worked well together. Designing the AuditLog schema, instrumenting the scheduler to write entries for automatic actions (open, close, auto-advance, notifications), building the replay endpoint that aggregates the log, and creating the organiser-facing timeline UI all connected cleanly. Writing tests for both the log entries and the replay endpoint ensured correctness.
+
+The **co-organiser access** feature (#242) was the largest piece of work this sprint. Adding the OlympiadOrganiser join table, backfilling existing organisers, building add/list routes, replacing the old `organiserId` filters with membership checks, deciding removal rules, building the UI, writing tests, and documenting the model was a full-stack effort. The membership-based access control is more flexible than the previous single-organiser model and sets us up for future collaboration features.
+
+I also fixed a critical bug where the `POST /rounds` endpoint was missing auth middleware, which was causing "You are not an organiser of this olympiad" errors even for valid organisers. Catching and fixing this during deployment testing prevented users from hitting the same issue.
+
+## What Could Be Improved
+
+The volume of tasks meant I sometimes worked on multiple features in parallel, which made context-switching costly. In future sprints, I would try to batch related tasks more aggressively rather than jumping between different user stories within the same day.
+
+The co-organiser work involved touching many files across the backend and frontend, and I occasionally lost track of which routes still needed updating. A checklist or task breakdown at the start would have helped me track progress more systematically.
+
+I also spent time debugging database connection issues during deployment that turned out to be configuration problems (PgBouncer incompatibility with Prisma transactions, clerkUserId with leading spaces). These were not code bugs but cost debugging time. Documenting common deployment issues and their solutions would help avoid repeating this investigation.
+
+The isolation tests I wrote were thorough but could have been written earlier in the sprint. Writing them after the implementation meant I was sometimes fixing bugs the tests revealed rather than having them guide the implementation from the start.
+
+## What We Learned
+
+I learned that **authorization checks need to be consistent across all routes**. The multi-olympiad isolation work showed that even one route missing a check can break the entire isolation guarantee. Auditing all routes systematically was more effective than fixing issues as they were reported.
+
+The timezone work reinforced that **time should always be stored in UTC and converted at the edges** (frontend display, API input). Comparing timestamps in different timezones is a subtle source of bugs that tests caught before they reached production.
+
+The audit log feature taught me the value of **instrumenting automatic actions for observability**. Being able to query a round's history and replay what happened when is invaluable for debugging and for user trust in the system.
+
+The co-organiser work showed that **replacing implicit access rules with explicit membership tables** is more work upfront but pays off in flexibility and clarity. The old model where only the creator could manage an olympiad was too restrictive for real-world use.
+
+I also learned the importance of **testing deployments end-to-end**. The auth middleware bug on `POST /rounds` only appeared after deployment because the local environment had different state. Automated tests caught logic errors but not configuration or middleware wiring issues.
+
+## Action Items for the Next Sprint
+
+- Batch related tasks together to reduce context-switching overhead.
+- Create a checklist when starting large features that touch many files.
+- Document common deployment issues and their solutions for the team.
+- Write isolation and authorization tests before implementation, not after.
+- Continue the pattern of instrumenting automatic actions for auditability.
+- Review all routes for consistent authorization checks when adding new features.
+
+## Overall Reflection
+
+This sprint was a significant step up in both scope and complexity. Completing 25 tasks across 5 user stories gave me confidence that I can handle large, multi-feature sprints. The work on multi-olympiad isolation and co-organiser access was particularly valuable because it established patterns that will make future features easier to implement.
+
+The most important lesson was that **systematic auditing and testing are more effective than ad-hoc fixes**. Whether it was checking every route for olympiad scoping, writing isolation tests for two olympiads, or verifying timezone boundary correctness, the systematic approach caught more issues than reactive debugging would have.
+
+For the next sprint, I would focus on maintaining this systematic approach while improving how I organize and batch work to reduce the cognitive load of context-switching between features.
