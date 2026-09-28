@@ -57,5 +57,10 @@ The team presented the planned Advanced-tier feature scope for this sprint:
 - Ensure user feedback is collected, documented and incoporated into the platform.
 - Ensure test coverage is above 60% and visible on the README.
 
+## 5. Feedback about the Portal
+
+- Try to check how data is fetched from the database to avoid fetching unnecessary data and improve speed.
+- Increase the font on the main page to make it more readable.
+
 ---
 *Minutes recorded by: Zandile Mkontwana*
