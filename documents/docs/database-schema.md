@@ -1,4 +1,5 @@
 ---
+sidebar_label: database-schema
 sidebar_position: 3
 ---
 

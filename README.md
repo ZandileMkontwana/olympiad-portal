@@ -1,26 +1,26 @@
 ---
 sidebar_position: 1
 ---
-![Backend Coverage](https://img.shields.io/badge/backend%20coverage-98.4%25-brightgreen)
-![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-100%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-108%20passing-brightgreen)
+![Backend Coverage](https://img.shields.io/badge/backend%20coverage-89.3%25-brightgreen)
+![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-96%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-750%20passing-brightgreen)
 
 ## Live deployments
 
 | Component | URL |
 |---|---|
 | Backend API (Render) | <https://olympiad-portal-backend.onrender.com> |
-| Frontend (Vercel) | <https://frontend-two-ruby-25.vercel.app> |
+| Frontend (Vercel) | <https://olympiad-portal-7fs5sexu9-zandile-mkontwanas-projects.vercel.app/> |
 | Documentation (Netlify) | <https://olympiad-portal-docs.netlify.app> |
 
 ## Code Coverage
 
 | Metric | Backend | Frontend |
 |--------|---------|----------|
-| Statements | 98.43% | 98.76% |
-| Branches | 95.65% | 93.93% |
-| Functions | 95.83% | 100% |
-| Lines | 98.41% | 100% |
+| Statements | 89.33% | 96% |
+| Branches | 78.06% | 87.62% |
+| Functions | 95.36% | 100% |
+| Lines | 89.94% | 98.35% |
 
 Run coverage locally:
 ```bash

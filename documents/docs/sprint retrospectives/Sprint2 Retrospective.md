@@ -1,3 +1,6 @@
+---
+sidebar_label: Sprint2 Retrospective
+---
 # Sprint 2 Retrospective
 
 ## Zandile (Paper Archive, Online Sitting A2/A3, Sitting Submission A5)

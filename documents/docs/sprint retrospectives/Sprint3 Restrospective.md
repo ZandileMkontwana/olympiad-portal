@@ -1,3 +1,6 @@
+---
+sidebar_label: Sprint3 Restrospective
+---
 # Sprint Retrospective – Zandile
 
 ## What Went Well
@@ -121,7 +124,7 @@ For the next sprint, I would focus on making the concurrency-testing process mor
 
 ---
 
-# Sprint Retrospective – Mlungisi (Ronnie)
+# Sprint Retrospective – Mlungisi 
 
 ## What Went Well
 
