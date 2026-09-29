@@ -25,8 +25,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata = {
-  title: 'Olympiad Portal — Organiser Console',
-  description: 'Set up rounds, upload papers, and track submissions.',
+  title: 'Olympiad Portal | Where curious minds rise',
+  description:
+    'A home for learners who love a good challenge. Explore olympiads, prepare with confidence and grow beyond the classroom.',
 };
 
 export default function RootLayout({ children }) {
