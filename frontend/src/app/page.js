@@ -10,6 +10,7 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
+import AuthRedirect from '@/components/AuthRedirect';
 import './landing.css';
 
 const pathways = [
@@ -54,6 +55,7 @@ function TreeMark({ size = 26, tone = 'ink' }) {
 export default function LandingPage() {
   return (
     <main className="landing">
+      <AuthRedirect />
       <div className="grain" aria-hidden="true" />
       <header className="site-header">
         <a className="brand" href="#top" aria-label="Olympiad Portal home">

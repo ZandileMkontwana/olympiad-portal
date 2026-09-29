@@ -1,5 +1,28 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+
+// Mock Next.js router for AuthRedirect component
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+}));
+
+// Mock Clerk for AuthRedirect component
+vi.mock('@clerk/nextjs', () => ({
+  useAuth: () => ({
+    isLoaded: true,
+    isSignedIn: false,
+    getToken: vi.fn(),
+  }),
+  ClerkProvider: ({ children }) => children,
+}));
+
+// Mock the API module for AuthRedirect
+vi.mock('@/lib/api', () => ({
+  fetchCurrentUser: vi.fn().mockResolvedValue(null),
+  dashboardPathForRole: (role) =>
+    ({ organiser: '/organiser', educator: '/educator', student: '/student' })[role] || '/login',
+}));
+
 import LandingPage from './page';
 
 describe('Landing page', () => {
