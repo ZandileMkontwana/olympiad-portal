@@ -40,20 +40,24 @@ The focus of Sprint 2 was the online test-taking journey end to end — start a 
 - Marking beyond MCQ — moderation queue, partial credit and remark requests. Sprint capacity went to the online-sitting chain and the notification/standings/dashboard cluster; MCQ automarking already covers the basic tier's marking requirement.
 - Qualifying-threshold round advancement — it depends on marks being final, which depends on the marking work above, so it moves with it.
 
-## Sprint 3 — Intermediate Finish + Start of Advanced
+## Sprint 3 — Intermediate Finish + Advanced Start
 
-- Marking beyond MCQ: moderation queue, partial credit, remark requests (carried over from Sprint 2)
-- Qualifying-threshold round advancement (carried over from Sprint 2)
-- Concurrency hardening at round open/close under load
-- Idempotent submission handling (already partially in place via `idempotencyKey`)
+The focus of Sprint 3 was completing the intermediate-tier features carried over from Sprint 2, plus starting on advanced-tier capabilities.
+
+**Delivered:**
+- Marking beyond MCQ: moderation queue, manual marking task assignment, score submission, and moderator review
+- Qualifying-threshold round advancement: entrants who meet the threshold are automatically registered for the next round
+- Appeals and reviewer workflow: educators can request remarking, organisers assign reviewers, approved appeals amend scores and re-trigger qualification in a single transaction
+- Concurrency hardening at round open/close: transaction-wrapped round-state re-checks, exactly-once submission handling under concurrent load, idempotent sitting creation
+- Multi-olympiad support with timezone-aware scheduling: each olympiad stores its own timezone, the scheduler compares in UTC, the frontend renders in the viewer's or olympiad's timezone
+- Co-organiser access: `OlympiadOrganiser` join table, membership-based access control replacing single-organiser checks, add/list/remove organiser UI
+- Audit log and round replay: every automatic scheduler action is logged, organisers can replay a round's history as a timeline
+- Load testing: concurrent boundary tests for submissions and sitting starts at round transitions
 
 ## Sprint 4 — Advanced Tier
 
 - Question banks with per-entrant variants and difficulty scoring
 - Merged online/offline submission handling, duplicate-entrant detection
-- Appeals flow (entrant → reviewer → outcome reflected in standings)
-- Multi-olympiad support across timezones, sharing one paper archive
-- Full audit log and round replay
 
 ## Why this order
 

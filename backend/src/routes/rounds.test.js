@@ -315,6 +315,10 @@ describe('Rounds routes', () => {
   });
 
   describe('POST /api/rounds', () => {
+    beforeEach(() => {
+      signInAsOrganiser();
+    });
+
     it('returns 400 when fields are missing', async () => {
       const res = await request(app).post('/api/rounds').send({ name: 'Round 1' });
       expect(res.status).toBe(400);

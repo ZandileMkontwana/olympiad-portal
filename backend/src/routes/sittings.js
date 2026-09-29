@@ -272,18 +272,18 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
         return created;
       }, TRANSACTION_OPTIONS);
     } catch (err) {
+      // Let P2002 idempotency errors bubble up to the outer catch,
+      // which handles the guarded updateMany + winner lookup.
       if (
-        err.code === 'P2002' &&
-        err.meta &&
-        err.meta.target &&
-        err.meta.target.includes('idempotencyKey')
+        err.code !== 'P2002' ||
+        !err.meta ||
+        !err.meta.target ||
+        !err.meta.target.includes('idempotencyKey')
       ) {
-        const existing = await prisma.submission.findUnique({
-          where: { idempotencyKey: `sitting:${sitting.id}` },
-          include: { result: true },
-        });
-        return res.status(200).json({ submission: existing, result: existing.result });
+        throw err;
       }
+      // P2002 on idempotencyKey — fall through to the outer catch
+      // handler below by re-throwing.
       throw err;
     }
 

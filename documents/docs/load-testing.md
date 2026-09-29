@@ -51,6 +51,17 @@ node load-test.js --cleanup   # remove the load-test round and its data
 
 This runs outside CI on purpose — it needs a live server and database, which the test workflow doesn't provision.
 
+### Concurrent boundary tests
+
+Two additional scripts target the specific concurrency boundaries identified during Sprint 3. Unlike the main harness above (which exercises the full flow end-to-end against a running server), these run in-process via `supertest` against the real routes and real database — but with a fake auth middleware standing in for Clerk. This isolates the database-level concurrency without needing a deployed backend.
+
+| Script | What it proves | npm command |
+|---|---|---|
+| `loadtest/round-boundary-submissions.js` | Simultaneous submissions arriving at a round's close boundary are handled exactly once — transaction-wrapped round-state re-check and atomic `Submission`+`Result` creation hold under concurrent load. | `npm run loadtest:submissions` |
+| `loadtest/round-open-sittings.js` | Simultaneous sitting starts at a round's open boundary — transaction-wrapped round-state re-check and atomic `RoundEntrant`+`Sitting` creation hold under concurrent load. | `npm run loadtest:sittings` |
+
+Both default to 50 concurrent entrants and accept `--concurrency=N` to adjust. Each creates its own `LOADTEST-`-prefixed data and cleans up after itself.
+
 ## Results
 
 ### Local dev backend — 27 September 2026
@@ -83,7 +94,7 @@ Environment: Render (`https://olympiad-portal.onrender.com`), same Supabase data
 | autosave | 30 | 30 | 0 | 17.1 | 338 | 408 | 525 |
 | submit + submit_duplicate | 30 | 17 | 13 | — | 442 | 549 | 550 |
 
-Exactly-once verification: **all checks PASS** (10 submissions, 0 duplicated keys) — but 13 of 30 submit attempts returned **500** instead of the idempotent 200. That is the pre-fix behavior of `main` at capture time; it is exactly the bug the harness was built to catch, and it is fixed on this branch (see Findings).
+Exactly-once verification: **all checks PASS** (10 submissions, 0 duplicated keys) — but 13 of 30 submit attempts returned **500** instead of the idempotent 200. That was the pre-fix behavior of `main` at capture time; the fix has since been merged and deployed to Render (see Findings), so this error no longer occurs on the live backend.
 
 Latency differences between the two environments are expected: the deployed instance reaches Supabase from a datacenter with a much shorter network path than a home connection, which is why deployed latencies are lower than local ones for the same code.
 
@@ -97,5 +108,5 @@ Latency differences between the two environments are expected: the deployed inst
 
 - Absolute latencies include Supabase network time; treat the numbers as relative indicators, not server CPU benchmarks.
 - API-level only — no browser rendering or static-asset load.
-- The deployed smoke run uses small counts; re-run the full-size configuration against the deployment after this branch ships to get production-scale numbers. Render's free tier also spins down when idle — the first request after a cold start is slow (the warmup phase exists to absorb that).
+- The deployed smoke run used small counts and was captured before the idempotency fix shipped to Render. The fix is now live; a full-size re-run against the deployment would confirm production-scale behaviour. Render's free tier also spins down when idle — the first request after a cold start is slow (the warmup phase exists to absorb that).
 - Every run reuses (and resets) the same dedicated load-test round; it never touches real olympiad data.

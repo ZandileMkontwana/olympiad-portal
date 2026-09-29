@@ -121,7 +121,7 @@ For the next sprint, I would focus on making the concurrency-testing process mor
 
 ---
 
-# Sprint Retrospective – Mlungisi (Ronnie)
+# Sprint Retrospective – Mlungisi 
 
 ## What Went Well
 
@@ -175,3 +175,60 @@ This sprint was a significant step up in both scope and complexity. Completing 2
 The most important lesson was that **systematic auditing and testing are more effective than ad-hoc fixes**. Whether it was checking every route for olympiad scoping, writing isolation tests for two olympiads, or verifying timezone boundary correctness, the systematic approach caught more issues than reactive debugging would have.
 
 For the next sprint, I would focus on maintaining this systematic approach while improving how I organize and batch work to reduce the cognitive load of context-switching between features.
+
+---
+
+# Sprint Retrospective – Ronie
+
+## What Went Well
+
+During this sprint, I focused primarily on appeal workflow completion, assign-flow closure, race-condition fixes, and frontend integration. My work closed the full appeal lifecycle from educator submission through reviewer assignment, decision recording, and standings/qualification update.
+
+The marker-clear race closure was a significant correctness improvement. The old flow cleared autoAdvanceProcessedAt and waited 30 seconds for the next scheduler tick, during which a concurrent tick could re-stamp the marker and silently swallow the re-trigger. Extracting advanceQualifiedEntrantsForRound into a shared function and running it inline inside the review transaction eliminated both the delay and the race. Idempotency via skipDuplicates made concurrent passes safe.
+
+Test coverage was strong across both layers. 11 net new backend tests for appeal outcomes (score amendment, immediate re-advance, released-round re-trigger, below-threshold no-op, out-of-range rejection, boundary values, rejected-path guards) and 3 new frontend tests for appeal assignment (self-assign, dropdown routing, assignment failure). The full backend suite reached 444/444 passing, and the frontend suite reached 215/215 passing with clean ESLint and Prettier.
+
+Post-publication semantics were defined and implemented, not deferred. Before this sprint, it was undefined what should happen when an appeal is approved after results have been released and certificates issued. The implementation amends released results in place, preserves releasedAt, regenerates certificates on demand, and still re-runs qualification. This prevents future ambiguity and is documented in appeal-workflow.md.
+
+The frontend assign-flow closed a real integration gap. The reviewer story was implemented but appeals could never reach a reviewer through the UI because there was no assign UI. Adding the pending appeals section with "Assign to me" and "Route to another reviewer" dropdown to /organiser/remarks unblocked the full reviewer workflow for manual testing and real use.
+
+Clean separation of concerns between backend and frontend. The backend already had the assign endpoint; the frontend just consumed it. No backend changes were needed for the frontend assignment story. The shared advancement pass is used by both scheduler and review route — a single source of truth that prevents drift.
+
+Documentation was comprehensive. appeal-workflow.md covers the full lifecycle: states, permissions, endpoints, approval effects, re-trigger safety properties, post-publication policy, edge cases, and audit trail. Future maintainers have a clear reference for how the appeal system works.
+
+## What Could Be Improved
+
+The assign-flow gap blocked manual testing longer than it should have. The reviewer story was implemented but couldn't be tested end-to-end because there was no way to assign appeals through the UI. This gap existed because backend and frontend work were tracked separately without an integration checkpoint. It should have been caught during sprint planning or earlier integration testing.
+
+Post-publication semantics required careful reasoning about edge cases. What does it mean to amend a score after certificates have been issued and results released? The answer (amend in place, preserve releasedAt, regenerate certificates on demand, re-run qualification) seems obvious in retrospect but required deliberate design decisions that weren't captured in the original story description.
+
+The marker-clear race was a pre-existing gap that only surfaced when post-publication semantics required immediate re-trigger. Earlier code review or integration testing might have caught it sooner.
+
+Line-ending normalization added friction to the verification step. The editing tool wrote LF endings; Prettier check flagged CRLF mismatches. This required manual normalization and wasn't a bug, but it added a non-trivial verification step after each edit.
+
+## What We Learned
+
+Race conditions in concurrent systems are often invisible until the timing changes. The marker-clear race existed for a while but only surfaced when the approval flow needed synchronous re-trigger instead of waiting for the next scheduler tick. Testing under different timing assumptions is a good way to surface latent races.
+
+Post-publication semantics are easy to defer but hard to retrofit. Defining what happens when an appeal is approved after results are released and certificates issued required deliberate design decisions. Leaving this undefined would have caused ambiguity and inconsistency later.
+
+Integration gaps between backend and frontend work are easy to miss when they're tracked as separate stories. The assign-flow gap existed because no one checked whether the frontend could actually reach the backend through a real user workflow. End-to-end integration testing, even manual, catches these gaps.
+
+Extracting shared logic into a single source of truth pays off quickly. The advanceQualifiedEntrantsForRound function is now used by both the scheduler and the review route. This prevents drift, makes the logic easier to test, and ensures both callers behave consistently.
+
+## Action Items for the Next Sprint
+
+- Add a note to appeal-workflow.md about the frontend UI at /organiser/remarks, including the pending appeals queue and reviewer selector.
+- Consider an integration test for the full appeal lifecycle (create → assign → review → standings/certificate/qualification update). Priority: medium.
+- Sprint planning for future cross-layer stories should include an "integration checkpoint" sub-task: verify the full workflow end-to-end before marking the story done.
+- Raise the line-ending normalization issue as a team-wide configuration item (.editorconfig or Prettier config).
+
+## Overall Reflection
+
+This sprint delivered the complete appeal workflow from end to end, closing a significant gap in the portal's functionality. The work progressed from implementing the appeal submission and reviewer assignment UI, through wiring appeal decisions into standings and qualification, to defining and documenting post-publication semantics.
+
+The most valuable outcome was the marker-clear race closure — immediate re-trigger is both faster and safer than the old 30-second-delay approach, and the shared advancement pass is now the single source of truth for qualification re-trigger across both scheduler and review route.
+
+The most important lesson was that integration gaps between backend and frontend work are easy to miss when they're tracked separately. The assign-flow gap blocked manual testing for the reviewer story, and the marker-clear race only surfaced when post-publication semantics changed the timing assumptions. Both would have been caught earlier by end-to-end integration testing or by coordinating backend and frontend work more tightly.
+
+For the next sprint, I would focus on maintaining the strong test coverage while adding integration tests for cross-cutting workflows, and ensuring that future cross-layer stories include an integration checkpoint as part of their definition of done.
