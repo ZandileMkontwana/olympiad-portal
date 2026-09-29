@@ -1,4 +1,5 @@
 ---
+sidebar_label: bug-tracking
 sidebar_position: 2
 ---
 

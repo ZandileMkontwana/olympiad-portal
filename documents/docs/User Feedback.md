@@ -1,3 +1,6 @@
+---
+sidebar_label: User Feedback
+---
 # User Feedback and Improvements
 
 ## 1. User Testing

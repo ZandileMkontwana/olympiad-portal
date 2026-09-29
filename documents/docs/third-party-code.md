@@ -1,4 +1,5 @@
 ---
+sidebar_label: third-party-code
 sidebar_position: 11
 ---
 

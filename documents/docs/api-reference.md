@@ -1,3 +1,6 @@
+---
+sidebar_label: api-reference
+---
 # API Reference
 
 All endpoints are mounted under the `/api` prefix.

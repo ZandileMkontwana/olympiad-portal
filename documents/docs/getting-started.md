@@ -1,4 +1,5 @@
 ---
+sidebar_label: getting-started
 sidebar_position: 1
 ---
 # Getting Started — Backend

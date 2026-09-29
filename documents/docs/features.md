@@ -1,4 +1,5 @@
 ---
+sidebar_label: features
 sidebar_position: 3
 ---
 

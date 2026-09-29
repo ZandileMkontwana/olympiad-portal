@@ -1,3 +1,6 @@
+---
+sidebar_label: team_only
+---
 # Sprint 3 Planning — Team Meeting
 
 **Project:** Olympiad Portal

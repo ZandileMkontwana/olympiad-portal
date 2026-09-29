@@ -1,4 +1,5 @@
 ---
+sidebar_label: tech-stack
 sidebar_position: 4
 ---
 

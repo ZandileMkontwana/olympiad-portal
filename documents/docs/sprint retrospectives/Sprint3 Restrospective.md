@@ -1,3 +1,6 @@
+---
+sidebar_label: Sprint3 Restrospective
+---
 # Sprint Retrospective – Zandile
 
 ## What Went Well
