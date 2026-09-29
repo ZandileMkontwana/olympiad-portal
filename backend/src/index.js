@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const { isDbBusyError, respondDbBusy } = require('./lib/dbErrors');
 require('dotenv').config();
 const papersRouter = require('./routes/papers');
@@ -17,6 +18,8 @@ const authRouter = require('./routes/auth');
 const studentAuthRouter = require('./routes/studentAuth');
 const certificatesRouter = require('./routes/certificates');
 const olympiadOrganisersRouter = require('./routes/olympiadOrganisers');
+const apiKeysRouter = require('./routes/apiKeys');
+const externalRouter = require('./routes/external');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
 
@@ -52,10 +55,25 @@ app.use(
   })
 );
 
+// Rate limiter for external API endpoints — 100 requests per 15 minutes per API key
+const externalRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each API key to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable deprecation warnings from `X-RateLimit-*` headers
+  keyGenerator: (req) => req.apiKey?.id || req.apiKey?.key || 'anonymous',
+  validate: { xForwardedForHeader: false, ip: false }, // Allow API key-based limiting
+  message: { error: 'Too many requests, please try again later.' },
+});
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(clerkMiddleware());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Public API endpoints — open CORS so anyone can call them from any origin
+app.use('/api/olympiads', cors());
+app.use('/api/external', cors());
 
 app.use('/api', papersRouter);
 app.use('/api', roundsRouter);
@@ -70,6 +88,10 @@ app.use('/api', authRouter);
 app.use('/api', studentAuthRouter);
 app.use('/api', certificatesRouter);
 app.use('/api', olympiadOrganisersRouter);
+app.use('/api/api-keys', apiKeysRouter);
+
+// External read-only API with rate limiting
+app.use('/api/external', externalRateLimiter, externalRouter);
 
 // JSON 404 for unmatched /api routes (prevents Express's default HTML response)
 app.use('/api', (req, res) => {
