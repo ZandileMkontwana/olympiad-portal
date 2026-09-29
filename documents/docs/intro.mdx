@@ -1,47 +1,50 @@
 ---
+sidebar_label: intro
 sidebar_position: 1
 ---
 
-# Tutorial Intro
+# Olympiad Portal
 
-Let's discover **Docusaurus in less than 5 minutes**.
+The Olympiad Portal is a full-stack web application built to manage the end-to-end lifecycle of academic olympiads — from round creation and paper management, through online test-taking and automarking, to standings, certificates, and appeals.
 
-## Getting Started
+## What the portal does
 
-Get started by **creating a new site**.
+Organisers create olympiads and configure rounds with open/close schedules. Educators register students and track their progress. Students sit tests online with timed sessions, autosave, and resume-on-disconnect. The system automarks MCQ papers, calculates standings, and manages qualification-based advancement between rounds.
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+Key capabilities include:
 
-### What you'll need
+- **Round lifecycle automation** — a scheduler ticks every 30 seconds to transition rounds through `scheduled → open → closed` states, triggering notifications and auto-advancing qualified entrants.
+- **Online test-taking** — timed sittings with periodic answer autosave, resume after disconnect, and submission with exactly-once semantics under concurrent load.
+- **Multi-olympiad support** — several olympiads can run concurrently, each with its own timezone, without data leaking across olympiads.
+- **Co-organiser access** — multiple organisers can collaborate on an olympiad, with membership-based access control.
+- **Marking and appeals** — a moderation queue for manual marking tasks, and a full appeals workflow where educators can request remarking, organisers assign reviewers, and approved appeals amend scores and re-trigger qualification in a single transaction.
+- **Standings and certificates** — live standings ranked by score, per-school rankings, and on-demand certificate PDF generation.
+- **Audit log and round replay** — every automatic scheduler action is logged, and organisers can replay a round's history as a timeline.
 
-- [Node.js](https://nodejs.org/en/download/) version 20.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+## Live deployments
 
-## Generate a new site
+| Component | URL |
+|---|---|
+| Backend API | [olympiad-portal-backend.onrender.com](https://olympiad-portal-backend.onrender.com) |
+| Frontend | [olympiad-portal on Vercel](https://olympiad-portal-7fs5sexu9-zandile-mkontwanas-projects.vercel.app/) |
+| Documentation | [olympiad-portal-docs.netlify.app](https://olympiad-portal-docs.netlify.app) |
 
-Generate a new Docusaurus site using the **classic template**.
+## Who built this
 
-The classic template will automatically be added to your project after you run the command:
+The portal was developed by the CodeCrafters team — Mlungisi, Ronie, Kutloano, and Zandile — as part of the University of the Witwatersrand's School of Computer Science and Applied Mathematics software development project (SDP).
 
-```bash
-npm init docusaurus@latest my-website classic
-```
+## How this documentation is organised
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
-
-The command also installs all necessary dependencies you need to run Docusaurus.
-
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+- [Getting Started](./getting-started) — local development setup for the backend
+- [Features](./features) — comprehensive feature list organised by user role
+- [API Reference](./api-reference) — every endpoint, with request/response shapes and auth requirements
+- [Database Schema](./database-schema) — the Prisma data model
+- [Tech Stack](./tech-stack) — technology choices and rationale
+- [Load Testing](./load-testing) — concurrency testing methodology and results
+- [Testing](./testing) — automated test coverage and what is tested
+- [Sprint Planning](./sprint%20planning/sprint1_planning) — sprint plans and meeting minutes
+- [Sprint Retrospectives](./sprint%20retrospectives/Sprint1%20Retrospective) — individual reflections after each sprint
+- [User Feedback](./User%20Feedback) — user testing results and implemented improvements
+- [Improvements](./improvement) — feedback-to-code traceability showing what was built from each piece of feedback
+- [Appeals Workflow](./appeal-workflow) — the full appeal lifecycle from request to resolution
+- [Third-Party Code](./third-party-code) — all external dependencies and services used by the portal

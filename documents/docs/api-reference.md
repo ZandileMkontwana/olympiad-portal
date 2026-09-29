@@ -1,3 +1,6 @@
+---
+sidebar_label: api-reference
+---
 # API Reference
 
 All endpoints are mounted under the `/api` prefix.
@@ -741,6 +744,381 @@ Requires auth, role `student`. Full review of one released result: the student's
 ```
 
 **Errors:** `404` result not found or not released yet, `404` no entrant record linked.
+
+---
+
+## Standings
+
+### GET /api/rounds/:id/standings
+
+Requires auth. Per-entrant standings for a round, ranked by average score. Educators see only their school's entrants; organisers see all.
+
+**Response (200):**
+```json
+[
+  {
+    "rank": 1,
+    "entrantId": "string",
+    "entrantName": "Alice Nkosi",
+    "schoolId": "string",
+    "schoolName": "Parktown High",
+    "score": 85.5
+  }
+]
+```
+
+**Errors:** `403` not authorized, `404` round not found.
+
+---
+
+### GET /api/rounds/:id/standings/schools
+
+Requires auth. Per-school aggregated standings for a round, ranked by total score. Educators see only their own school's row; organisers see all schools.
+
+**Response (200):**
+```json
+[
+  {
+    "rank": 1,
+    "schoolId": "string",
+    "schoolName": "Parktown High",
+    "totalScore": 256.5,
+    "entrantCount": 3
+  }
+]
+```
+
+**Errors:** `403` not authorized, `404` round not found.
+
+---
+
+## Results Management
+
+### POST /api/rounds/:id/release-results
+
+Requires auth, role `educator`. Releases all automarked results for a closed round so students can view them. Sets `releasedAt` on every result that doesn't have it yet, and transitions the round state to `released`.
+
+**Response (200):**
+```json
+{ "releasedCount": 12, "round": { "id": "string", "state": "released" } }
+```
+
+**Errors:** `403` round is not `closed`, `404` round not found.
+
+---
+
+### POST /api/rounds/:id/unrelease-results
+
+Requires auth, role `educator`. Hides all released results for a round so students can no longer view them. Clears `releasedAt` on every result. If the round was in `released` state it reverts to `closed`.
+
+**Response (200):**
+```json
+{ "unreleasedCount": 12, "round": { "id": "string", "state": "closed" } }
+```
+
+**Errors:** `404` round not found.
+
+---
+
+## Marking
+
+The marking workflow lets organisers manually review submissions that go beyond MCQ automarking. Tasks progress through states: `unassigned` → `assigned` → `marked` → `moderated`.
+
+### GET /api/marking/queue
+
+Requires auth, role `organiser`. Lists marking tasks for olympiads the caller organises. Defaults to `unassigned` tasks; pass `?status=assigned`, `?status=marked`, `?status=moderated`, or `?status=all` to filter.
+
+**Response (200):**
+```json
+[
+  {
+    "id": "string",
+    "status": "unassigned",
+    "submission": {
+      "id": "string",
+      "entrant": { "id": "string", "name": "Alice Nkosi" },
+      "round": { "id": "string", "name": "Round 1" }
+    },
+    "assignedTo": { "id": "string", "name": "Organiser One" } | null,
+    "score": null,
+    "breakdown": null,
+    "moderatedScore": null,
+    "createdAt": "ISO date"
+  }
+]
+```
+
+**Errors:** `403` not an organiser.
+
+---
+
+### PATCH /api/marking/:id/assign
+
+Requires auth, role `organiser`. Assigns a marking task to an organiser. If `assignedToId` is omitted, the task is assigned to the requester.
+
+**Body:**
+```json
+{ "assignedToId": "string" }
+```
+
+**Response (200):** the updated marking task with `status: "assigned"`.
+
+**Errors:** `400` assignedToId does not match a known user, `403` not a organiser of this olympiad, `404` task not found.
+
+---
+
+### PATCH /api/marking/:id
+
+Requires auth, role `organiser`. Records the marker's score for a task, with optional per-question breakdown for partial credit. Transitions the task to `marked`.
+
+**Body:**
+```json
+{ "score": 75, "breakdown": { "q1": 10, "q2": 8, "q3": 7 } }
+```
+
+`score` (number, required) is the percentage score. `breakdown` (optional) is a per-question score map.
+
+**Response (200):** the updated marking task with `status: "marked"`.
+
+**Errors:** `400` score is missing or not a number, `403` not a organiser of this olympiad, `404` task not found.
+
+---
+
+### PATCH /api/marking/:id/moderate
+
+Requires auth, role `organiser`. Records a moderator's reviewed score for an already-marked task, separate from the original marker's score. Transitions the task to `moderated`.
+
+**Body:**
+```json
+{ "moderatedScore": 80 }
+```
+
+**Response (200):** the updated marking task with `status: "moderated"`.
+
+**Errors:** `400` moderatedScore is missing or not a number, `403` task is not in `marked` status or caller is not a organiser of this olympiad, `404` task not found.
+
+---
+
+## Remark / Appeals
+
+Educators can request a remark on a submission; organisers review and approve or reject the appeal. When approved, the result score is updated and qualification is re-evaluated atomically.
+
+### POST /api/submissions/:id/remark
+
+Requires auth, role `educator`. Creates a remark request for a marked submission.
+
+**Body:**
+```json
+{ "reason": "Marker appears to have missed question 3" }
+```
+
+**Response (201):**
+```json
+{
+  "id": "string",
+  "submissionId": "string",
+  "requestedById": "string",
+  "reason": "Marker appears to have missed question 3",
+  "status": "pending",
+  "createdAt": "ISO date"
+}
+```
+
+**Errors:** `400` reason is missing or submission has not been marked, `404` submission not found, `409` a remark request is already active for this submission.
+
+---
+
+### GET /api/remark/queue
+
+Requires auth, role `organiser`. Lists remark requests for olympiads the caller organises. Defaults to `pending` requests; pass `?status=assigned`, `?status=approved`, `?status=rejected`, or `?status=all`. Use `?assignedTo=me` to see only the caller's assigned work.
+
+**Response (200):**
+```json
+[
+  {
+    "id": "string",
+    "status": "pending",
+    "reason": "Marker appears to have missed question 3",
+    "submission": {
+      "id": "string",
+      "entrant": { "id": "string", "name": "Alice Nkosi" },
+      "round": { "id": "string", "name": "Round 1" },
+      "result": { "id": "string", "score": 66.67 }
+    },
+    "requestedBy": { "id": "string", "name": "Ms Teacher", "email": "teacher@school.com" },
+    "assignedTo": null,
+    "reviewedBy": null,
+    "newScore": null,
+    "reviewNotes": null,
+    "createdAt": "ISO date"
+  }
+]
+```
+
+**Errors:** `403` not an organiser.
+
+---
+
+### PATCH /api/remark/:id/assign
+
+Requires auth, role `organiser`. Routes a pending remark request to a reviewer. If `assignedToId` is omitted, the requester is assigned.
+
+**Body:**
+```json
+{ "assignedToId": "string" }
+```
+
+**Response (200):** the updated remark request with `status: "assigned"`.
+
+**Errors:** `400` assignedToId does not match a known organiser, `403` caller is not an organiser of this olympiad, `404` request not found, `409` request is not in `pending` status.
+
+---
+
+### PATCH /api/remark/:id/review
+
+Requires auth, role `organiser`. The assigned reviewer approves or rejects a remark request. When approved, the result score is updated and qualification-based advancement is re-evaluated atomically inside the same transaction.
+
+**Body:**
+```json
+{ "status": "approved", "newScore": 80, "reviewNotes": "Question 3 was indeed missed" }
+```
+
+`status` must be `"approved"` or `"rejected"`. `newScore` (0–100) is required when approving. `reviewNotes` is optional.
+
+**Response (200):** the updated remark request.
+
+**Errors:** `400` invalid status or newScore out of range, `403` request is assigned to a different reviewer, `404` request not found, `409` request is not in `assigned` status.
+
+---
+
+## Co-Organisers
+
+Olympiad creators can add other organisers as co-organisers to share management responsibilities. Co-organisers have the same permissions as the creator within the scope of that olympiad.
+
+### GET /api/organisers
+
+Requires auth, role `organiser`. Lists all users with role `organiser` — used by the "Add organiser" dropdown.
+
+**Response (200):**
+```json
+[
+  { "id": "string", "name": "Organiser One", "email": "org@example.com" }
+]
+```
+
+---
+
+### GET /api/olympiads/:id/organisers
+
+Requires auth, role `organiser`. Lists all organisers (creator + co-organisers) for an olympiad.
+
+**Response (200):**
+```json
+[
+  {
+    "id": "string",
+    "organiserId": "string",
+    "name": "Organiser One",
+    "email": "org@example.com",
+    "addedAt": "ISO date",
+    "isCreator": true
+  }
+]
+```
+
+**Errors:** `403` caller is not an organiser of this olympiad.
+
+---
+
+### POST /api/olympiads/:id/organisers
+
+Requires auth, role `organiser`. Adds a co-organiser to an olympiad.
+
+**Body:**
+```json
+{ "organiserId": "string" }
+```
+
+**Response (201):**
+```json
+{
+  "id": "string",
+  "organiserId": "string",
+  "name": "Co-organiser Name",
+  "email": "co@example.com",
+  "addedAt": "ISO date",
+  "isCreator": false
+}
+```
+
+**Errors:** `400` organiserId is missing or target user is not an organiser, `403` caller is not an organiser of this olympiad, `404` olympiad or user not found, `409` user is already an organiser of this olympiad.
+
+---
+
+### DELETE /api/olympiads/:id/organisers/:organiserId
+
+Requires auth, role `organiser`. Removes a co-organiser from an olympiad. The creator cannot be removed.
+
+**Response (204):** No content.
+
+**Errors:** `403` caller is not an organiser of this olympiad, or the target is the creator, `404` olympiad or organiser not found.
+
+---
+
+## Audit Log & Replay
+
+### GET /api/rounds/:id/audit-log
+
+Requires auth. Returns the raw audit log entries for a round, newest first. Available to organisers and educators who have access to the olympiad.
+
+**Response (200):**
+```json
+[
+  {
+    "id": "string",
+    "action": "round_opened",
+    "timestamp": "ISO date",
+    "roundId": "string",
+    "payload": {}
+  }
+]
+```
+
+Known action types: `round_opened`, `round_closed`, `auto_advanced`, `notification_sent`.
+
+**Errors:** `403` not authorized, `404` round not found.
+
+---
+
+### GET /api/rounds/:id/replay
+
+Requires auth. Returns the round's audit log as a chronological timeline enriched with human-readable summaries — useful for organisers reviewing what happened during a round's lifecycle.
+
+**Response (200):**
+```json
+{
+  "round": {
+    "id": "string",
+    "name": "Round 1",
+    "olympiadName": "Wits Maths Olympiad",
+    "state": "closed",
+    "openTime": "ISO date",
+    "closeTime": "ISO date"
+  },
+  "timeline": [
+    {
+      "id": "string",
+      "action": "round_opened",
+      "timestamp": "ISO date",
+      "roundId": "string",
+      "payload": {},
+      "summary": "Round opened at 2026-09-15T08:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Errors:** `403` not authorized, `404` round not found.
 
 ---
 

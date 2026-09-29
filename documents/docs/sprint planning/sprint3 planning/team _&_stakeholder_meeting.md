@@ -1,3 +1,6 @@
+---
+sidebar_label: team _&_stakeholder_meeting
+---
 # Sprint 3 Planning — Team & Stakeholder Meeting
 
 **Project:** Olympiad Portal
