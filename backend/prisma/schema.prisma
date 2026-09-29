@@ -12,7 +12,7 @@ datasource db {
 model Olympiad {
   id           String              @id @default(uuid())
   name         String
-  timezone     String
+  timezone     String              @default("UTC")
   description  String? // organiser-written blurb shown to educators requesting access
   grades       String? // target learner grades, e.g. "Grade 8-12"
   startDate    DateTime? // olympiad run dates, organiser-set
@@ -255,7 +255,7 @@ model NotificationRule {
 // audit what happened and when.
 model AuditLog {
   id        String   @id @default(uuid())
-  action    String   // 'round_opened' | 'round_closed' | 'auto_advanced' | 'notification_sent'
+  action    String   // 'round_opened' | 'round_closed' | 'auto_advanced' | 'notification_sent' | 'entrants_registered'
   timestamp DateTime @default(now())
   roundId   String?
   payload   Json?    // detail data, e.g. { entrantId, nextRoundId } for auto-advance

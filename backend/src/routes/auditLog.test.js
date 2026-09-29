@@ -57,7 +57,7 @@ describe('GET /rounds/:id/audit-log', () => {
     expect(res.body.error).toBe('Round not found');
   });
 
-  it('returns audit log entries for a round ordered by timestamp desc', async () => {
+  it('returns audit log entries for a round ordered by timestamp asc', async () => {
     const mockRound = {
       id: 'r1',
       name: 'Round 1',
@@ -66,16 +66,16 @@ describe('GET /rounds/:id/audit-log', () => {
     };
     const mockLogs = [
       {
-        id: 'log-2',
-        action: 'round_closed',
-        timestamp: new Date('2026-06-15T12:00:00Z'),
+        id: 'log-1',
+        action: 'round_opened',
+        timestamp: new Date('2026-06-15T08:00:00Z'),
         roundId: 'r1',
         payload: {},
       },
       {
-        id: 'log-1',
-        action: 'round_opened',
-        timestamp: new Date('2026-06-15T08:00:00Z'),
+        id: 'log-2',
+        action: 'round_closed',
+        timestamp: new Date('2026-06-15T12:00:00Z'),
         roundId: 'r1',
         payload: {},
       },
@@ -88,11 +88,11 @@ describe('GET /rounds/:id/audit-log', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(2);
-    expect(res.body[0].action).toBe('round_closed');
-    expect(res.body[1].action).toBe('round_opened');
+    expect(res.body[0].action).toBe('round_opened');
+    expect(res.body[1].action).toBe('round_closed');
     expect(prisma.auditLog.findMany).toHaveBeenCalledWith({
       where: { roundId: 'r1' },
-      orderBy: { timestamp: 'desc' },
+      orderBy: { timestamp: 'asc' },
     });
   });
 

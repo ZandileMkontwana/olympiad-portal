@@ -32,8 +32,8 @@ const NOTIFICATION_RECIPIENT_ROLES = ['educator', 'organiser', 'all'];
 router.post('/olympiads', ...requireRole('organiser'), async (req, res) => {
   try {
     const { name, timezone, description, grades, startDate, endDate } = req.body;
-    if (!name || !timezone) {
-      return res.status(400).json({ error: 'name and timezone are required' });
+    if (!name) {
+      return res.status(400).json({ error: 'name is required' });
     }
     if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
       return res.status(400).json({ error: 'endDate must be on or after startDate' });
@@ -41,7 +41,7 @@ router.post('/olympiads', ...requireRole('organiser'), async (req, res) => {
     const olympiad = await prisma.olympiad.create({
       data: {
         name,
-        timezone,
+        timezone: timezone || 'UTC',
         description: description || null,
         grades: grades || null,
         startDate: startDate ? new Date(startDate) : null,
@@ -208,6 +208,33 @@ router.put('/olympiads/:id', ...requireRole('organiser'), async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update olympiad' });
+  }
+});
+
+// DELETE /olympiads/:id
+// Creator-only: removes the olympiad and all its organiser associations.
+router.delete('/olympiads/:id', ...requireRole('organiser'), async (req, res) => {
+  try {
+    const olympiad = await prisma.olympiad.findUnique({
+      where: { id: req.params.id },
+      select: { organiserId: true },
+    });
+
+    if (!olympiad) {
+      return res.status(404).json({ error: 'Olympiad not found' });
+    }
+
+    if (req.user.id !== olympiad.organiserId) {
+      return res.status(403).json({ error: 'Only the creator can delete this olympiad' });
+    }
+
+    await prisma.olympiadOrganiser.deleteMany({ where: { olympiadId: req.params.id } });
+    await prisma.olympiad.delete({ where: { id: req.params.id } });
+
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete olympiad' });
   }
 });
 
@@ -652,11 +679,17 @@ router.get('/rounds/:id/submissions', requireAuth, async (req, res) => {
 // A read-only preview of who would qualify for the next round based on
 // this round's qualifyingThreshold, without actually registering anyone.
 // Useful for organisers to check before/after a round closes.
-router.get('/rounds/:id/progression', async (req, res) => {
+router.get('/rounds/:id/progression', requireAuth, async (req, res) => {
   try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const round = await prisma.round.findUnique({
       where: { id: req.params.id },
       include: {
+        olympiad: true,
         roundEntrants: {
           include: {
             entrant: {
@@ -675,6 +708,9 @@ router.get('/rounds/:id/progression', async (req, res) => {
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
+
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
 
     if (round.qualifyingThreshold === null || round.qualifyingThreshold === undefined) {
       return res.json({
@@ -871,12 +907,23 @@ router.get('/rounds/:id/standings/schools', requireAuth, async (req, res) => {
 });
 
 // POST /rounds/:id/release-results
-router.post('/rounds/:id/release-results', ...requireRole('educator'), async (req, res) => {
+router.post('/rounds/:id/release-results', requireAuth, ...requireRole('organiser'), async (req, res) => {
   try {
-    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
+
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
 
     if (round.state !== 'closed') {
       return res.status(403).json({
@@ -918,12 +965,23 @@ router.post('/rounds/:id/release-results', ...requireRole('educator'), async (re
 });
 
 // POST /rounds/:id/unrelease-results
-router.post('/rounds/:id/unrelease-results', ...requireRole('educator'), async (req, res) => {
+router.post('/rounds/:id/unrelease-results', requireAuth, ...requireRole('organiser'), async (req, res) => {
   try {
-    const round = await prisma.round.findUnique({ where: { id: req.params.id } });
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
+
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
 
     const updated = await prisma.result.updateMany({
       where: {
@@ -1265,7 +1323,7 @@ router.get('/rounds/:id/audit-log', requireAuth, async (req, res) => {
 
     const logs = await prisma.auditLog.findMany({
       where: { roundId: req.params.id },
-      orderBy: { timestamp: 'desc' },
+      orderBy: { timestamp: 'asc' },
     });
 
     res.json(logs);
@@ -1325,6 +1383,10 @@ router.get('/rounds/:id/replay', requireAuth, async (req, res) => {
         closeTime: round.closeTime,
       },
       timeline,
+      isEmpty: timeline.length === 0,
+      message: timeline.length === 0
+        ? 'No automatic actions have been recorded for this round yet.'
+        : undefined,
     });
   } catch (err) {
     console.error(err);
@@ -1344,6 +1406,8 @@ function buildActionSummary(log) {
       return `Entrant ${p.entrantName || p.entrantId} advanced to round ${p.nextRoundId || '?'}`;
     case 'notification_sent':
       return `${p.triggerType} notification sent to ${p.recipientEmail || '?'}`;
+    case 'entrants_registered':
+      return `${p.count || 0} entrant(s) auto-registered for this round`;
     default:
       return `${log.action} at ${log.timestamp.toISOString()}`;
   }

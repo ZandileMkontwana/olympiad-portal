@@ -9,6 +9,15 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
 
+  // The landing and auth pages render their own headers — don't stack a second one.
+  // With Clerk's path-based routing, also hide on sub-routes like /login/factor-one.
+  if (
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register')
+  )
+    return null;
+
   const headerClass = 'bg-lavender-deep';
 
   return (
@@ -36,16 +45,7 @@ export default function SiteHeader() {
               Log in
             </Link>
           </div>
-        ) : (
-          <div className="flex gap-4 text-sm">
-            <Link href="/organiser" className="nav-link-light text-white/70">
-              Olympiads
-            </Link>
-            <Link href="/archive" className="nav-link-light text-white/70">
-              Archive
-            </Link>
-          </div>
-        )}
+        ) : null}
       </nav>
     </header>
   );

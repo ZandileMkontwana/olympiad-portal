@@ -238,19 +238,13 @@ describe('Olympiad Organisers routes', () => {
   });
 
   describe('DELETE /api/olympiads/:id/organisers/:organiserId', () => {
-    it('removes a co-organiser', async () => {
-      prisma.olympiadOrganiser.findUnique
-        .mockResolvedValueOnce({
-          id: 'oo-1',
-          olympiadId: 'oly-1',
-          organiserId: 'organiser-1',
-        }) // membership check
-        .mockResolvedValueOnce({
-          id: 'oo-2',
-          olympiadId: 'oly-1',
-          organiserId: 'organiser-2',
-        }); // target lookup
+    it('removes a co-organiser when caller is the creator', async () => {
       prisma.olympiad.findUnique.mockResolvedValue({ organiserId: 'organiser-1' });
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+        id: 'oo-2',
+        olympiadId: 'oly-1',
+        organiserId: 'organiser-2',
+      });
       prisma.olympiadOrganiser.delete.mockResolvedValue({});
 
       const res = await request(app).delete('/api/olympiads/oly-1/organisers/organiser-2');
@@ -259,11 +253,6 @@ describe('Olympiad Organisers routes', () => {
     });
 
     it('prevents removing the creator', async () => {
-      prisma.olympiadOrganiser.findUnique.mockResolvedValueOnce({
-        id: 'oo-1',
-        olympiadId: 'oly-1',
-        organiserId: 'organiser-1',
-      }); // membership check
       prisma.olympiad.findUnique.mockResolvedValue({ organiserId: 'organiser-1' });
 
       const res = await request(app).delete('/api/olympiads/oly-1/organisers/organiser-1');
@@ -271,22 +260,17 @@ describe('Olympiad Organisers routes', () => {
       expect(res.body.error).toMatch(/creator/);
     });
 
-    it('returns 403 when caller is not an organiser of the olympiad', async () => {
-      prisma.olympiadOrganiser.findUnique.mockResolvedValue(null);
+    it('returns 403 when caller is not the creator', async () => {
+      prisma.olympiad.findUnique.mockResolvedValue({ organiserId: 'organiser-other' });
 
       const res = await request(app).delete('/api/olympiads/oly-1/organisers/organiser-2');
       expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/creator/i);
     });
 
     it('returns 404 when target organiser is not found', async () => {
-      prisma.olympiadOrganiser.findUnique
-        .mockResolvedValueOnce({
-          id: 'oo-1',
-          olympiadId: 'oly-1',
-          organiserId: 'organiser-1',
-        }) // membership check
-        .mockResolvedValueOnce(null); // target not found
       prisma.olympiad.findUnique.mockResolvedValue({ organiserId: 'organiser-1' });
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue(null);
 
       const res = await request(app).delete('/api/olympiads/oly-1/organisers/organiser-2');
       expect(res.status).toBe(404);

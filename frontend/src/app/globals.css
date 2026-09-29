@@ -4,6 +4,7 @@
    (Tailwind classes and inherited text) render slightly larger. */
 html {
   font-size: 17px;
+  scroll-behavior: smooth;
 }
 
 :root {

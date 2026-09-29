@@ -122,8 +122,8 @@ router.post('/olympiads/:id/organisers', ...requireRole('organiser'), async (req
 
 // DELETE /olympiads/:id/organisers/:organiserId
 // Removes a co-organiser from an olympiad.
-// Rules: any existing organiser can remove another, but the creator
-// (Olympiad.organiserId) cannot be removed — not even by themselves.
+// Rules: only the creator (Olympiad.organiserId) can remove co-organisers.
+// The creator cannot be removed — not even by themselves.
 router.delete(
   '/olympiads/:id/organisers/:organiserId',
   ...requireRole('organiser'),
@@ -132,10 +132,6 @@ router.delete(
       const olympiadId = req.params.id;
       const targetOrganiserId = req.params.organiserId;
 
-      if (!(await isOlympiadOrganiser(req.user.id, olympiadId))) {
-        return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
-      }
-
       const olympiad = await prisma.olympiad.findUnique({
         where: { id: olympiadId },
         select: { organiserId: true },
@@ -143,6 +139,13 @@ router.delete(
 
       if (!olympiad) {
         return res.status(404).json({ error: 'Olympiad not found' });
+      }
+
+      // Only the creator can remove co-organisers.
+      if (req.user.id !== olympiad.organiserId) {
+        return res.status(403).json({
+          error: 'Only the creator can remove organisers',
+        });
       }
 
       // The creator is never removable.

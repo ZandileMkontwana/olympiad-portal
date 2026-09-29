@@ -33,6 +33,7 @@ import {
   fetchNotificationRules,
   updateNotificationRule,
   testNotificationTrigger,
+  assignRemarkRequest,
   dashboardPathForRole,
   releaseResults,
   unreleaseResults,
@@ -1382,6 +1383,56 @@ describe('api client', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
           body: JSON.stringify({ reason: 'Marker was too harsh' }),
+        })
+      );
+    });
+  });
+
+  describe('assignRemarkRequest', () => {
+    it('sends PATCH to /api/remark/:id/assign with an empty body to self-assign', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({ id: 'remark-1', status: 'assigned', assignedToId: 'organiser-1' }),
+      });
+
+      const result = await assignRemarkRequest('remark-1', {}, 'test-token');
+
+      expect(result.status).toBe('assigned');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/remark/remark-1/assign',
+        expect.objectContaining({
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({}),
+        })
+      );
+    });
+
+    it('passes assignedToId through so an appeal can be routed to another reviewer', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({ id: 'remark-1', status: 'assigned', assignedToId: 'organiser-2' }),
+      });
+
+      const result = await assignRemarkRequest(
+        'remark-1',
+        { assignedToId: 'organiser-2' },
+        'test-token'
+      );
+
+      expect(result.assignedToId).toBe('organiser-2');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/remark/remark-1/assign',
+        expect.objectContaining({
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ assignedToId: 'organiser-2' }),
         })
       );
     });
