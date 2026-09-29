@@ -45,16 +45,7 @@ export default function SiteHeader() {
               Log in
             </Link>
           </div>
-        ) : (
-          <div className="flex gap-4 text-sm">
-            <Link href="/organiser" className="nav-link-light text-white/70">
-              Olympiads
-            </Link>
-            <Link href="/archive" className="nav-link-light text-white/70">
-              Archive
-            </Link>
-          </div>
-        )}
+        ) : null}
       </nav>
     </header>
   );

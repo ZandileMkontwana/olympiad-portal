@@ -632,6 +632,11 @@
 /* ── Organiser dashboard shell ─────────────────────────────────────────── */
 
 .organiser-shell {
+  --ink: #241f38;
+  --ink-soft: #6f6690;
+  --violet: #6c4fd8;
+  --violet-dark: #4a34a8;
+  --violet-deep: #201a3d;
   background: #f8f7fc;
   color: var(--ink);
   display: flex;

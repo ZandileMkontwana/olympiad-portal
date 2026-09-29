@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import '@/app/auth.css';
 import {
+  Archive as ArchiveIcon,
   Bell,
   CalendarDays,
   ChevronRight,
@@ -24,13 +26,14 @@ const NAV_ITEMS = [
   { href: '/organiser/marking', label: 'Marking', icon: ClipboardCheck, key: 'marking' },
   { href: '/organiser/remarks', label: 'Remarks', icon: MessageSquareQuote, key: 'remarks' },
   { href: '/organiser/replay', label: 'Replay', icon: History, key: 'replay' },
+  { href: '/organiser/archive', label: 'Archive', icon: ArchiveIcon, key: 'archive' },
 ];
 
 /**
  * Shared sidebar + topbar layout for all /organiser/* routes.
  *
  * Props:
- *  - activeNav: which nav item to highlight ('dashboard' | 'marking' | 'remarks' | 'replay')
+ *  - activeNav: which nav item to highlight ('dashboard' | 'marking' | 'remarks' | 'replay' | 'archive')
  *  - breadcrumb: string shown as the current page in the topbar breadcrumb
  *  - user: { name, email, role } — used for the profile block and avatar initials
  *  - children: page content rendered inside <div className="organiser-main">
