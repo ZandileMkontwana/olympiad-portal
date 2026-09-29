@@ -1,4 +1,5 @@
 ---
+sidebar_label: appeal-workflow
 sidebar_position: 8
 ---
 

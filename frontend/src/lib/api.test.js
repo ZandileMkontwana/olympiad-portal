@@ -35,6 +35,24 @@ import {
   testNotificationTrigger,
   assignRemarkRequest,
   dashboardPathForRole,
+  releaseResults,
+  unreleaseResults,
+  listMarkingQueue,
+  assignMarkingTask,
+  submitMarking,
+  moderateMarkingTask,
+  listRoundSubmissions,
+  requestRemark,
+  listRemarkQueue,
+  reviewRemarkRequest,
+  listOlympiadOrganisers,
+  addOlympiadOrganiser,
+  removeOlympiadOrganiser,
+  listAllOrganisers,
+  fetchRoundReplay,
+  fetchRoundEntrants,
+  saveSittingAnswers,
+  createSitting,
 } from './api';
 
 describe('api client', () => {
@@ -1186,6 +1204,190 @@ describe('api client', () => {
     });
   });
 
+  describe('releaseResults', () => {
+    it('sends POST to /api/rounds/:id/release-results with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ released: true }),
+      });
+      const result = await releaseResults('round-1', 'test-token');
+      expect(result.released).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/release-results',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('unreleaseResults', () => {
+    it('sends POST to /api/rounds/:id/unrelease-results with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ unreleased: true }),
+      });
+      const result = await unreleaseResults('round-1', 'test-token');
+      expect(result.unreleased).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/unrelease-results',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('listMarkingQueue', () => {
+    it('sends GET to /api/marking/queue with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 'task-1' }]),
+      });
+      const result = await listMarkingQueue('test-token');
+      expect(result[0].id).toBe('task-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/marking/queue',
+        expect.objectContaining({
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+
+    it('appends status query parameter when provided', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+      });
+      await listMarkingQueue('test-token', 'marked');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/marking/queue?status=marked',
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('assignMarkingTask', () => {
+    it('sends PATCH to /api/marking/:id/assign with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'task-1', assignedTo: 'org-1' }),
+      });
+      const result = await assignMarkingTask('task-1', 'test-token', 'org-1');
+      expect(result.assignedTo).toBe('org-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/marking/task-1/assign',
+        expect.objectContaining({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ assignedToId: 'org-1' }),
+        })
+      );
+    });
+
+    it('sends empty body when no assignedToId is given', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'task-1' }),
+      });
+      await assignMarkingTask('task-1', 'test-token');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/marking/task-1/assign',
+        expect.objectContaining({
+          body: JSON.stringify({}),
+        })
+      );
+    });
+  });
+
+  describe('submitMarking', () => {
+    it('sends PATCH to /api/marking/:id with score and Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'task-1', score: 85 }),
+      });
+      const result = await submitMarking(
+        'task-1',
+        { score: 85, breakdown: { q1: 10 } },
+        'test-token'
+      );
+      expect(result.score).toBe(85);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/marking/task-1',
+        expect.objectContaining({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ score: 85, breakdown: { q1: 10 } }),
+        })
+      );
+    });
+  });
+
+  describe('moderateMarkingTask', () => {
+    it('sends PATCH to /api/marking/:id/moderate with moderatedScore', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'task-1', moderatedScore: 90 }),
+      });
+      const result = await moderateMarkingTask('task-1', 90, 'test-token');
+      expect(result.moderatedScore).toBe(90);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/marking/task-1/moderate',
+        expect.objectContaining({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ moderatedScore: 90 }),
+        })
+      );
+    });
+  });
+
+  describe('listRoundSubmissions', () => {
+    it('sends GET to /api/rounds/:id/submissions', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 'sub-1' }]),
+      });
+      const result = await listRoundSubmissions('round-1');
+      expect(result[0].id).toBe('sub-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/submissions',
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('requestRemark', () => {
+    it('sends POST to /api/submissions/:id/remark with reason and Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: 'remark-1', status: 'pending' }),
+      });
+      const result = await requestRemark('sub-1', 'Marker was too harsh', 'test-token');
+      expect(result.status).toBe('pending');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/submissions/sub-1/remark',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ reason: 'Marker was too harsh' }),
+        })
+      );
+    });
+  });
+
   describe('assignRemarkRequest', () => {
     it('sends PATCH to /api/remark/:id/assign with an empty body to self-assign', async () => {
       fetchMock.mockResolvedValue({
@@ -1231,6 +1433,236 @@ describe('api client', () => {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
           body: JSON.stringify({ assignedToId: 'organiser-2' }),
+        })
+      );
+    });
+  });
+
+  describe('listRemarkQueue', () => {
+    it('sends GET to /api/remark/queue with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 'rq-1' }]),
+      });
+      const result = await listRemarkQueue('test-token');
+      expect(result[0].id).toBe('rq-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/remark/queue',
+        expect.objectContaining({
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+
+    it('passes status and assignedTo query parameters', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+      });
+      await listRemarkQueue('test-token', { status: 'pending', assignedTo: 'me' });
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/remark/queue?'),
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('reviewRemarkRequest', () => {
+    it('sends PATCH to /api/remark/:id/review with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'rq-1', status: 'approved' }),
+      });
+      const result = await reviewRemarkRequest(
+        'rq-1',
+        { status: 'approved', newScore: 80, reviewNotes: 'Fair' },
+        'test-token'
+      );
+      expect(result.status).toBe('approved');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/remark/rq-1/review',
+        expect.objectContaining({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ status: 'approved', newScore: 80, reviewNotes: 'Fair' }),
+        })
+      );
+    });
+  });
+
+  describe('listOlympiadOrganisers', () => {
+    it('sends GET to /api/olympiads/:id/organisers with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 'oo-1', organiserId: 'org-1', isCreator: true }]),
+      });
+      const result = await listOlympiadOrganisers('oly-1', 'test-token');
+      expect(result[0].isCreator).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads/oly-1/organisers',
+        expect.objectContaining({
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('addOlympiadOrganiser', () => {
+    it('sends POST to /api/olympiads/:id/organisers with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () => Promise.resolve({ id: 'oo-2', organiserId: 'org-2' }),
+      });
+      const result = await addOlympiadOrganiser('oly-1', 'org-2', 'test-token');
+      expect(result.organiserId).toBe('org-2');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads/oly-1/organisers',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ organiserId: 'org-2' }),
+        })
+      );
+    });
+  });
+
+  describe('removeOlympiadOrganiser', () => {
+    it('sends DELETE to /api/olympiads/:id/organisers/:organiserId with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ message: 'Removed' }),
+      });
+      const result = await removeOlympiadOrganiser('oly-1', 'org-2', 'test-token');
+      expect(result.message).toBe('Removed');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/olympiads/oly-1/organisers/org-2',
+        expect.objectContaining({
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('listAllOrganisers', () => {
+    it('sends GET to /api/organisers with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 'org-1', name: 'Organiser One' }]),
+      });
+      const result = await listAllOrganisers('test-token');
+      expect(result[0].name).toBe('Organiser One');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/organisers',
+        expect.objectContaining({
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('fetchRoundReplay', () => {
+    it('sends GET to /api/rounds/:id/replay with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            round: { id: 'round-1', name: 'Round 1' },
+            timeline: [{ id: 'evt-1', action: 'round_opened' }],
+          }),
+      });
+      const result = await fetchRoundReplay('round-1', 'test-token');
+      expect(result.timeline[0].action).toBe('round_opened');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/replay',
+        expect.objectContaining({
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
+  describe('fetchRoundEntrants', () => {
+    it('sends GET to /api/rounds/:id/entrants with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 'e1', name: 'Alice' }]),
+      });
+      const result = await fetchRoundEntrants('round-1', 'test-token');
+      expect(result[0].name).toBe('Alice');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/entrants',
+        expect.objectContaining({
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+
+    it('sends GET without Authorization header when no token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+      });
+      await fetchRoundEntrants('round-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/entrants',
+        expect.objectContaining({
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+    });
+  });
+
+  describe('saveSittingAnswers', () => {
+    it('sends PATCH to /api/sittings/:id/answers with answers and Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'sitting-1' }),
+      });
+      const result = await saveSittingAnswers('sitting-1', { q1: 'A', q2: 'B' }, 'test-token');
+      expect(result.id).toBe('sitting-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/sittings/sitting-1/answers',
+        expect.objectContaining({
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ answers: { q1: 'A', q2: 'B' } }),
+        })
+      );
+    });
+  });
+
+  describe('createSitting', () => {
+    it('sends POST to /api/rounds/:id/sittings with entrantId and Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: () =>
+          Promise.resolve({
+            sitting: { id: 'sit-1', entrantId: 'e1' },
+            round: { id: 'r1', name: 'Round 1' },
+            paper: { fileUrl: 'http://example.com/paper.pdf', questions: ['q1'] },
+          }),
+      });
+      const result = await createSitting('round-1', 'e1', 'test-token');
+      expect(result.sitting.id).toBe('sit-1');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/rounds/round-1/sittings',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+          body: JSON.stringify({ entrantId: 'e1' }),
         })
       );
     });

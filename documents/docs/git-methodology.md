@@ -1,4 +1,5 @@
 ---
+sidebar_label: git-methodology
 sidebar_position: 2
 ---
 

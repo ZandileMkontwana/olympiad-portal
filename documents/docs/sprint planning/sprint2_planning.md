@@ -1,4 +1,5 @@
 ---
+sidebar_label: sprint2_planning
 sidebar_position: 7
 ---
 

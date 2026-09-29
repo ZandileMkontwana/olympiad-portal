@@ -1,3 +1,6 @@
+---
+sidebar_label: AI_declaration
+---
 ## AI Declaration - Zandile
 
 AI assistance (Claude, Anthropic — Claude Sonnet 5, accessed via Claude.ai) was used throughout this project's development in the following ways:
