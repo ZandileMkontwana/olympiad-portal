@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
+import OrganiserShell from '@/components/OrganiserShell';
 import { listOlympiads, fetchRoundReplay, ApiError } from '@/lib/api';
 
 const ACTION_STYLES = {
@@ -80,9 +80,9 @@ export default function ReplayPage() {
 
   if (checking) {
     return (
-      <main className="round-page">
+      <OrganiserShell activeNav="replay" breadcrumb="Replay" user={user}>
         <p>Loading...</p>
-      </main>
+      </OrganiserShell>
     );
   }
 
@@ -92,17 +92,11 @@ export default function ReplayPage() {
   );
 
   return (
-    <main className="round-page">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-        <Link href="/organiser" style={{ fontSize: '0.9em', color: 'rgba(139, 92, 246, 0.9)' }}>
-          ← Back to dashboard
-        </Link>
+    <OrganiserShell activeNav="replay" breadcrumb="Replay" user={user}>
+      <div className="organiser-page-heading">
+        <h1>Round Replay</h1>
+        <p>View the timeline of automatic actions the scheduler performed on a round.</p>
       </div>
-
-      <h1>Round Replay</h1>
-      <p className="description">
-        View the timeline of automatic actions the scheduler performed on a round.
-      </p>
 
       {/* Round selector */}
       <div style={{ marginBottom: '24px' }}>
@@ -270,6 +264,6 @@ export default function ReplayPage() {
           )}
         </div>
       )}
-    </main>
+    </OrganiserShell>
   );
 }

@@ -9,8 +9,14 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
 
-  // The landing page renders its own header — don't stack a second one.
-  if (pathname === '/') return null;
+  // The landing and auth pages render their own headers — don't stack a second one.
+  // With Clerk's path-based routing, also hide on sub-routes like /login/factor-one.
+  if (
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register')
+  )
+    return null;
 
   const headerClass = 'bg-lavender-deep';
 

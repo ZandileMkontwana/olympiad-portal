@@ -17,8 +17,26 @@ const jsxInJs = () => ({
   },
 });
 
+// Mock CSS imports so they don't fail during test resolution
+const mockCss = () => ({
+  name: 'mock-css',
+  enforce: 'pre',
+  resolveId(id) {
+    if (id.endsWith('.css')) {
+      return { id: 'virtual:mock-css', external: false };
+    }
+    return null;
+  },
+  load(id) {
+    if (id === 'virtual:mock-css') {
+      return 'export default {}';
+    }
+    return null;
+  },
+});
+
 export default defineConfig({
-  plugins: [jsxInJs(), react()],
+  plugins: [jsxInJs(), mockCss(), react()],
   test: {
     globals: true,
     environment: 'jsdom',

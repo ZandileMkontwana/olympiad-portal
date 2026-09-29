@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
+import OrganiserShell from '@/components/OrganiserShell';
 import { listMarkingQueue, assignMarkingTask, submitMarking, ApiError } from '@/lib/api';
 
 function questionIdsFromAnswers(answers) {
@@ -121,24 +122,24 @@ export default function MarkingPage() {
 
   if (checking) {
     return (
-      <main className="round-page">
-        <p>Loading...</p>
+      <main className="organiser-shell">
+        <p style={{ padding: '48px', fontSize: '14px', color: '#817a91' }}>Loading...</p>
       </main>
     );
   }
 
   return (
-    <main className="round-page">
-      <h1>Marking Queue</h1>
-      <p className="description">
-        Logged in as <strong>{user.email}</strong> ({user.role})
-      </p>
+    <OrganiserShell activeNav="marking" breadcrumb="Marking Queue" user={user}>
+      <div className="organiser-page-heading">
+        <h1>Marking Queue</h1>
+        <p>Review and mark submissions assigned to you.</p>
+      </div>
 
       {status === 'loading' && <p className="description">Loading marking queue...</p>}
       {status === 'error' && (
         <p className="message">Couldn&apos;t load the marking queue. Try refreshing.</p>
       )}
-      {status === 'empty' && <p className="description">No submissions waiting to be marked. 🎉</p>}
+      {status === 'empty' && <p className="description">No submissions waiting to be marked.</p>}
 
       {status === 'ready' && !selectedTask && (
         <ul style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -234,6 +235,6 @@ export default function MarkingPage() {
           </div>
         </form>
       )}
-    </main>
+    </OrganiserShell>
   );
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
+import OrganiserShell from '@/components/OrganiserShell';
 import {
   listAllOrganisers,
   listRemarkQueue,
@@ -166,19 +167,20 @@ export default function RemarksPage() {
 
   if (checking) {
     return (
-      <main className="round-page">
-        <p>Loading...</p>
+      <main className="organiser-shell">
+        <p style={{ padding: '48px', fontSize: '14px', color: '#817a91' }}>Loading...</p>
       </main>
     );
   }
 
   return (
-    <main className="round-page">
-      <h1>Appeals</h1>
-      <p className="description">
-        Route pending appeals to a reviewer, then decide the ones assigned to you,{' '}
-        <strong>{user.email}</strong>.
-      </p>
+    <OrganiserShell activeNav="remarks" breadcrumb="Appeals" user={user}>
+      <div className="organiser-page-heading">
+        <h1>Appeals</h1>
+        <p>
+          Route pending appeals to a reviewer, then decide the ones assigned to you.
+        </p>
+      </div>
 
       <h2 style={{ marginBottom: '8px' }}>Pending appeals</h2>
       {pendingStatus === 'loading' && <p className="description">Loading pending appeals...</p>}
@@ -401,6 +403,6 @@ export default function RemarksPage() {
           </div>
         </form>
       )}
-    </main>
+    </OrganiserShell>
   );
 }
