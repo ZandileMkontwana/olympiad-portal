@@ -3,21 +3,42 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { SignIn, useAuth } from '@clerk/nextjs';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { SignIn, useAuth, useClerk } from '@clerk/nextjs';
 import { studentLogin, dashboardPathForRole, fetchCurrentUser } from '@/lib/api';
 import { getStudentSession, setStudentSession } from '@/lib/studentSession';
 import '../../auth.css';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isSignedIn, getToken } = useAuth();
+  const { signOut } = useClerk();
   const [role, setRole] = useState('student');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Read error from URL parameters (from /auth/check redirect)
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    const expectedRole = searchParams.get('expected');
+    const actualRole = searchParams.get('actual');
+    
+    if (errorParam === 'role_mismatch') {
+      setError(`This account is registered as a ${actualRole}, not as a ${expectedRole}. Please select the correct role or sign in with a different account.`);
+      // Sign out from Clerk so they can sign in again
+      signOut();
+    } else if (errorParam === 'not_registered') {
+      setError('Your account is not registered in the system yet. Please contact your administrator.');
+      signOut();
+    } else if (errorParam === 'unknown') {
+      setError('An error occurred. Please try again.');
+      signOut();
+    }
+  }, [searchParams, signOut]);
 
   // Redirect if there's already a stored student session
   useEffect(() => {
@@ -236,16 +257,23 @@ export default function LoginPage() {
               </p>
             </>
           ) : (
-            <SignIn
-              routing="path"
-              path="/login"
-              signUpUrl="/register"
-              forceRedirectUrl={`/auth/check?expectedRole=${role}`}
-              localization={{
-                signIn: {
-                  start: {
-                    title: 'Sign In',
-                  },
+            <>
+              {error && (
+                <div className="auth-alert auth-alert-error" role="alert" style={{ marginBottom: '16px' }}>
+                  <strong>Couldn&apos;t sign you in</strong>
+                  {error}
+                </div>
+              )}
+              <SignIn
+                routing="path"
+                path="/login"
+                signUpUrl="/register"
+                forceRedirectUrl={`/auth/check?expectedRole=${role}`}
+                localization={{
+                  signIn: {
+                    start: {
+                      title: 'Sign In',
+                    },
                 },
               }}
               appearance={{
@@ -270,6 +298,7 @@ export default function LoginPage() {
                 },
               }}
             />
+            </>
           )}
         </div>
       </section>
