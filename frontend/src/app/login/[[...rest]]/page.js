@@ -19,23 +19,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-
-  // Read error from URL parameters (from /auth/check redirect)
-  useEffect(() => {
+  const [error, setError] = useState(() => {
     const errorParam = searchParams.get('error');
     const expectedRole = searchParams.get('expected');
     const actualRole = searchParams.get('actual');
-    
     if (errorParam === 'role_mismatch') {
-      setError(`This account is registered as a ${actualRole}, not as a ${expectedRole}. Please select the correct role or sign in with a different account.`);
-      // Sign out from Clerk so they can sign in again
-      signOut();
-    } else if (errorParam === 'not_registered') {
-      setError('Your account is not registered in the system yet. Please contact your administrator.');
-      signOut();
-    } else if (errorParam === 'unknown') {
-      setError('An error occurred. Please try again.');
+      return `This account is registered as a ${actualRole}, not as a ${expectedRole}. Please select the correct role or sign in with a different account.`;
+    }
+    if (errorParam === 'not_registered') {
+      return 'Your account is not registered in the system yet. Please contact your administrator.';
+    }
+    if (errorParam === 'unknown') {
+      return 'An error occurred. Please try again.';
+    }
+    return null;
+  });
+
+  // Sign out from Clerk when redirected with an auth error
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'role_mismatch' || errorParam === 'not_registered' || errorParam === 'unknown') {
       signOut();
     }
   }, [searchParams, signOut]);
