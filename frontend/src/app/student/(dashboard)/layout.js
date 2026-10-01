@@ -6,18 +6,22 @@ import '@/app/auth.css';
 // The sit (test-taking) page sits outside this group and stays full-screen.
 export default function StudentLayout({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#f8f7fc' }}>
+    <div className="app-shell">
       <StudentSidebar />
-      <main
-        style={{
-          marginLeft: '240px',
-          width: 'calc(100% - 15rem)',
-          maxWidth: '1120px',
-          padding: '54px clamp(24px, 4vw, 58px) 80px',
-        }}
-      >
-        {children}
-      </main>
+      <div className="page-shell">
+        <header className="topbar">
+          <div className="breadcrumbs">
+            <span>Workspace</span>
+            <strong>Student overview</strong>
+          </div>
+          <div className="top-actions">
+            <div className="avatar">AM</div>
+          </div>
+        </header>
+        <main className="dashboard">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

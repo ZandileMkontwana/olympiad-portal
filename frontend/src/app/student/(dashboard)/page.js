@@ -9,17 +9,20 @@ import {
   Award,
   BarChart3,
   ChevronRight,
+  ArrowRight,
   ClipboardList,
+  ClipboardCheck,
   CheckCircle2,
+  Clock3,
   LineChart,
   Search,
   Sparkles,
   Trophy,
+  CalendarDays,
 } from 'lucide-react';
 
-// Student dashboard. The persistent sidebar lives in the (dashboard) layout;
-// this page shows everything in one scroll — a single unified "My tests" list
-// (started tests plus rounds not yet started) and one results list.
+// Student dashboard — uses the unified dashboard UI design with
+// welcome-row, hero-card, stats-grid, content-grid, and panel classes.
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
 
@@ -70,40 +73,33 @@ function olympiadTone(index) {
   return tones[index % tones.length];
 }
 
+function todayFormatted() {
+  return new Date().toLocaleDateString('en-ZA', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 const STATUS_STYLES = {
-  'in-progress': { bg: 'rgba(76,175,125,0.1)', color: '#3fae7a', label: 'In progress' },
-  'not-started': { bg: 'rgba(224,168,62,0.12)', color: '#c99a2e', label: 'Not started' },
-  completed: { bg: 'rgba(139,92,246,0.08)', color: '#6d3fd1', label: 'Completed' },
-  expired: { bg: 'rgba(139,127,168,0.1)', color: '#8b7fa8', label: 'Expired' },
-  locked: { bg: 'rgba(139,127,168,0.06)', color: '#999', label: 'Locked' },
+  'in-progress': { bg: 'rgba(76,175,125,0.1)', color: '#3fae7a', label: 'In progress', tone: 'green' },
+  'not-started': { bg: 'rgba(224,168,62,0.12)', color: '#c99a2e', label: 'Not started', tone: 'amber' },
+  completed: { bg: 'rgba(139,92,246,0.08)', color: '#6d3fd1', label: 'Completed', tone: 'purple' },
+  expired: { bg: 'rgba(139,127,168,0.1)', color: '#8b7fa8', label: 'Expired', tone: 'blue' },
+  locked: { bg: 'rgba(139,127,168,0.06)', color: '#999', label: 'Locked', tone: 'blue' },
 };
 
-/* ── Stat card (organiser-matched) ────────────────────────────────────── */
+/* ── Stat card ────────────────────────────────────────────────────────── */
 
-function StatCard({ icon, label, value, accent }) {
+function StatCard({ icon: Icon, label, value, detail, tone }) {
   return (
-    <div className="dashboard-panel" style={{ padding: '16px 18px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
-        <div
-          style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '9px',
-            background: accent || 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          {icon}
-        </div>
-        <div>
-          <p style={{ margin: 0, fontSize: '1.25em', fontWeight: 700, color: '#241f38', lineHeight: 1 }}>
-            {value}
-          </p>
-          <p style={{ margin: '3px 0 0', fontSize: '0.72em', color: '#6f6690' }}>{label}</p>
-        </div>
+    <div className="stat-card">
+      <div className={`stat-icon ${tone || 'purple'}`}><Icon /></div>
+      <div>
+        <p>{label}</p>
+        <strong>{value}</strong>
+        <span>{detail}</span>
       </div>
     </div>
   );
@@ -275,8 +271,6 @@ function TestsSection({ tests, rounds }) {
         round: r.round,
         lockedReason: r.lockedReason,
       }));
-    // Urgent first: in-progress, then tests waiting to be started (both by
-    // their deadline), then finished/expired ones by most recent.
     const order = { 'in-progress': 0, 'not-started': 1, completed: 2, expired: 3 };
     return [...started, ...notStarted].sort((a, b) => {
       if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
@@ -288,8 +282,6 @@ function TestsSection({ tests, rounds }) {
     });
   }, [tests, rounds]);
 
-  const inProgress = items.filter((i) => i.status === 'in-progress').length;
-
   return (
     <div>
       {items.length === 0 ? (
@@ -300,71 +292,60 @@ function TestsSection({ tests, rounds }) {
           </p>
         </div>
       ) : (
-        <div className="mini-event-list" style={{ marginTop: '14px' }}>
-          {items.map((item, idx) => {
+        <div className="test-list">
+          {items.map((item) => {
             const isSitting = item.kind === 'sitting';
             const style = STATUS_STYLES[item.status] || STATUS_STYLES.completed;
+            const dateLabel = isSitting
+              ? `Started ${formatDate(item.test.startedAt)}`
+              : `Closes ${formatDate(item.round.closeTime)}`;
+
             return (
-              <div key={item.id}>
-                <div className="mini-event" style={{ position: 'relative' }}>
-                  <span className={`event-dot ${olympiadTone(idx)}`} />
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>
-                      {isSitting
-                        ? `Started ${formatDate(item.test.startedAt)}`
-                        : `Closes ${formatDate(item.round.closeTime)}`}
-                      {item.status === 'in-progress' ? ` · ${timeLeft(item.test.expiresAt)}` : ''}
-                    </small>
-                  </span>
-                  <span
-                    style={{
-                      background: style.bg,
-                      color: style.color,
-                      padding: '3px 10px',
-                      borderRadius: '20px',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {style.label}
-                  </span>
+              <div className="test-row" key={item.id}>
+                <div className={`test-symbol ${style.tone}`}><ClipboardCheck /></div>
+                <div className="test-main">
+                  <strong>{item.name}</strong>
+                  <span>{dateLabel}</span>
                   {item.status === 'in-progress' && (
-                    <Link
-                      href={`/student/sit?id=${item.test.roundId}`}
-                      onClick={(e) => {
-                        if (!window.confirm('Continue this test? Your answers are saved.'))
-                          e.preventDefault();
-                      }}
-                      className="request-review"
-                      style={{ background: '#6c4fd8', color: '#fff', textDecoration: 'none', fontSize: '10px' }}
-                    >
-                      Resume
-                    </Link>
-                  )}
-                  {item.status === 'not-started' && (
-                    <Link
-                      href={`/student/sit?id=${item.round.id}`}
-                      onClick={(e) => {
-                        if (
-                          !window.confirm(`Start "${item.name}"? Once started, your time begins.`)
-                        )
-                          e.preventDefault();
-                      }}
-                      className="request-review"
-                      style={{ background: '#6c4fd8', color: '#fff', textDecoration: 'none', fontSize: '10px' }}
-                    >
-                      Start test
-                    </Link>
-                  )}
-                  {item.status === 'locked' && item.lockedReason && (
-                    <span style={{ fontSize: '10px', color: '#999', fontStyle: 'italic' }}>{item.lockedReason}</span>
-                  )}
-                  {(item.status !== 'in-progress' && item.status !== 'not-started' && item.status !== 'locked') && (
-                    <ChevronRight size={15} style={{ color: '#aaa1b7' }} />
+                    <div className="progress-line">
+                      <i style={{ width: '68%' }} />
+                    </div>
                   )}
                 </div>
+                <div className="test-side">
+                  <span className={`status-badge ${style.tone}`}>{style.label}</span>
+                  <small>
+                    {item.status === 'in-progress' ? timeLeft(item.test.expiresAt) : ''}
+                  </small>
+                </div>
+                {item.status === 'in-progress' && (
+                  <Link
+                    href={`/student/sit?id=${item.test.roundId}`}
+                    onClick={(e) => {
+                      if (!window.confirm('Continue this test? Your answers are saved.'))
+                        e.preventDefault();
+                    }}
+                  >
+                    <ArrowRight className="row-arrow" />
+                  </Link>
+                )}
+                {item.status === 'not-started' && (
+                  <Link
+                    href={`/student/sit?id=${item.round.id}`}
+                    onClick={(e) => {
+                      if (!window.confirm(`Start "${item.name}"? Once started, your time begins.`))
+                        e.preventDefault();
+                    }}
+                  >
+                    <ArrowRight className="row-arrow" />
+                  </Link>
+                )}
+                {item.status === 'locked' && item.lockedReason && (
+                  <span style={{ fontSize: '10px', color: '#999', fontStyle: 'italic' }}>{item.lockedReason}</span>
+                )}
+                {(item.status !== 'in-progress' && item.status !== 'not-started' && item.status !== 'locked') && (
+                  <ArrowRight className="row-arrow" />
+                )}
               </div>
             );
           })}
@@ -378,7 +359,6 @@ function TestsSection({ tests, rounds }) {
 
 function ResultsSection({ results }) {
   const [search, setSearch] = useState('');
-  const best = results.reduce((max, r) => Math.max(max, r.score), 0);
   const filtered = results.filter((r) => r.round.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -421,35 +401,98 @@ function ResultsSection({ results }) {
           <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>No results released yet.</p>
         </div>
       ) : (
-        <div className="mini-event-list" style={{ marginTop: '14px' }}>
-          {filtered.map((result, idx) => (
-            <Link
-              href={`/student/result?id=${result.id}`}
-              key={result.id}
-              className="mini-event"
-              style={{ textDecoration: 'none', cursor: 'pointer' }}
-            >
-              <span className={`event-dot ${olympiadTone(idx)}`} />
-              <span>
-                <strong>{result.round.name}</strong>
-                <small>Submitted {formatDate(result.submittedAt)}</small>
-              </span>
-              <span
-                style={{
-                  fontSize: '16px',
-                  fontWeight: 700,
-                  color: scoreColor(result.score),
-                  flexShrink: 0,
-                }}
+        <div className="test-list">
+          {filtered.map((result, idx) => {
+            const tone = olympiadTone(idx);
+            const toneColorMap = { violet: 'purple', amber: 'amber', blue: 'blue' };
+            return (
+              <Link
+                href={`/student/result?id=${result.id}`}
+                key={result.id}
+                className="test-row"
+                style={{ textDecoration: 'none', cursor: 'pointer' }}
               >
-                {Math.round(result.score)}%
-              </span>
-              <ChevronRight size={15} style={{ color: '#aaa1b7' }} />
-            </Link>
-          ))}
+                <div className={`test-symbol ${toneColorMap[tone] || 'purple'}`}><ClipboardCheck /></div>
+                <div className="test-main">
+                  <strong>{result.round.name}</strong>
+                  <span>Submitted {formatDate(result.submittedAt)}</span>
+                </div>
+                <div className="test-side">
+                  <span style={{ fontSize: '16px', fontWeight: 700, color: scoreColor(result.score) }}>
+                    {Math.round(result.score)}%
+                  </span>
+                </div>
+                <ArrowRight className="row-arrow" />
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
+  );
+}
+
+/* ── Up-next cards ────────────────────────────────────────────────────── */
+
+function UpNextSection({ rounds, sittings }) {
+  const notStarted = rounds
+    .filter((r) => !r.sitting && !r.locked)
+    .sort((a, b) => new Date(a.round.closeTime) - new Date(b.round.closeTime))
+    .slice(0, 2);
+
+  const inProgress = sittings
+    .filter((s) => testStatus(s) === 'in-progress')
+    .sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt))
+    .slice(0, 1);
+
+  const upcoming = [
+    ...inProgress.map((s) => ({
+      name: s.round.name,
+      subtitle: `Test in progress`,
+      date: new Date(s.expiresAt),
+      timeLabel: timeLeft(s.expiresAt),
+      day: new Date(s.expiresAt).getDate(),
+      month: new Date(s.expiresAt).toLocaleDateString('en-ZA', { month: 'short' }).toUpperCase(),
+    })),
+    ...notStarted.map((r) => ({
+      name: r.round.name,
+      subtitle: `Round opens soon`,
+      date: new Date(r.round.openTime),
+      timeLabel: '',
+      day: new Date(r.round.openTime).getDate(),
+      month: new Date(r.round.openTime).toLocaleDateString('en-ZA', { month: 'short' }).toUpperCase(),
+    })),
+  ].slice(0, 2);
+
+  if (upcoming.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '20px 0' }}>
+        <CalendarDays size={20} style={{ color: '#8b7fa8', marginBottom: '6px' }} />
+        <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>
+          No upcoming deadlines.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {upcoming.map((item, idx) => (
+        <div className={`calendar-card${idx > 0 ? ' muted-card' : ''}`} key={idx}>
+          <div className="calendar-date">
+            <strong>{item.day}</strong>
+            <span>{item.month}</span>
+          </div>
+          <div>
+            <strong>{item.name}</strong>
+            <span>{item.subtitle}</span>
+            {item.timeLabel && (
+              <small><Clock3 /> {item.timeLabel}</small>
+            )}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -484,8 +527,6 @@ export default function StudentDashboard() {
     load();
   }, [checking, user, getToken]);
 
-  // `!user` covers the window after sign-out clears the session but before
-  // the redirect away finishes — otherwise user.name below would crash.
   if (checking || !user || status === 'loading') {
     return (
       <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>
@@ -506,21 +547,20 @@ export default function StudentDashboard() {
 
   const firstName = (user?.name || user?.email || 'Student').split(/[\s@]/)[0];
   const availableCount = rounds.filter((r) => !r.sitting && !r.locked).length;
+  const heroTest = inProgress[0] || null;
 
   return (
     <>
       {/* Welcome row */}
-      <div className="organiser-welcome-row">
+      <section className="welcome-row">
         <div>
-          <p className="organiser-eyebrow">
-            <Sparkles size={14} /> Your student space
-          </p>
+          <p className="eyebrow">{todayFormatted()}</p>
           <h1>
-            {greetingFor()}, {firstName}.
+            {greetingFor()}, {firstName} <span>&#10022;</span>
           </h1>
-          <p className="organiser-subtitle">
+          <p className="subheading">
             {inProgress.length > 0
-              ? `You have ${inProgress.length} test${inProgress.length > 1 ? 's' : ''} in progress — ${timeLeft(inProgress[0].expiresAt)}.`
+              ? `You have ${inProgress.length} test${inProgress.length > 1 ? 's' : ''} in progress — keep going!`
               : availableCount > 0
               ? `You have ${availableCount} test${availableCount > 1 ? 's' : ''} ready to take.`
               : 'All caught up — nothing due right now.'}
@@ -533,18 +573,48 @@ export default function StudentDashboard() {
               if (!window.confirm('Continue this test? Your answers are saved.'))
                 e.preventDefault();
             }}
-            className="primary-action"
-            style={{ textDecoration: 'none' }}
+            className="button primary"
           >
-            Resume test <ChevronRight size={15} />
+            Resume test <ArrowRight />
           </Link>
         )}
-      </div>
+      </section>
+
+      {/* Hero card — in-progress test */}
+      {heroTest && (
+        <section className="hero-card">
+          <div className="hero-copy">
+            <div className="hero-kicker"><Sparkles /> Your next milestone</div>
+            <h2>Finish strong</h2>
+            <p>{heroTest.round.name}</p>
+            <div className="hero-meta">
+              <span><Clock3 /> {timeLeft(heroTest.expiresAt)}</span>
+              <span><ClipboardCheck /> In progress</span>
+            </div>
+            <Link
+              href={resumeHref}
+              onClick={(e) => {
+                if (!window.confirm('Continue this test? Your answers are saved.'))
+                  e.preventDefault();
+              }}
+              className="button light"
+            >
+              Continue test <ArrowRight />
+            </Link>
+          </div>
+          <div className="hero-ring">
+            <div>
+              <strong>68%</strong>
+              <span>complete</span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {status === 'error' && (
         <div
           role="alert"
-          className="dashboard-panel"
+          className="panel"
           style={{ marginTop: '20px', padding: '16px', borderColor: '#f3c2c2', background: '#fdf0f0' }}
         >
           <p style={{ color: '#8f2f2f', fontSize: '13px', margin: 0 }}>
@@ -555,94 +625,92 @@ export default function StudentDashboard() {
 
       {status === 'ready' && (
         <>
-          {/* Stats row */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: '14px',
-              marginTop: '24px',
-            }}
-          >
-            <StatCard
-              icon={<ClipboardList size={16} color="#fff" />}
-              label="Tests"
-              value={sittings.length}
-            />
-            <StatCard
-              icon={<CheckCircle2 size={16} color="#fff" />}
-              label="Completed"
-              value={completed}
-              accent="linear-gradient(135deg, #4caf7d, #2d8a5e)"
-            />
-            <StatCard
-              icon={<BarChart3 size={16} color="#fff" />}
-              label="Average"
-              value={avgScore !== null ? `${avgScore}%` : '\u2014'}
-              accent={avgScore !== null ? `linear-gradient(135deg, ${scoreColor(avgScore)}, ${scoreColor(avgScore)}dd)` : undefined}
-            />
-            <StatCard
-              icon={<Trophy size={16} color="#fff" />}
-              label="Best score"
-              value={bestScore}
-              accent={
-                results.length > 0
-                  ? `linear-gradient(135deg, ${scoreColor(Math.max(...results.map((r) => r.score)))}, ${scoreColor(Math.max(...results.map((r) => r.score)))}dd)`
-                  : undefined
-              }
-            />
+          {/* Section heading */}
+          <div className="section-heading">
+            <div>
+              <h2>Your overview</h2>
+              <p>A quick look at your Olympiad journey.</p>
+            </div>
           </div>
 
-          {/* Dashboard grid: Tests + Achievements/Trend */}
-          <section className="organiser-dashboard-grid" aria-label="Student dashboard overview" style={{ marginTop: '20px' }}>
+          {/* Stats grid */}
+          <section className="stats-grid">
+            <StatCard
+              icon={ClipboardCheck}
+              label="Tests completed"
+              value={completed}
+              detail={sittings.length > 0 ? `${sittings.length} total started` : 'No tests yet'}
+              tone="purple"
+            />
+            <StatCard
+              icon={Trophy}
+              label="Average score"
+              value={avgScore !== null ? `${avgScore}%` : '\u2014'}
+              detail={avgScore !== null ? `Best: ${bestScore}` : 'Take a test to see stats'}
+              tone="amber"
+            />
+            <StatCard
+              icon={Clock3}
+              label="Tests available"
+              value={availableCount}
+              detail={availableCount > 0 ? 'Ready to start' : 'None right now'}
+              tone="blue"
+            />
+            <StatCard
+              icon={Sparkles}
+              label="Best score"
+              value={bestScore}
+              detail={results.length > 0 ? `${results.length} result${results.length !== 1 ? 's' : ''} released` : 'No results yet'}
+              tone="green"
+            />
+          </section>
+
+          {/* Content grid */}
+          <section className="content-grid">
             {/* My tests panel */}
-            <article className="dashboard-panel">
-              <div className="dashboard-panel-heading">
+            <div className="panel">
+              <div className="panel-heading">
                 <div>
-                  <span className="command-eyebrow">
-                    <ClipboardList size={13} /> Assessments
-                  </span>
                   <h2>My tests</h2>
-                  <p>Start, resume, and review your test sittings.</p>
+                  <p>Stay on top of your active and upcoming challenges.</p>
                 </div>
                 {inProgress.length > 0 && (
-                  <span className="nav-count" style={{ flex: '0 0 auto' }}>
+                  <span style={{
+                    background: 'rgba(76,175,125,0.1)',
+                    color: '#3fae7a',
+                    padding: '3px 10px',
+                    borderRadius: '20px',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                  }}>
                     {inProgress.length} active
                   </span>
                 )}
               </div>
               <TestsSection tests={sittings} rounds={rounds} />
-            </article>
+              <Link href="/student" className="full-link">
+                View all tests <ArrowRight />
+              </Link>
+            </div>
 
-            {/* Right column: Trend + Achievements */}
-            <article className="dashboard-panel">
-              <div className="dashboard-panel-heading">
+            {/* Up next panel */}
+            <div className="panel calendar-panel">
+              <div className="panel-heading">
                 <div>
-                  <span className="command-eyebrow">
-                    <LineChart size={13} /> Performance
-                  </span>
-                  <h2>Trend &amp; achievements</h2>
-                  <p>Track your progress over time.</p>
+                  <h2>Up next</h2>
+                  <p>Your upcoming deadlines.</p>
                 </div>
+                <CalendarDays className="heading-icon" />
               </div>
-              <TrendChart results={results} />
-              <div style={{ marginTop: '16px', borderTop: '1px solid #f0edf6', paddingTop: '14px' }}>
-                <span className="command-eyebrow" style={{ marginBottom: '10px', display: 'inline-flex' }}>
-                  <Award size={13} /> Badges
-                </span>
-                <AchievementBadges results={results} sittings={sittings} />
-              </div>
-            </article>
+              <UpNextSection rounds={rounds} sittings={sittings} />
+            </div>
           </section>
 
-          {/* Results panel (full width) */}
-          <section style={{ marginTop: '16px' }}>
-            <article className="dashboard-panel">
-              <div className="dashboard-panel-heading">
+          {/* Trend & achievements + Results (second row) */}
+          <section className="content-grid">
+            <div className="panel">
+              <div className="panel-heading">
                 <div>
-                  <span className="command-eyebrow">
-                    <CheckCircle2 size={13} /> Results
-                  </span>
                   <h2>My results</h2>
                   <p>
                     {results.length > 0
@@ -651,13 +719,38 @@ export default function StudentDashboard() {
                   </p>
                 </div>
                 {results.length > 0 && (
-                  <Link href={`/student/result?id=${results[0]?.id}`} className="panel-link">
-                    View latest <ChevronRight size={14} />
+                  <Link href={`/student/result?id=${results[0]?.id}`} className="text-button">
+                    View latest <ArrowRight />
                   </Link>
                 )}
               </div>
               <ResultsSection results={results} />
-            </article>
+            </div>
+
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Performance</h2>
+                  <p>Track your progress over time.</p>
+                </div>
+                <Award className="heading-icon" />
+              </div>
+              <TrendChart results={results} />
+              <div style={{ marginTop: '16px', borderTop: '1px solid #f0edf6', paddingTop: '14px' }}>
+                <span style={{
+                  color: '#a0a7b5',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  letterSpacing: '.12em',
+                  textTransform: 'uppercase',
+                  display: 'block',
+                  marginBottom: '10px',
+                }}>
+                  Badges
+                </span>
+                <AchievementBadges results={results} sittings={sittings} />
+              </div>
+            </div>
           </section>
         </>
       )}
