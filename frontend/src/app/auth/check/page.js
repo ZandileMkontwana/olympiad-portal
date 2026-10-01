@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { fetchCurrentUser, dashboardPathForRole } from '@/lib/api';
 
-export default function AuthCheckPage() {
+function AuthCheckContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -29,14 +29,11 @@ export default function AuthCheckPage() {
         if (cancelled) return;
         
         if (!user || !user.role) {
-          // No profile in backend - redirect to login with error
           router.replace('/login?error=not_registered');
           return;
         }
         
-        // Validate that the user's role matches the expected role
         if (expectedRole && user.role !== expectedRole) {
-          // Role mismatch - redirect to login with error
           router.replace(`/login?error=role_mismatch&expected=${expectedRole}&actual=${user.role}`);
           return;
         }
@@ -78,5 +75,13 @@ export default function AuthCheckPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function AuthCheckPage() {
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}><p style={{ color: '#766e89', fontSize: '14px' }}>Loading...</p></div>}>
+      <AuthCheckContent />
+    </Suspense>
   );
 }
