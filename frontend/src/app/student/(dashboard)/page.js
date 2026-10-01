@@ -668,7 +668,7 @@ export default function StudentDashboard() {
           {/* Content grid */}
           <section className="content-grid">
             {/* My tests panel */}
-            <div className="panel">
+            <div className="panel" id="tests">
               <div className="panel-heading">
                 <div>
                   <h2>My tests</h2>
@@ -708,7 +708,7 @@ export default function StudentDashboard() {
 
           {/* Trend & achievements + Results (second row) */}
           <section className="content-grid">
-            <div className="panel">
+            <div className="panel" id="results">
               <div className="panel-heading">
                 <div>
                   <h2>My results</h2>

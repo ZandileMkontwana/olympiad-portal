@@ -683,7 +683,15 @@ export default function EducatorDashboard() {
               </span>
               <ArrowRight />
             </Link>
-            <button type="button">
+            <button
+              type="button"
+              onClick={() => {
+                const olympiadSection = document.querySelector('.content-grid .panel:first-child');
+                if (olympiadSection) {
+                  olympiadSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+            >
               <div className="quick-icon amber"><Trophy /></div>
               <span>
                 <strong>Browse olympiads</strong>
