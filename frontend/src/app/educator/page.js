@@ -451,6 +451,7 @@ export default function EducatorDashboard() {
         setOlympiads(data);
         setStatus(data.length > 0 ? 'ready' : 'empty');
       } catch (err) {
+        console.error('Failed to fetch olympiads:', err);
         setStatus('error');
       }
     }
