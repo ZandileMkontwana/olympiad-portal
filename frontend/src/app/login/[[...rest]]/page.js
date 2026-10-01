@@ -240,7 +240,7 @@ export default function LoginPage() {
               routing="path"
               path="/login"
               signUpUrl="/register"
-              forceRedirectUrl="/auth/check"
+              forceRedirectUrl={`/auth/check?expectedRole=${role}`}
               localization={{
                 signIn: {
                   start: {

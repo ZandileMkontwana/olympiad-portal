@@ -1,16 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, useClerk } from '@clerk/nextjs';
 import { fetchCurrentUser, dashboardPathForRole } from '@/lib/api';
 
 export default function AuthCheckPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { signOut } = useClerk();
   const [error, setError] = useState(null);
-  const [noProfile, setNoProfile] = useState(false);
+  const [errorType, setErrorType] = useState(null); // 'noProfile' | 'roleMismatch' | 'other'
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -26,17 +27,27 @@ export default function AuthCheckPage() {
       try {
         const token = await getToken();
         const user = await fetchCurrentUser(token);
+        const expectedRole = searchParams.get('expectedRole');
         
         if (cancelled) return;
         
-        if (user && user.role) {
-          router.replace(dashboardPathForRole(user.role));
-        } else {
-          setNoProfile(true);
+        if (!user || !user.role) {
+          setErrorType('noProfile');
           setError('Your account is not registered in the system yet.');
+          return;
         }
+        
+        // Validate that the user's role matches the expected role
+        if (expectedRole && user.role !== expectedRole) {
+          setErrorType('roleMismatch');
+          setError(`This account is registered as a ${user.role}, not as a ${expectedRole}. Please sign in with the correct account type.`);
+          return;
+        }
+        
+        router.replace(dashboardPathForRole(user.role));
       } catch (err) {
         if (cancelled) return;
+        setErrorType('other');
         setError('An error occurred. Please try again.');
       }
     }
@@ -45,7 +56,7 @@ export default function AuthCheckPage() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, getToken, router]);
+  }, [isLoaded, isSignedIn, getToken, router, searchParams]);
 
   async function handleSignOut() {
     await signOut();
@@ -63,12 +74,19 @@ export default function AuthCheckPage() {
     }}>
       {error ? (
         <div style={{ textAlign: 'center', maxWidth: '400px' }}>
-          <p style={{ color: noProfile ? '#b45309' : '#e0615f', fontSize: '14px', marginBottom: '16px' }}>
+          <p style={{ 
+            color: errorType === 'roleMismatch' ? '#e0615f' : errorType === 'noProfile' ? '#b45309' : '#e0615f',
+            fontSize: '14px',
+            marginBottom: '16px',
+            fontWeight: 500,
+          }}>
             {error}
           </p>
-          {noProfile && (
+          {(errorType === 'noProfile' || errorType === 'roleMismatch') && (
             <p style={{ color: '#766e89', fontSize: '13px', marginBottom: '20px' }}>
-              Please contact your administrator to register your account, or sign in with a different account.
+              {errorType === 'roleMismatch'
+                ? 'Make sure you selected the correct role and are using the right credentials.'
+                : 'Please contact your administrator to register your account, or sign in with a different account.'}
             </p>
           )}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
