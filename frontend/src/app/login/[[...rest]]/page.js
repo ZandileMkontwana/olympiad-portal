@@ -28,7 +28,10 @@ export default function LoginPage() {
   }, [router]);
 
   // Redirect if already signed in via Clerk (educator/organiser)
+  // Only run this if there's no student session to avoid race conditions
   useEffect(() => {
+    const session = getStudentSession();
+    if (session?.user?.role) return; // Student session takes priority
     if (!isSignedIn) return;
     let cancelled = false;
     async function check() {
