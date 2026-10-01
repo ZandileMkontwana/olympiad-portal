@@ -5,6 +5,15 @@ import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { listOlympiads, requestOlympiadAccess } from '@/lib/api';
+import '@/app/auth.css';
+import {
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  FileText,
+  Radio,
+  Sparkles,
+} from 'lucide-react';
 
 // Olympiad-first board for educators. The persistent sidebar lives in
 // app/educator/layout.js; students are managed on the School Dashboard
@@ -30,52 +39,72 @@ function timeUntil(iso) {
   return `${hrs}h ${Math.floor((ms % 3600000) / 60000)}m`;
 }
 
-/* ── Stat card ────────────────────────────────────────────────────────── */
+function formatDate(iso, tz) {
+  const opts = {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  };
+  if (tz) opts.timeZone = tz;
+  return new Date(iso).toLocaleDateString('en-ZA', opts);
+}
+
+function greetingFor() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function olympiadTone(index) {
+  const tones = ['violet', 'amber', 'blue'];
+  return tones[index % tones.length];
+}
+
+const ACCESS_BADGES = {
+  pending: { label: 'Requested', bg: 'rgba(245,158,11,0.12)', color: '#b45309' },
+  declined: { label: 'Declined', bg: 'rgba(224,97,95,0.1)', color: '#e0615f' },
+};
+
+const META_CHIP_STYLE = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px',
+  background: 'white',
+  border: '1px solid rgba(139,92,246,0.1)',
+  borderRadius: '20px',
+  padding: '4px 12px',
+  fontSize: '0.75em',
+  fontWeight: 600,
+  color: '#4a4360',
+};
+
+/* ── Stat card (organiser-matched) ────────────────────────────────────── */
 
 function StatCard({ icon, label, value, accent }) {
   return (
-    <div
-      style={{
-        flex: 1,
-        background: 'white',
-        borderRadius: '12px',
-        padding: '12px 15px',
-        boxShadow: '0 2px 8px rgba(139,92,246,0.07)',
-        border: '1px solid rgba(139,92,246,0.1)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '11px',
-        minWidth: '140px',
-      }}
-    >
-      <div
-        style={{
-          width: '34px',
-          height: '34px',
-          borderRadius: '9px',
-          background: accent || 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '1.05em',
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </div>
-      <div>
-        <p
+    <div className="dashboard-panel" style={{ padding: '16px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+        <div
           style={{
-            margin: 0,
-            fontSize: '1.25em',
-            fontWeight: 700,
-            color: '#2d2640',
-            lineHeight: 1,
+            width: '34px',
+            height: '34px',
+            borderRadius: '9px',
+            background: accent || 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
           }}
         >
-          {value}
-        </p>
-        <p style={{ margin: '2px 0 0', fontSize: '0.72em', color: '#8b7fa8' }}>{label}</p>
+          {icon}
+        </div>
+        <div>
+          <p style={{ margin: 0, fontSize: '1.25em', fontWeight: 700, color: '#241f38', lineHeight: 1 }}>
+            {value}
+          </p>
+          <p style={{ margin: '3px 0 0', fontSize: '0.72em', color: '#6f6690' }}>{label}</p>
+        </div>
       </div>
     </div>
   );
@@ -95,7 +124,7 @@ function NextUpCard({ round, olympiadName }) {
           textAlign: 'center',
         }}
       >
-        <p style={{ fontSize: '1.5em', margin: '0 0 6px' }}>✨</p>
+        <Sparkles size={20} style={{ color: '#8b7fa8', marginBottom: '6px' }} />
         <p style={{ margin: 0, color: '#6b6480', fontSize: '0.85em' }}>
           No rounds need your attention right now.
         </p>
@@ -183,47 +212,7 @@ function NextUpCard({ round, olympiadName }) {
   );
 }
 
-/* ── Olympiad accordion ────────────────────────────────────────────────── */
-
-function formatDate(iso, tz) {
-  const opts = {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  };
-  if (tz) opts.timeZone = tz;
-  return new Date(iso).toLocaleDateString('en-ZA', opts);
-}
-
-function formatDateTime(iso, tz) {
-  const opts = {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  };
-  if (tz) opts.timeZone = tz;
-  return new Date(iso).toLocaleString('en-ZA', opts);
-}
-
-const ACCESS_BADGES = {
-  pending: { label: '⏳ Requested', bg: 'rgba(245,158,11,0.12)', color: '#b45309' },
-  declined: { label: '✖ Declined', bg: 'rgba(224,97,95,0.1)', color: '#e0615f' },
-};
-
-const META_CHIP_STYLE = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '6px',
-  background: 'white',
-  border: '1px solid rgba(139,92,246,0.1)',
-  borderRadius: '20px',
-  padding: '4px 12px',
-  fontSize: '0.75em',
-  fontWeight: 600,
-  color: '#4a4360',
-};
+/* ── Round row ────────────────────────────────────────────────────────── */
 
 function RoundRow({ round }) {
   const style = STATE_STYLES[round.state] || STATE_STYLES.scheduled;
@@ -280,9 +269,8 @@ function RoundRow({ round }) {
   );
 }
 
-// Shown when the educator's school is not (yet) part of the olympiad:
-// organiser-set description, run dates, grades, learners per school, and
-// the access-request controls.
+/* ── Olympiad info panel (access request) ─────────────────────────────── */
+
 function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
   const counts = olympiad.schoolEntrantCounts || [];
   const tz = olympiad.timezone || null;
@@ -406,12 +394,13 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
   );
 }
 
-function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestingAccess }) {
+/* ── Olympiad accordion card ──────────────────────────────────────────── */
+
+function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestingAccess, index }) {
   const rounds = olympiad.rounds || [];
   const openCount = rounds.filter((r) => r.state === 'open').length;
   const scheduledCount = rounds.filter((r) => r.state === 'scheduled').length;
   const badge = ACCESS_BADGES[olympiad.schoolAccess];
-  // An unknown access state (enrichment unavailable) keeps the old rounds view.
   const showsRounds = !olympiad.schoolAccess || olympiad.schoolAccess === 'approved';
   const tz = olympiad.timezone || null;
 
@@ -427,52 +416,21 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
     new Date(olympiad.endDate) >= now;
 
   return (
-    <div
-      style={{
-        background: 'white',
-        borderRadius: '16px',
-        border: '1px solid rgba(139,92,246,0.1)',
-        boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
-        overflow: 'hidden',
-      }}
-    >
-      <button
-        type="button"
+    <div>
+      <div
+        className="mini-event"
+        style={{ cursor: 'pointer', position: 'relative', padding: '13px 0' }}
         onClick={onToggle}
-        aria-expanded={expanded}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '14px 18px',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          textAlign: 'left',
-          fontFamily: 'inherit',
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onToggle();
         }}
       >
-        <div
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.05em',
-            flexShrink: 0,
-          }}
-        >
-          🏆
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: '#2d2640' }}>
-              {olympiad.name}
-            </p>
+        <span className={`event-dot ${olympiadTone(index)}`} />
+        <span>
+          <strong>
+            {olympiad.name}
             {isUpcoming && (
               <span
                 style={{
@@ -480,8 +438,9 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
                   color: '#b45309',
                   padding: '1px 8px',
                   borderRadius: '10px',
-                  fontSize: '0.65em',
+                  fontSize: '0.85em',
                   fontWeight: 700,
+                  marginLeft: '8px',
                 }}
               >
                 Upcoming
@@ -494,22 +453,23 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
                   color: '#2d8a5e',
                   padding: '1px 8px',
                   borderRadius: '10px',
-                  fontSize: '0.65em',
+                  fontSize: '0.85em',
                   fontWeight: 700,
+                  marginLeft: '8px',
                 }}
               >
                 Active
               </span>
             )}
-          </div>
-          <p style={{ margin: '2px 0 0', fontSize: '0.78em', color: '#8b7fa8' }}>
-            {dateRange ? `📅 ${dateRange}` : '📅 Dates TBC'}
+          </strong>
+          <small>
+            {dateRange ? dateRange : 'Dates TBC'}
             {' · '}
             {rounds.length} round{rounds.length !== 1 ? 's' : ''}
             {openCount > 0 && ` · ${openCount} open`}
             {scheduledCount > 0 && ` · ${scheduledCount} scheduled`}
-          </p>
-        </div>
+          </small>
+        </span>
         {badge && (
           <span
             style={{
@@ -517,7 +477,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
               color: badge.color,
               padding: '3px 10px',
               borderRadius: '20px',
-              fontSize: '0.7em',
+              fontSize: '10px',
               fontWeight: 700,
               flexShrink: 0,
             }}
@@ -525,27 +485,25 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
             {badge.label}
           </span>
         )}
-        <span
+        <ChevronRight
+          size={15}
           style={{
-            color: '#a89fc9',
-            fontSize: '0.9em',
-            display: 'inline-block',
+            color: '#aaa1b7',
             transform: expanded ? 'rotate(90deg)' : 'none',
             transition: 'transform 0.15s ease',
-            flexShrink: 0,
           }}
-        >
-          ▸
-        </span>
-      </button>
+        />
+      </div>
 
       {expanded &&
         (showsRounds ? (
           <div
             style={{
-              borderTop: '1px solid rgba(139,92,246,0.08)',
+              margin: '4px 0 8px',
               padding: '14px',
-              background: '#fbfaff',
+              border: '1px solid rgba(139,92,246,0.15)',
+              borderRadius: '10px',
+              background: '#faf8ff',
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
@@ -573,7 +531,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
 /* ── Main page ────────────────────────────────────────────────────────── */
 
 export default function EducatorDashboard() {
-  const { checking } = useRequireRole('educator');
+  const { user, checking } = useRequireRole('educator');
   const { getToken } = useAuth();
 
   const [olympiads, setOlympiads] = useState([]);
@@ -650,15 +608,8 @@ export default function EducatorDashboard() {
 
   if (checking) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          minHeight: '60vh',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <p style={{ color: '#8b7fa8' }}>Loading...</p>
+      <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>
+        Loading...
       </div>
     );
   }
@@ -666,32 +617,49 @@ export default function EducatorDashboard() {
   const openCount = roundsByState.open.length;
   const scheduledCount = roundsByState.scheduled.length;
   const releasedCount = roundsByState.released.length;
+  const firstName = (user?.name || user?.email || 'Educator').split(/[\s@]/)[0];
 
   return (
     <>
-      {/* Stats + Next up */}
+      {/* Welcome row */}
+      <div className="organiser-welcome-row">
+        <div>
+          <p className="organiser-eyebrow">
+            <Sparkles size={14} /> Your educator space
+          </p>
+          <h1>
+            {greetingFor()}, {firstName}.
+          </h1>
+          <p className="organiser-subtitle">
+            Here is what is happening across your Olympiads.
+          </p>
+        </div>
+      </div>
+
+      {/* Stats row */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr 1fr 1.4fr',
           gap: '14px',
           alignItems: 'stretch',
+          marginTop: '24px',
         }}
       >
         <StatCard
-          icon="🟢"
+          icon={<Radio size={16} color="#fff" />}
           label="Open Rounds"
           value={openCount}
           accent="linear-gradient(135deg, #3fae7a, #2d8a5e)"
         />
         <StatCard
-          icon="🕒"
+          icon={<Clock size={16} color="#fff" />}
           label="Scheduled"
           value={scheduledCount}
           accent="linear-gradient(135deg, #f59e0b, #d97706)"
         />
         <StatCard
-          icon="📄"
+          icon={<FileText size={16} color="#fff" />}
           label="Released"
           value={releasedCount}
           accent="linear-gradient(135deg, #c99a2e, #b07d1e)"
@@ -701,50 +669,66 @@ export default function EducatorDashboard() {
         </div>
       </div>
 
-      {/* Olympiads board */}
-      <div style={{ marginTop: '32px' }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: '1.15em', fontWeight: 700, color: '#2d2640' }}>
-          Olympiads
-        </h2>
-
-        {status === 'loading' && <p style={{ color: '#8b7fa8' }}>Loading olympiads...</p>}
-        {status === 'empty' && (
-          <div
-            style={{
-              padding: '32px',
-              textAlign: 'center',
-              background: 'white',
-              borderRadius: '14px',
-              border: '1px solid rgba(139,92,246,0.1)',
-            }}
-          >
-            <p style={{ color: '#8b7fa8', margin: 0 }}>No olympiads yet.</p>
-          </div>
-        )}
-        {status === 'error' && <p style={{ color: '#e0615f' }}>Couldn&apos;t load olympiads.</p>}
-
-        {status === 'ready' && (
-          <>
-            {accessError && (
-              <p style={{ color: '#e0615f', margin: '0 0 10px', fontSize: '0.85em' }}>
-                {accessError}
-              </p>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {olympiads.map((o) => (
-                <OlympiadCard
-                  key={o.id}
-                  olympiad={o}
-                  expanded={expandedId === o.id}
-                  onToggle={() => setExpandedId(expandedId === o.id ? null : o.id)}
-                  onRequestAccess={handleRequestAccess}
-                  requestingAccess={requestingId === o.id}
-                />
-              ))}
+      {/* Olympiads panel */}
+      <section style={{ marginTop: '20px' }}>
+        <article className="dashboard-panel">
+          <div className="dashboard-panel-heading">
+            <div>
+              <span className="command-eyebrow">
+                <ClipboardList size={13} /> Your workspace
+              </span>
+              <h2>Olympiads</h2>
+              <p>Manage rounds, track access, and view learner progress.</p>
             </div>
-          </>
-        )}
-      </div>
+            {status === 'ready' && (
+              <span className="nav-count" style={{ flex: '0 0 auto' }}>
+                {olympiads.length}
+              </span>
+            )}
+          </div>
+
+          {status === 'loading' && (
+            <p style={{ color: '#817a91', fontSize: '13px', marginTop: '18px' }}>
+              Loading olympiads...
+            </p>
+          )}
+
+          {status === 'empty' && (
+            <p style={{ color: '#92899f', fontSize: '12px', marginTop: '18px' }}>
+              No olympiads available yet.
+            </p>
+          )}
+
+          {status === 'error' && (
+            <p style={{ color: 'red', fontSize: '13px', marginTop: '18px' }}>
+              Couldn&apos;t load olympiads. Try refreshing.
+            </p>
+          )}
+
+          {status === 'ready' && (
+            <>
+              {accessError && (
+                <p style={{ color: '#e0615f', margin: '12px 0 0', fontSize: '12px' }}>
+                  {accessError}
+                </p>
+              )}
+              <div className="mini-event-list">
+                {olympiads.map((o, idx) => (
+                  <OlympiadCard
+                    key={o.id}
+                    olympiad={o}
+                    index={idx}
+                    expanded={expandedId === o.id}
+                    onToggle={() => setExpandedId(expandedId === o.id ? null : o.id)}
+                    onRequestAccess={handleRequestAccess}
+                    requestingAccess={requestingId === o.id}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </article>
+      </section>
     </>
   );
 }

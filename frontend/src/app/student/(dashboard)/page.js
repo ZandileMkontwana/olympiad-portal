@@ -4,6 +4,18 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { fetchMySittings, fetchMyResults, fetchMyRounds } from '@/lib/api';
+import '@/app/auth.css';
+import {
+  Award,
+  BarChart3,
+  ChevronRight,
+  ClipboardList,
+  CheckCircle2,
+  LineChart,
+  Search,
+  Sparkles,
+  Trophy,
+} from 'lucide-react';
 
 // Student dashboard. The persistent sidebar lives in the (dashboard) layout;
 // this page shows everything in one scroll — a single unified "My tests" list
@@ -12,11 +24,18 @@ import { fetchMySittings, fetchMyResults, fetchMyRounds } from '@/lib/api';
 /* ── helpers ──────────────────────────────────────────────────────────── */
 
 function formatDate(isoString) {
-  return new Date(isoString).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
+  return new Date(isoString).toLocaleDateString('en-ZA', {
     day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   });
+}
+
+function greetingFor() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
 }
 
 function testStatus(test) {
@@ -25,13 +44,13 @@ function testStatus(test) {
   return 'in-progress';
 }
 
-function scoreStyle(score) {
-  if (score >= 70) return 'text-sage';
-  if (score >= 50) return 'text-gold';
-  return 'text-red-600';
+function scoreHex(score) {
+  if (score >= 70) return '#4caf7d';
+  if (score >= 50) return '#c99a2e';
+  return '#dc2626';
 }
 
-function scoreHex(score) {
+function scoreColor(score) {
   if (score >= 70) return '#4caf7d';
   if (score >= 50) return '#c99a2e';
   return '#dc2626';
@@ -46,33 +65,46 @@ function timeLeft(expiresAt) {
   return `${mins}m left`;
 }
 
+function olympiadTone(index) {
+  const tones = ['violet', 'amber', 'blue'];
+  return tones[index % tones.length];
+}
+
 const STATUS_STYLES = {
-  'in-progress': 'bg-sage/10 text-sage border border-sage/30',
-  'not-started': 'bg-gold/10 text-gold border border-gold/30',
-  completed: 'bg-lavender/10 text-lavender-deep border border-lavender/30',
-  expired: 'bg-slate/10 text-slate border border-slate/30',
-  locked: 'bg-gray-100 text-gray-500 border border-gray-300',
-};
-const STATUS_LABELS = {
-  'in-progress': 'In progress',
-  'not-started': 'Not started',
-  completed: 'Completed',
-  expired: 'Expired',
-  locked: 'Locked',
+  'in-progress': { bg: 'rgba(76,175,125,0.1)', color: '#3fae7a', label: 'In progress' },
+  'not-started': { bg: 'rgba(224,168,62,0.12)', color: '#c99a2e', label: 'Not started' },
+  completed: { bg: 'rgba(139,92,246,0.08)', color: '#6d3fd1', label: 'Completed' },
+  expired: { bg: 'rgba(139,127,168,0.1)', color: '#8b7fa8', label: 'Expired' },
+  locked: { bg: 'rgba(139,127,168,0.06)', color: '#999', label: 'Locked' },
 };
 
-/* ── Stat card ────────────────────────────────────────────────────────── */
+/* ── Stat card (organiser-matched) ────────────────────────────────────── */
 
 function StatCard({ icon, label, value, accent }) {
   return (
-    <div className="rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <span className="text-2xl" aria-hidden="true">
+    <div className="dashboard-panel" style={{ padding: '16px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+        <div
+          style={{
+            width: '34px',
+            height: '34px',
+            borderRadius: '9px',
+            background: accent || 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
           {icon}
-        </span>
+        </div>
+        <div>
+          <p style={{ margin: 0, fontSize: '1.25em', fontWeight: 700, color: '#241f38', lineHeight: 1 }}>
+            {value}
+          </p>
+          <p style={{ margin: '3px 0 0', fontSize: '0.72em', color: '#6f6690' }}>{label}</p>
+        </div>
       </div>
-      <p className={`mt-3 font-display text-2xl font-bold ${accent || 'text-ink'}`}>{value}</p>
-      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-soft">{label}</p>
     </div>
   );
 }
@@ -87,9 +119,9 @@ function TrendChart({ results }) {
 
   if (sorted.length < 2) {
     return (
-      <div className="flex h-full flex-col items-center justify-center rounded-xl border border-lavender/20 bg-surface p-6 text-center shadow-sm">
-        <span className="text-2xl">📈</span>
-        <p className="mt-2 text-sm text-ink-soft">
+      <div style={{ textAlign: 'center', padding: '24px 0' }}>
+        <BarChart3 size={24} style={{ color: '#8b7fa8', marginBottom: '8px' }} />
+        <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>
           Your performance trend will appear here once you have at least two released results.
         </p>
       </div>
@@ -109,12 +141,11 @@ function TrendChart({ results }) {
   const areaPath = `${path} L ${points[points.length - 1].x} ${h - pad} L ${points[0].x} ${h - pad} Z`;
 
   return (
-    <div className="rounded-xl border border-lavender/20 bg-surface p-6 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-base font-semibold text-ink">Performance trend</h3>
-        <span className="text-xs font-medium text-ink-soft">Last {sorted.length} results</span>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <span style={{ fontSize: '11px', color: '#8b7fa8' }}>Last {sorted.length} results</span>
       </div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="mt-4 w-full">
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%' }}>
         <defs>
           <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.18" />
@@ -196,78 +227,30 @@ function AchievementBadges({ results, sittings }) {
   ];
 
   return (
-    <div className="rounded-xl border border-lavender/20 bg-surface p-6 shadow-sm">
-      <h3 className="font-display text-base font-semibold text-ink">Achievements</h3>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        {badges.map((b) => (
-          <div
-            key={b.id}
-            title={b.desc}
-            className={`flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-opacity ${
-              b.earned ? 'border-gold/40 bg-gold/5' : 'border-lavender/15 opacity-40 grayscale'
-            }`}
-          >
-            <span className="text-2xl">{b.icon}</span>
-            <p className="text-xs font-semibold text-ink">{b.label}</p>
-          </div>
-        ))}
-      </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+      {badges.map((b) => (
+        <div
+          key={b.id}
+          title={b.desc}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '12px 8px',
+            borderRadius: '10px',
+            border: b.earned ? '1px solid rgba(224,168,62,0.4)' : '1px solid rgba(139,92,246,0.1)',
+            background: b.earned ? 'rgba(224,168,62,0.05)' : 'transparent',
+            opacity: b.earned ? 1 : 0.4,
+            filter: b.earned ? 'none' : 'grayscale(1)',
+            textAlign: 'center',
+          }}
+        >
+          <span style={{ fontSize: '1.5em' }}>{b.icon}</span>
+          <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: '#241f38' }}>{b.label}</p>
+        </div>
+      ))}
     </div>
-  );
-}
-
-/* ── Hero ─────────────────────────────────────────────────────────────── */
-
-function HeroBanner({ name, school, inProgress, availableCount, resumeHref }) {
-  return (
-    <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-lavender-deep to-lavender px-8 py-10 text-white shadow-md sm:px-10">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/10"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-16 -left-6 h-40 w-40 rounded-full bg-white/5"
-      />
-      <p className="text-sm font-semibold uppercase tracking-widest text-white/75">Welcome back</p>
-      <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-        {name}
-      </h1>
-      {school && <p className="mt-2 text-lg font-medium text-white/85">{school.name ?? school}</p>}
-
-      <div className="mt-6 flex flex-wrap items-center gap-4">
-        {inProgress.length > 0 ? (
-          <>
-            <div className="rounded-lg bg-white/15 px-4 py-2">
-              <p className="text-sm font-medium">
-                {inProgress.length} test{inProgress.length > 1 ? 's' : ''} in progress -{' '}
-                <span className="font-bold">{timeLeft(inProgress[0].expiresAt)}</span>
-              </p>
-            </div>
-            {resumeHref && (
-              <Link
-                href={resumeHref}
-                onClick={(e) => {
-                  if (!window.confirm('Continue this test? Your answers are saved.'))
-                    e.preventDefault();
-                }}
-                className="rounded-lg bg-white px-5 py-2.5 text-base font-semibold text-lavender-deep transition-opacity hover:opacity-90"
-              >
-                Resume test →
-              </Link>
-            )}
-          </>
-        ) : availableCount > 0 ? (
-          <p className="text-lg font-medium text-white/90">
-            You have {availableCount} test{availableCount > 1 ? 's' : ''} ready to take.
-          </p>
-        ) : (
-          <p className="text-lg font-medium text-white/90">
-            All caught up — nothing due right now.
-          </p>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -308,53 +291,44 @@ function TestsSection({ tests, rounds }) {
   const inProgress = items.filter((i) => i.status === 'in-progress').length;
 
   return (
-    <section>
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-display text-2xl font-semibold text-ink">My tests</h2>
-        {inProgress > 0 && (
-          <span className="text-sm font-medium text-sage">{inProgress} to finish</span>
-        )}
-      </div>
+    <div>
       {items.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
-          <span className="text-3xl">📝</span>
-          <p className="mt-2 text-base text-ink-soft">
-            No tests yet. They&apos;ll appear here once a round opens.
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <ClipboardList size={24} style={{ color: '#8b7fa8', marginBottom: '8px' }} />
+          <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>
+            No tests yet. They will appear here once a round opens.
           </p>
         </div>
       ) : (
-        <ul className="mt-4 space-y-3">
-          {items.map((item) => {
+        <div className="mini-event-list" style={{ marginTop: '14px' }}>
+          {items.map((item, idx) => {
             const isSitting = item.kind === 'sitting';
+            const style = STATUS_STYLES[item.status] || STATUS_STYLES.completed;
             return (
-              <li
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm"
-              >
-                <div>
-                  <p className="text-lg font-semibold text-ink">{item.name}</p>
-                  {isSitting ? (
-                    <>
-                      <p className="mt-0.5 text-sm text-ink-soft">
-                        Started {formatDate(item.test.startedAt)}
-                      </p>
-                      {item.status === 'in-progress' && (
-                        <p className="mt-0.5 text-xs font-semibold text-sage">
-                          {timeLeft(item.test.expiresAt)}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="mt-0.5 text-sm text-ink-soft">
-                      Closes {formatDate(item.round.closeTime)}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
+              <div key={item.id}>
+                <div className="mini-event" style={{ position: 'relative' }}>
+                  <span className={`event-dot ${olympiadTone(idx)}`} />
+                  <span>
+                    <strong>{item.name}</strong>
+                    <small>
+                      {isSitting
+                        ? `Started ${formatDate(item.test.startedAt)}`
+                        : `Closes ${formatDate(item.round.closeTime)}`}
+                      {item.status === 'in-progress' ? ` · ${timeLeft(item.test.expiresAt)}` : ''}
+                    </small>
+                  </span>
                   <span
-                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium ${STATUS_STYLES[item.status]}`}
+                    style={{
+                      background: style.bg,
+                      color: style.color,
+                      padding: '3px 10px',
+                      borderRadius: '20px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      flexShrink: 0,
+                    }}
                   >
-                    {STATUS_LABELS[item.status]}
+                    {style.label}
                   </span>
                   {item.status === 'in-progress' && (
                     <Link
@@ -363,7 +337,8 @@ function TestsSection({ tests, rounds }) {
                         if (!window.confirm('Continue this test? Your answers are saved.'))
                           e.preventDefault();
                       }}
-                      className="rounded-lg bg-lavender-deep px-5 py-2.5 text-base font-medium text-white transition-opacity hover:opacity-90"
+                      className="request-review"
+                      style={{ background: '#6c4fd8', color: '#fff', textDecoration: 'none', fontSize: '10px' }}
                     >
                       Resume
                     </Link>
@@ -377,21 +352,25 @@ function TestsSection({ tests, rounds }) {
                         )
                           e.preventDefault();
                       }}
-                      className="rounded-lg bg-lavender-deep px-5 py-2.5 text-base font-medium text-white transition-opacity hover:opacity-90"
+                      className="request-review"
+                      style={{ background: '#6c4fd8', color: '#fff', textDecoration: 'none', fontSize: '10px' }}
                     >
                       Start test
                     </Link>
                   )}
                   {item.status === 'locked' && item.lockedReason && (
-                    <span className="text-xs text-gray-500 italic">{item.lockedReason}</span>
+                    <span style={{ fontSize: '10px', color: '#999', fontStyle: 'italic' }}>{item.lockedReason}</span>
+                  )}
+                  {(item.status !== 'in-progress' && item.status !== 'not-started' && item.status !== 'locked') && (
+                    <ChevronRight size={15} style={{ color: '#aaa1b7' }} />
                   )}
                 </div>
-              </li>
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -403,60 +382,74 @@ function ResultsSection({ results }) {
   const filtered = results.filter((r) => r.round.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <section>
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="font-display text-2xl font-semibold text-ink">My results</h2>
-        {results.length > 0 && (
-          <span className="text-sm font-medium text-ink-soft">
-            Best: <span className={scoreStyle(best)}>{Math.round(best)}%</span>
-          </span>
-        )}
-      </div>
-
+    <div>
       {results.length > 3 && (
-        <input
-          type="text"
-          placeholder="Search by round name..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="mt-3 w-full rounded-lg border border-lavender/30 bg-surface px-3.5 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
-        />
+        <div style={{ marginBottom: '12px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: '1px solid rgba(139,92,246,0.15)',
+              borderRadius: '9px',
+              padding: '8px 12px',
+              background: '#fff',
+            }}
+          >
+            <Search size={14} style={{ color: '#8b7fa8' }} />
+            <input
+              type="text"
+              placeholder="Search by round name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                border: 'none',
+                outline: 'none',
+                flex: 1,
+                fontSize: '12px',
+                color: '#241f38',
+                background: 'transparent',
+              }}
+            />
+          </div>
+        </div>
       )}
 
       {results.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
-          <span className="text-3xl">🏆</span>
-          <p className="mt-2 text-base text-ink-soft">No results released yet.</p>
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <Trophy size={24} style={{ color: '#8b7fa8', marginBottom: '8px' }} />
+          <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>No results released yet.</p>
         </div>
       ) : (
-        <ul className="mt-4 space-y-3">
-          {filtered.map((result) => (
-            <li
+        <div className="mini-event-list" style={{ marginTop: '14px' }}>
+          {filtered.map((result, idx) => (
+            <Link
+              href={`/student/result?id=${result.id}`}
               key={result.id}
-              className="rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm"
+              className="mini-event"
+              style={{ textDecoration: 'none', cursor: 'pointer' }}
             >
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-lg font-semibold text-ink">{result.round.name}</p>
-                  <p className="mt-0.5 text-sm text-ink-soft">
-                    Submitted {formatDate(result.submittedAt)}
-                  </p>
-                </div>
-                <p className={`font-display text-3xl font-semibold ${scoreStyle(result.score)}`}>
-                  {Math.round(result.score)}%
-                </p>
-              </div>
-              <Link
-                href={`/student/result?id=${result.id}`}
-                className="mt-4 inline-block rounded-lg border border-lavender/40 px-5 py-2.5 text-base font-medium text-lavender-deep transition-colors hover:bg-lavender/10"
+              <span className={`event-dot ${olympiadTone(idx)}`} />
+              <span>
+                <strong>{result.round.name}</strong>
+                <small>Submitted {formatDate(result.submittedAt)}</small>
+              </span>
+              <span
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: scoreColor(result.score),
+                  flexShrink: 0,
+                }}
               >
-                View test →
-              </Link>
-            </li>
+                {Math.round(result.score)}%
+              </span>
+              <ChevronRight size={15} style={{ color: '#aaa1b7' }} />
+            </Link>
           ))}
-        </ul>
+        </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -495,8 +488,8 @@ export default function StudentDashboard() {
   // the redirect away finishes — otherwise user.name below would crash.
   if (checking || !user || status === 'loading') {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-lg text-ink-soft">Loading...</p>
+      <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>
+        Loading...
       </div>
     );
   }
@@ -505,68 +498,167 @@ export default function StudentDashboard() {
   const inProgress = sittings.filter((s) => testStatus(s) === 'in-progress');
   const resumeHref = inProgress.length > 0 ? `/student/sit?id=${inProgress[0].roundId}` : null;
   const bestScore =
-    results.length > 0 ? `${Math.round(Math.max(...results.map((r) => r.score)))}%` : '—';
+    results.length > 0 ? `${Math.round(Math.max(...results.map((r) => r.score)))}%` : '\u2014';
   const avgScore =
     results.length > 0
       ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length)
       : null;
 
+  const firstName = (user?.name || user?.email || 'Student').split(/[\s@]/)[0];
+  const availableCount = rounds.filter((r) => !r.sitting && !r.locked).length;
+
   return (
     <>
-      <HeroBanner
-        name={user.name}
-        school={user.school}
-        inProgress={inProgress}
-        availableCount={rounds.filter((r) => !r.sitting && !r.locked).length}
-        resumeHref={resumeHref}
-      />
+      {/* Welcome row */}
+      <div className="organiser-welcome-row">
+        <div>
+          <p className="organiser-eyebrow">
+            <Sparkles size={14} /> Your student space
+          </p>
+          <h1>
+            {greetingFor()}, {firstName}.
+          </h1>
+          <p className="organiser-subtitle">
+            {inProgress.length > 0
+              ? `You have ${inProgress.length} test${inProgress.length > 1 ? 's' : ''} in progress — ${timeLeft(inProgress[0].expiresAt)}.`
+              : availableCount > 0
+              ? `You have ${availableCount} test${availableCount > 1 ? 's' : ''} ready to take.`
+              : 'All caught up — nothing due right now.'}
+          </p>
+        </div>
+        {resumeHref && (
+          <Link
+            href={resumeHref}
+            onClick={(e) => {
+              if (!window.confirm('Continue this test? Your answers are saved.'))
+                e.preventDefault();
+            }}
+            className="primary-action"
+            style={{ textDecoration: 'none' }}
+          >
+            Resume test <ChevronRight size={15} />
+          </Link>
+        )}
+      </div>
 
       {status === 'error' && (
         <div
           role="alert"
-          className="relative mt-8 rounded-lg border border-red-200 bg-red-50 p-5 text-base text-red-800"
+          className="dashboard-panel"
+          style={{ marginTop: '20px', padding: '16px', borderColor: '#f3c2c2', background: '#fdf0f0' }}
         >
-          Couldn&apos;t load your tests or results. Try refreshing the page.
+          <p style={{ color: '#8f2f2f', fontSize: '13px', margin: 0 }}>
+            Couldn&apos;t load your tests or results. Try refreshing the page.
+          </p>
         </div>
       )}
 
       {status === 'ready' && (
         <>
-          <div className="relative mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <StatCard icon="📝" label="Tests" value={sittings.length} />
-            <StatCard icon="✅" label="Completed" value={completed} />
+          {/* Stats row */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '14px',
+              marginTop: '24px',
+            }}
+          >
             <StatCard
-              icon="📊"
-              label="Average"
-              value={avgScore !== null ? `${avgScore}%` : '—'}
-              accent={avgScore !== null ? scoreStyle(avgScore) : undefined}
+              icon={<ClipboardList size={16} color="#fff" />}
+              label="Tests"
+              value={sittings.length}
             />
             <StatCard
-              icon="🏆"
+              icon={<CheckCircle2 size={16} color="#fff" />}
+              label="Completed"
+              value={completed}
+              accent="linear-gradient(135deg, #4caf7d, #2d8a5e)"
+            />
+            <StatCard
+              icon={<BarChart3 size={16} color="#fff" />}
+              label="Average"
+              value={avgScore !== null ? `${avgScore}%` : '\u2014'}
+              accent={avgScore !== null ? `linear-gradient(135deg, ${scoreColor(avgScore)}, ${scoreColor(avgScore)}dd)` : undefined}
+            />
+            <StatCard
+              icon={<Trophy size={16} color="#fff" />}
               label="Best score"
               value={bestScore}
               accent={
                 results.length > 0
-                  ? scoreStyle(Math.max(...results.map((r) => r.score)))
+                  ? `linear-gradient(135deg, ${scoreColor(Math.max(...results.map((r) => r.score)))}, ${scoreColor(Math.max(...results.map((r) => r.score)))}dd)`
                   : undefined
               }
             />
           </div>
 
-          <div className="relative mt-10 grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+          {/* Dashboard grid: Tests + Achievements/Trend */}
+          <section className="organiser-dashboard-grid" aria-label="Student dashboard overview" style={{ marginTop: '20px' }}>
+            {/* My tests panel */}
+            <article className="dashboard-panel">
+              <div className="dashboard-panel-heading">
+                <div>
+                  <span className="command-eyebrow">
+                    <ClipboardList size={13} /> Assessments
+                  </span>
+                  <h2>My tests</h2>
+                  <p>Start, resume, and review your test sittings.</p>
+                </div>
+                {inProgress.length > 0 && (
+                  <span className="nav-count" style={{ flex: '0 0 auto' }}>
+                    {inProgress.length} active
+                  </span>
+                )}
+              </div>
+              <TestsSection tests={sittings} rounds={rounds} />
+            </article>
+
+            {/* Right column: Trend + Achievements */}
+            <article className="dashboard-panel">
+              <div className="dashboard-panel-heading">
+                <div>
+                  <span className="command-eyebrow">
+                    <LineChart size={13} /> Performance
+                  </span>
+                  <h2>Trend &amp; achievements</h2>
+                  <p>Track your progress over time.</p>
+                </div>
+              </div>
               <TrendChart results={results} />
-            </div>
-            <AchievementBadges results={results} sittings={sittings} />
-          </div>
+              <div style={{ marginTop: '16px', borderTop: '1px solid #f0edf6', paddingTop: '14px' }}>
+                <span className="command-eyebrow" style={{ marginBottom: '10px', display: 'inline-flex' }}>
+                  <Award size={13} /> Badges
+                </span>
+                <AchievementBadges results={results} sittings={sittings} />
+              </div>
+            </article>
+          </section>
 
-          <div className="relative mt-12">
-            <TestsSection tests={sittings} rounds={rounds} />
-          </div>
-
-          <div className="relative mt-12">
-            <ResultsSection results={results} />
-          </div>
+          {/* Results panel (full width) */}
+          <section style={{ marginTop: '16px' }}>
+            <article className="dashboard-panel">
+              <div className="dashboard-panel-heading">
+                <div>
+                  <span className="command-eyebrow">
+                    <CheckCircle2 size={13} /> Results
+                  </span>
+                  <h2>My results</h2>
+                  <p>
+                    {results.length > 0
+                      ? `Best score: ${bestScore}`
+                      : 'Your released results will appear here.'}
+                  </p>
+                </div>
+                {results.length > 0 && (
+                  <Link href={`/student/result?id=${results[0]?.id}`} className="panel-link">
+                    View latest <ChevronRight size={14} />
+                  </Link>
+                )}
+              </div>
+              <ResultsSection results={results} />
+            </article>
+          </section>
         </>
       )}
     </>
