@@ -259,6 +259,7 @@ export default function LoginPage() {
               routing="path"
               path="/login"
               signUpUrl="/register"
+              forceRedirectUrl="/auth/check"
               localization={{
                 signIn: {
                   start: {
