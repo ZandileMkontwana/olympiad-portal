@@ -1,3 +1,6 @@
+---
+sidebar_label: Sprint1 Retrospective
+---
 # Sprint 1 Retrospective
 
 ## Zandile (Round Lifecycle & Data Core)

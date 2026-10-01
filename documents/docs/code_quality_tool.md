@@ -1,3 +1,6 @@
+---
+sidebar_label: code_quality_tool
+---
 ## Version Control
  
 ### Code quality tooling

@@ -93,7 +93,29 @@ router.get('/olympiads', async (req, res) => {
     // with the educator's school's access state and the number of distinct
     // entrants per school, so the dashboard can show an info card for
     // olympiads the school isn't part of yet.
-    if (!user || user.role !== 'educator') {
+    if (!user) {
+      // Clean up response for public API — remove internal fields
+      const publicOlympiads = olympiads.map((o) => ({
+        id: o.id,
+        name: o.name,
+        timezone: o.timezone,
+        description: o.description,
+        grades: o.grades,
+        startDate: o.startDate,
+        endDate: o.endDate,
+        rounds: o.rounds.map((r) => ({
+          id: r.id,
+          name: r.name,
+          openTime: r.openTime,
+          closeTime: r.closeTime,
+          state: r.state,
+          qualifyingThreshold: r.qualifyingThreshold,
+        })),
+      }));
+      return res.json(publicOlympiads);
+    }
+
+    if (user.role !== 'educator') {
       return res.json(olympiads);
     }
 
@@ -907,105 +929,115 @@ router.get('/rounds/:id/standings/schools', requireAuth, async (req, res) => {
 });
 
 // POST /rounds/:id/release-results
-router.post('/rounds/:id/release-results', requireAuth, ...requireRole('organiser'), async (req, res) => {
-  try {
-    const user = await loadAuthUser(req);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+router.post(
+  '/rounds/:id/release-results',
+  requireAuth,
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const user = await loadAuthUser(req);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
 
-    const round = await prisma.round.findUnique({
-      where: { id: req.params.id },
-      include: { olympiad: true },
-    });
-    if (!round) {
-      return res.status(404).json({ error: 'Round not found' });
-    }
-
-    const check = await requireOlympiadAccess(req, res, round, user);
-    if (!check) return;
-
-    if (round.state !== 'closed') {
-      return res.status(403).json({
-        error: `Results can only be released for closed rounds (currently '${round.state}')`,
+      const round = await prisma.round.findUnique({
+        where: { id: req.params.id },
+        include: { olympiad: true },
       });
-    }
+      if (!round) {
+        return res.status(404).json({ error: 'Round not found' });
+      }
 
-    const now = new Date();
-    const updated = await prisma.result.updateMany({
-      where: {
-        releasedAt: null,
-        submission: { roundId: round.id },
-      },
-      data: { releasedAt: now },
-    });
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
 
-    // Flipping the round to 'released' is the only path past 'closed' in the
-    // state machine — without it, certificates and released-round paper
-    // downloads stay locked forever even though results carry releasedAt.
-    // The state filter keeps the closed -> released transition atomic: if a
-    // concurrent request already moved the round on, nothing is written.
-    // Legacy closed rounds with pre-existing releasedAt stamps still
-    // converge — they remain 'closed', so the filter matches them.
-    const flipped = await prisma.round.updateMany({
-      where: { id: round.id, state: 'closed' },
-      data: { state: 'released' },
-    });
-    if (flipped.count === 0) {
-      return res.status(409).json({
-        error: 'Round state changed while releasing results - it is no longer closed',
+      if (round.state !== 'closed') {
+        return res.status(403).json({
+          error: `Results can only be released for closed rounds (currently '${round.state}')`,
+        });
+      }
+
+      const now = new Date();
+      const updated = await prisma.result.updateMany({
+        where: {
+          releasedAt: null,
+          submission: { roundId: round.id },
+        },
+        data: { releasedAt: now },
       });
-    }
 
-    res.json({ releasedCount: updated.count, releasedAt: now });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not release results' });
+      // Flipping the round to 'released' is the only path past 'closed' in the
+      // state machine — without it, certificates and released-round paper
+      // downloads stay locked forever even though results carry releasedAt.
+      // The state filter keeps the closed -> released transition atomic: if a
+      // concurrent request already moved the round on, nothing is written.
+      // Legacy closed rounds with pre-existing releasedAt stamps still
+      // converge — they remain 'closed', so the filter matches them.
+      const flipped = await prisma.round.updateMany({
+        where: { id: round.id, state: 'closed' },
+        data: { state: 'released' },
+      });
+      if (flipped.count === 0) {
+        return res.status(409).json({
+          error: 'Round state changed while releasing results - it is no longer closed',
+        });
+      }
+
+      res.json({ releasedCount: updated.count, releasedAt: now });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not release results' });
+    }
   }
-});
+);
 
 // POST /rounds/:id/unrelease-results
-router.post('/rounds/:id/unrelease-results', requireAuth, ...requireRole('organiser'), async (req, res) => {
-  try {
-    const user = await loadAuthUser(req);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+router.post(
+  '/rounds/:id/unrelease-results',
+  requireAuth,
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const user = await loadAuthUser(req);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
 
-    const round = await prisma.round.findUnique({
-      where: { id: req.params.id },
-      include: { olympiad: true },
-    });
-    if (!round) {
-      return res.status(404).json({ error: 'Round not found' });
-    }
-
-    const check = await requireOlympiadAccess(req, res, round, user);
-    if (!check) return;
-
-    const updated = await prisma.result.updateMany({
-      where: {
-        releasedAt: { not: null },
-        submission: { roundId: round.id },
-      },
-      data: { releasedAt: null },
-    });
-
-    // A released round drops back to 'closed' once its results are hidden
-    // again. Rounds in any other state are left untouched.
-    if (round.state === 'released') {
-      await prisma.round.update({
-        where: { id: round.id },
-        data: { state: 'closed' },
+      const round = await prisma.round.findUnique({
+        where: { id: req.params.id },
+        include: { olympiad: true },
       });
-    }
+      if (!round) {
+        return res.status(404).json({ error: 'Round not found' });
+      }
 
-    res.json({ unreleasedCount: updated.count });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not unrelease results' });
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
+
+      const updated = await prisma.result.updateMany({
+        where: {
+          releasedAt: { not: null },
+          submission: { roundId: round.id },
+        },
+        data: { releasedAt: null },
+      });
+
+      // A released round drops back to 'closed' once its results are hidden
+      // again. Rounds in any other state are left untouched.
+      if (round.state === 'released') {
+        await prisma.round.update({
+          where: { id: round.id },
+          data: { state: 'closed' },
+        });
+      }
+
+      res.json({ unreleasedCount: updated.count });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not unrelease results' });
+    }
   }
-});
+);
 
 // GET /rounds/:id/notifications
 router.get('/rounds/:id/notifications', ...requireRole('organiser'), async (req, res) => {
@@ -1384,9 +1416,10 @@ router.get('/rounds/:id/replay', requireAuth, async (req, res) => {
       },
       timeline,
       isEmpty: timeline.length === 0,
-      message: timeline.length === 0
-        ? 'No automatic actions have been recorded for this round yet.'
-        : undefined,
+      message:
+        timeline.length === 0
+          ? 'No automatic actions have been recorded for this round yet.'
+          : undefined,
     });
   } catch (err) {
     console.error(err);
