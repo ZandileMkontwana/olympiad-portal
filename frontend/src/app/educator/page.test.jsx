@@ -125,7 +125,7 @@ describe('Educator Dashboard Page', () => {
     listOlympiads.mockResolvedValue([]);
     render(<EducatorDashboard />);
     await waitFor(() => {
-      expect(screen.getByText(/No olympiads yet/)).toBeTruthy();
+      expect(screen.getByText(/No olympiads available yet/)).toBeTruthy();
     });
   });
 
@@ -209,7 +209,7 @@ describe('Educator Dashboard Page', () => {
     });
 
     // The pending badge shows on the collapsed card header
-    expect(screen.getByText('⏳ Requested')).toBeTruthy();
+    expect(screen.getByText('Requested')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /Science Olympiad/ }));
 
@@ -228,7 +228,7 @@ describe('Educator Dashboard Page', () => {
       expect(screen.getByRole('button', { name: /Science Olympiad/ })).toBeTruthy();
     });
 
-    expect(screen.getByText('✖ Declined')).toBeTruthy();
+    expect(screen.getByText('Declined')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /Science Olympiad/ }));
 
