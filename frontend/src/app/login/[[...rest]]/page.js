@@ -27,25 +27,6 @@ export default function LoginPage() {
     }
   }, [router]);
 
-  // Redirect if already signed in via Clerk (educator/organiser)
-  // Only run this if there's no student session to avoid race conditions
-  useEffect(() => {
-    const session = getStudentSession();
-    if (session?.user?.role) return; // Student session takes priority
-    if (!isSignedIn) return;
-    let cancelled = false;
-    async function check() {
-      const token = await getToken();
-      const user = await fetchCurrentUser(token);
-      if (cancelled) return;
-      if (user) {
-        router.replace(dashboardPathForRole(user.role));
-      }
-    }
-    check();
-    return () => { cancelled = true; };
-  }, [isSignedIn, getToken, router]);
-
   async function handleStudentSubmit(e) {
     e.preventDefault();
     setError(null);

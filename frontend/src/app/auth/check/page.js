@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth, useClerk } from '@clerk/nextjs';
 import { fetchCurrentUser, dashboardPathForRole } from '@/lib/api';
 
 export default function AuthCheckPage() {
   const router = useRouter();
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { signOut } = useClerk();
   const [error, setError] = useState(null);
+  const [noProfile, setNoProfile] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -30,13 +32,12 @@ export default function AuthCheckPage() {
         if (user && user.role) {
           router.replace(dashboardPathForRole(user.role));
         } else {
-          setError('Unable to load your profile. Please try again.');
-          setTimeout(() => router.replace('/login'), 2000);
+          setNoProfile(true);
+          setError('Your account is not registered in the system yet.');
         }
       } catch (err) {
         if (cancelled) return;
-        setError('An error occurred. Redirecting you back...');
-        setTimeout(() => router.replace('/login'), 2000);
+        setError('An error occurred. Please try again.');
       }
     }
 
@@ -45,6 +46,11 @@ export default function AuthCheckPage() {
       cancelled = true;
     };
   }, [isLoaded, isSignedIn, getToken, router]);
+
+  async function handleSignOut() {
+    await signOut();
+    router.replace('/login');
+  }
 
   return (
     <div style={{
@@ -56,9 +62,33 @@ export default function AuthCheckPage() {
       gap: '16px',
     }}>
       {error ? (
-        <>
-          <p style={{ color: '#e0615f', fontSize: '14px' }}>{error}</p>
-        </>
+        <div style={{ textAlign: 'center', maxWidth: '400px' }}>
+          <p style={{ color: noProfile ? '#b45309' : '#e0615f', fontSize: '14px', marginBottom: '16px' }}>
+            {error}
+          </p>
+          {noProfile && (
+            <p style={{ color: '#766e89', fontSize: '13px', marginBottom: '20px' }}>
+              Please contact your administrator to register your account, or sign in with a different account.
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={handleSignOut}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid #e5e1ed',
+                background: '#fff',
+                color: '#6c4fd8',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Sign in with different account
+            </button>
+          </div>
+        </div>
       ) : (
         <>
           <div style={{
