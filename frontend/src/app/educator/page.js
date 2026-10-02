@@ -5,6 +5,21 @@ import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { listOlympiads, requestOlympiadAccess } from '@/lib/api';
+import '@/app/auth.css';
+import {
+  ChevronRight,
+  ArrowRight,
+  ClipboardList,
+  Clock,
+  FileText,
+  Radio,
+  Sparkles,
+  Trophy,
+  Users,
+  CalendarDays,
+  Plus,
+  ChevronDown,
+} from 'lucide-react';
 
 // Olympiad-first board for educators. The persistent sidebar lives in
 // app/educator/layout.js; students are managed on the School Dashboard
@@ -30,161 +45,6 @@ function timeUntil(iso) {
   return `${hrs}h ${Math.floor((ms % 3600000) / 60000)}m`;
 }
 
-/* ── Stat card ────────────────────────────────────────────────────────── */
-
-function StatCard({ icon, label, value, accent }) {
-  return (
-    <div
-      style={{
-        flex: 1,
-        background: 'white',
-        borderRadius: '12px',
-        padding: '12px 15px',
-        boxShadow: '0 2px 8px rgba(139,92,246,0.07)',
-        border: '1px solid rgba(139,92,246,0.1)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '11px',
-        minWidth: '140px',
-      }}
-    >
-      <div
-        style={{
-          width: '34px',
-          height: '34px',
-          borderRadius: '9px',
-          background: accent || 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '1.05em',
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </div>
-      <div>
-        <p
-          style={{
-            margin: 0,
-            fontSize: '1.25em',
-            fontWeight: 700,
-            color: '#2d2640',
-            lineHeight: 1,
-          }}
-        >
-          {value}
-        </p>
-        <p style={{ margin: '2px 0 0', fontSize: '0.72em', color: '#8b7fa8' }}>{label}</p>
-      </div>
-    </div>
-  );
-}
-
-/* ── Next-up focus card ───────────────────────────────────────────────── */
-
-function NextUpCard({ round, olympiadName }) {
-  if (!round) {
-    return (
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #ede6f8, #f5effa)',
-          borderRadius: '14px',
-          padding: '18px 22px',
-          border: '1px solid rgba(139,92,246,0.12)',
-          textAlign: 'center',
-        }}
-      >
-        <p style={{ fontSize: '1.5em', margin: '0 0 6px' }}>✨</p>
-        <p style={{ margin: 0, color: '#6b6480', fontSize: '0.85em' }}>
-          No rounds need your attention right now.
-        </p>
-      </div>
-    );
-  }
-  const style = STATE_STYLES[round.state] || STATE_STYLES.scheduled;
-  const target = round.state === 'open' ? round.closeTime : round.openTime;
-  const countdown = timeUntil(target);
-  const actionLabel =
-    round.state === 'open' ? 'closes in' : round.state === 'scheduled' ? 'opens in' : null;
-
-  return (
-    <div
-      style={{
-        background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)',
-        borderRadius: '14px',
-        padding: '18px 22px',
-        color: 'white',
-        position: 'relative',
-        overflow: 'hidden',
-        boxShadow: '0 8px 22px rgba(91,33,182,0.26)',
-      }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          right: '-30px',
-          top: '-30px',
-          width: '120px',
-          height: '120px',
-          borderRadius: '50%',
-          background: 'rgba(255,255,255,0.07)',
-        }}
-      />
-      <p
-        style={{
-          margin: 0,
-          fontSize: '0.68em',
-          opacity: 0.75,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          fontWeight: 600,
-        }}
-      >
-        Next up
-      </p>
-      <h3 style={{ margin: '4px 0 0', fontSize: '1.15em', fontWeight: 800 }}>{round.name}</h3>
-      <p style={{ margin: '3px 0 0', fontSize: '0.78em', opacity: 0.85 }}>{olympiadName}</p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
-        <span
-          style={{
-            background: 'rgba(255,255,255,0.15)',
-            padding: '3px 10px',
-            borderRadius: '20px',
-            fontSize: '0.72em',
-            fontWeight: 700,
-          }}
-        >
-          {style.label}
-        </span>
-        {actionLabel && countdown && (
-          <span style={{ fontSize: '0.78em', opacity: 0.9 }}>
-            {actionLabel} <strong>{countdown}</strong>
-          </span>
-        )}
-      </div>
-      <Link
-        href={`/educator/round_view?id=${round.id}`}
-        style={{
-          display: 'inline-block',
-          marginTop: '12px',
-          background: 'white',
-          color: '#6d3fd1',
-          padding: '7px 14px',
-          borderRadius: '8px',
-          textDecoration: 'none',
-          fontWeight: 700,
-          fontSize: '0.8em',
-        }}
-      >
-        View round →
-      </Link>
-    </div>
-  );
-}
-
-/* ── Olympiad accordion ────────────────────────────────────────────────── */
-
 function formatDate(iso, tz) {
   const opts = {
     day: 'numeric',
@@ -195,21 +55,30 @@ function formatDate(iso, tz) {
   return new Date(iso).toLocaleDateString('en-ZA', opts);
 }
 
-function formatDateTime(iso, tz) {
-  const opts = {
+function greetingFor() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function olympiadTone(index) {
+  const tones = ['violet', 'amber', 'blue'];
+  return tones[index % tones.length];
+}
+
+function todayFormatted() {
+  return new Date().toLocaleDateString('en-ZA', {
+    weekday: 'long',
     day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  };
-  if (tz) opts.timeZone = tz;
-  return new Date(iso).toLocaleString('en-ZA', opts);
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
 const ACCESS_BADGES = {
-  pending: { label: '⏳ Requested', bg: 'rgba(245,158,11,0.12)', color: '#b45309' },
-  declined: { label: '✖ Declined', bg: 'rgba(224,97,95,0.1)', color: '#e0615f' },
+  pending: { label: 'Requested', bg: 'rgba(245,158,11,0.12)', color: '#b45309' },
+  declined: { label: 'Declined', bg: 'rgba(224,97,95,0.1)', color: '#e0615f' },
 };
 
 const META_CHIP_STYLE = {
@@ -224,6 +93,23 @@ const META_CHIP_STYLE = {
   fontWeight: 600,
   color: '#4a4360',
 };
+
+/* ── Stat card ────────────────────────────────────────────────────────── */
+
+function StatCard({ icon: Icon, label, value, detail, tone }) {
+  return (
+    <div className="stat-card">
+      <div className={`stat-icon ${tone || 'purple'}`}><Icon /></div>
+      <div>
+        <p>{label}</p>
+        <strong>{value}</strong>
+        <span>{detail}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Round row ────────────────────────────────────────────────────────── */
 
 function RoundRow({ round }) {
   const style = STATE_STYLES[round.state] || STATE_STYLES.scheduled;
@@ -280,9 +166,8 @@ function RoundRow({ round }) {
   );
 }
 
-// Shown when the educator's school is not (yet) part of the olympiad:
-// organiser-set description, run dates, grades, learners per school, and
-// the access-request controls.
+/* ── Olympiad info panel (access request) ─────────────────────────────── */
+
 function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
   const counts = olympiad.schoolEntrantCounts || [];
   const tz = olympiad.timezone || null;
@@ -307,8 +192,8 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
       </p>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <span style={META_CHIP_STYLE}>📅 {dateRange}</span>
-        <span style={META_CHIP_STYLE}>🎓 {olympiad.grades || 'TBC'}</span>
+        <span style={META_CHIP_STYLE}>{'\ud83d\udcc5'} {dateRange}</span>
+        <span style={META_CHIP_STYLE}>{'\ud83c\udf93'} {olympiad.grades || 'TBC'}</span>
       </div>
 
       <div>
@@ -373,7 +258,7 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
             fontSize: '0.8em',
           }}
         >
-          ⏳ Access requested — waiting for the organiser to approve.
+          {'\u23f3'} Access requested — waiting for the organiser to approve.
         </p>
       ) : (
         <div>
@@ -398,7 +283,7 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
               fontFamily: 'inherit',
             }}
           >
-            {requesting ? 'Requesting…' : declined ? 'Request access again' : 'Request access'}
+            {requesting ? 'Requesting\u2026' : declined ? 'Request access again' : 'Request access'}
           </button>
         </div>
       )}
@@ -406,12 +291,13 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
   );
 }
 
-function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestingAccess }) {
+/* ── Olympiad accordion card ──────────────────────────────────────────── */
+
+function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestingAccess, index }) {
   const rounds = olympiad.rounds || [];
   const openCount = rounds.filter((r) => r.state === 'open').length;
   const scheduledCount = rounds.filter((r) => r.state === 'scheduled').length;
   const badge = ACCESS_BADGES[olympiad.schoolAccess];
-  // An unknown access state (enrichment unavailable) keeps the old rounds view.
   const showsRounds = !olympiad.schoolAccess || olympiad.schoolAccess === 'approved';
   const tz = olympiad.timezone || null;
 
@@ -427,52 +313,21 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
     new Date(olympiad.endDate) >= now;
 
   return (
-    <div
-      style={{
-        background: 'white',
-        borderRadius: '16px',
-        border: '1px solid rgba(139,92,246,0.1)',
-        boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
-        overflow: 'hidden',
-      }}
-    >
-      <button
-        type="button"
+    <div>
+      <div
+        className="round-row"
+        style={{ cursor: 'pointer', position: 'relative', padding: '13px 0', border: 'none' }}
         onClick={onToggle}
-        aria-expanded={expanded}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '14px 18px',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          textAlign: 'left',
-          fontFamily: 'inherit',
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onToggle();
         }}
       >
-        <div
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.05em',
-            flexShrink: 0,
-          }}
-        >
-          🏆
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: '#2d2640' }}>
-              {olympiad.name}
-            </p>
+        <div className={`round-status ${olympiadTone(index)}`}><Trophy /></div>
+        <div className="test-main">
+          <strong>
+            {olympiad.name}
             {isUpcoming && (
               <span
                 style={{
@@ -480,8 +335,9 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
                   color: '#b45309',
                   padding: '1px 8px',
                   borderRadius: '10px',
-                  fontSize: '0.65em',
+                  fontSize: '0.85em',
                   fontWeight: 700,
+                  marginLeft: '8px',
                 }}
               >
                 Upcoming
@@ -494,21 +350,26 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
                   color: '#2d8a5e',
                   padding: '1px 8px',
                   borderRadius: '10px',
-                  fontSize: '0.65em',
+                  fontSize: '0.85em',
                   fontWeight: 700,
+                  marginLeft: '8px',
                 }}
               >
                 Active
               </span>
             )}
-          </div>
-          <p style={{ margin: '2px 0 0', fontSize: '0.78em', color: '#8b7fa8' }}>
-            {dateRange ? `📅 ${dateRange}` : '📅 Dates TBC'}
+          </strong>
+          <span>
+            {dateRange ? dateRange : 'Dates TBC'}
             {' · '}
             {rounds.length} round{rounds.length !== 1 ? 's' : ''}
             {openCount > 0 && ` · ${openCount} open`}
             {scheduledCount > 0 && ` · ${scheduledCount} scheduled`}
-          </p>
+          </span>
+          <div className="round-meta">
+            {dateRange && <span><CalendarDays /> {dateRange}</span>}
+            <span><Users /> {rounds.length} round{rounds.length !== 1 ? 's' : ''}</span>
+          </div>
         </div>
         {badge && (
           <span
@@ -517,7 +378,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
               color: badge.color,
               padding: '3px 10px',
               borderRadius: '20px',
-              fontSize: '0.7em',
+              fontSize: '10px',
               fontWeight: 700,
               flexShrink: 0,
             }}
@@ -525,27 +386,26 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
             {badge.label}
           </span>
         )}
-        <span
+        <ChevronRight
+          size={15}
           style={{
-            color: '#a89fc9',
-            fontSize: '0.9em',
-            display: 'inline-block',
+            color: '#aaa1b7',
             transform: expanded ? 'rotate(90deg)' : 'none',
             transition: 'transform 0.15s ease',
             flexShrink: 0,
           }}
-        >
-          ▸
-        </span>
-      </button>
+        />
+      </div>
 
       {expanded &&
         (showsRounds ? (
           <div
             style={{
-              borderTop: '1px solid rgba(139,92,246,0.08)',
+              margin: '4px 0 8px',
               padding: '14px',
-              background: '#fbfaff',
+              border: '1px solid rgba(139,92,246,0.15)',
+              borderRadius: '10px',
+              background: '#faf8ff',
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
@@ -573,7 +433,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
 /* ── Main page ────────────────────────────────────────────────────────── */
 
 export default function EducatorDashboard() {
-  const { checking } = useRequireRole('educator');
+  const { user, checking } = useRequireRole('educator');
   const { getToken } = useAuth();
 
   const [olympiads, setOlympiads] = useState([]);
@@ -591,6 +451,7 @@ export default function EducatorDashboard() {
         setOlympiads(data);
         setStatus(data.length > 0 ? 'ready' : 'empty');
       } catch (err) {
+        console.error('Failed to fetch olympiads:', err);
         setStatus('error');
       }
     }
@@ -604,8 +465,6 @@ export default function EducatorDashboard() {
   async function handleRequestAccess(olympiad) {
     setRequestingId(olympiad.id);
     setAccessError(null);
-    // Optimistic — flip the card to its waiting state right away; rolled
-    // back if the request fails.
     setAccessState(olympiad.id, 'pending');
     try {
       const token = await getToken();
@@ -618,8 +477,6 @@ export default function EducatorDashboard() {
     }
   }
 
-  // Rounds of olympiads the school isn't part of don't count towards the
-  // stats or the next-up card — the educator can't act on them yet.
   const memberOlympiads = useMemo(
     () => olympiads.filter((o) => !o.schoolAccess || o.schoolAccess === 'approved'),
     [olympiads]
@@ -650,15 +507,8 @@ export default function EducatorDashboard() {
 
   if (checking) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          minHeight: '60vh',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <p style={{ color: '#8b7fa8' }}>Loading...</p>
+      <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>
+        Loading...
       </div>
     );
   }
@@ -666,85 +516,193 @@ export default function EducatorDashboard() {
   const openCount = roundsByState.open.length;
   const scheduledCount = roundsByState.scheduled.length;
   const releasedCount = roundsByState.released.length;
+  const firstName = (user?.name || user?.email || 'Educator').split(/[\s@]/)[0];
 
   return (
     <>
-      {/* Stats + Next up */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr 1.4fr',
-          gap: '14px',
-          alignItems: 'stretch',
-        }}
-      >
-        <StatCard
-          icon="🟢"
-          label="Open Rounds"
-          value={openCount}
-          accent="linear-gradient(135deg, #3fae7a, #2d8a5e)"
-        />
-        <StatCard
-          icon="🕒"
-          label="Scheduled"
-          value={scheduledCount}
-          accent="linear-gradient(135deg, #f59e0b, #d97706)"
-        />
-        <StatCard
-          icon="📄"
-          label="Released"
-          value={releasedCount}
-          accent="linear-gradient(135deg, #c99a2e, #b07d1e)"
-        />
-        <div style={{ gridRow: 'span 1' }}>
-          <NextUpCard round={nextUpRound} olympiadName={nextUpRound?.olympiadName} />
+      {/* Welcome row */}
+      <section className="welcome-row">
+        <div>
+          <p className="eyebrow">{todayFormatted()}</p>
+          <h1>
+            {greetingFor()}, {firstName} <span>&#10022;</span>
+          </h1>
+          <p className="subheading">
+            Here&apos;s what&apos;s happening across your Olympiads today.
+          </p>
+        </div>
+        <button className="button primary">
+          <Plus /> Create olympiad
+        </button>
+      </section>
+
+      {/* Educator banner */}
+      <section className="educator-banner">
+        <div>
+          <div className="hero-kicker"><Sparkles /> Educator workspace</div>
+          <h2>Make every learner count.</h2>
+          <p>Track participation, share feedback, and help your students find their edge.</p>
+        </div>
+        <div className="banner-stat">
+          <strong>{memberOlympiads.length}</strong>
+          <span>olympiads joined</span>
+          <div><i /></div>
+        </div>
+      </section>
+
+      {/* Section heading */}
+      <div className="section-heading">
+        <div>
+          <h2>School overview</h2>
+          <p>Your programme at a glance.</p>
         </div>
       </div>
 
-      {/* Olympiads board */}
-      <div style={{ marginTop: '32px' }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: '1.15em', fontWeight: 700, color: '#2d2640' }}>
-          Olympiads
-        </h2>
+      {/* Stats grid */}
+      <section className="stats-grid">
+        <StatCard
+          icon={Radio}
+          label="Open rounds"
+          value={openCount}
+          detail={openCount > 0 ? 'Need attention' : 'None right now'}
+          tone="green"
+        />
+        <StatCard
+          icon={Trophy}
+          label="Olympiads joined"
+          value={memberOlympiads.length}
+          detail={olympiads.length > memberOlympiads.length ? `${olympiads.length - memberOlympiads.length} pending access` : 'All approved'}
+          tone="amber"
+        />
+        <StatCard
+          icon={FileText}
+          label="Released"
+          value={releasedCount}
+          detail={scheduledCount > 0 ? `${scheduledCount} scheduled` : 'No scheduled rounds'}
+          tone="blue"
+        />
+        <StatCard
+          icon={ClipboardList}
+          label="Total rounds"
+          value={allRounds.length}
+          detail={`${openCount} currently active`}
+          tone="purple"
+        />
+      </section>
 
-        {status === 'loading' && <p style={{ color: '#8b7fa8' }}>Loading olympiads...</p>}
-        {status === 'empty' && (
-          <div
-            style={{
-              padding: '32px',
-              textAlign: 'center',
-              background: 'white',
-              borderRadius: '14px',
-              border: '1px solid rgba(139,92,246,0.1)',
-            }}
-          >
-            <p style={{ color: '#8b7fa8', margin: 0 }}>No olympiads yet.</p>
-          </div>
-        )}
-        {status === 'error' && <p style={{ color: '#e0615f' }}>Couldn&apos;t load olympiads.</p>}
-
-        {status === 'ready' && (
-          <>
-            {accessError && (
-              <p style={{ color: '#e0615f', margin: '0 0 10px', fontSize: '0.85em' }}>
-                {accessError}
-              </p>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {olympiads.map((o) => (
-                <OlympiadCard
-                  key={o.id}
-                  olympiad={o}
-                  expanded={expandedId === o.id}
-                  onToggle={() => setExpandedId(expandedId === o.id ? null : o.id)}
-                  onRequestAccess={handleRequestAccess}
-                  requestingAccess={requestingId === o.id}
-                />
-              ))}
+      {/* Content grid */}
+      <section className="content-grid">
+        {/* Olympiad activity panel */}
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Olympiad activity</h2>
+              <p>Monitor rounds and learner participation.</p>
             </div>
-          </>
-        )}
-      </div>
+            {status === 'ready' && (
+              <span style={{
+                background: 'rgba(139,92,246,0.08)',
+                color: '#6d3fd1',
+                padding: '3px 10px',
+                borderRadius: '20px',
+                fontSize: '10px',
+                fontWeight: 700,
+              }}>
+                {olympiads.length}
+              </span>
+            )}
+          </div>
+
+          {status === 'loading' && (
+            <p style={{ color: '#817a91', fontSize: '13px', marginTop: '18px' }}>
+              Loading olympiads...
+            </p>
+          )}
+
+          {status === 'empty' && (
+            <p style={{ color: '#92899f', fontSize: '12px', marginTop: '18px' }}>
+              No olympiads available yet.
+            </p>
+          )}
+
+          {status === 'error' && (
+            <p style={{ color: 'red', fontSize: '13px', marginTop: '18px' }}>
+              Couldn&apos;t load olympiads. Try refreshing.
+            </p>
+          )}
+
+          {status === 'ready' && (
+            <>
+              {accessError && (
+                <p style={{ color: '#e0615f', margin: '12px 0 0', fontSize: '12px' }}>
+                  {accessError}
+                </p>
+              )}
+              <div className="round-list">
+                {olympiads.map((o, idx) => (
+                  <OlympiadCard
+                    key={o.id}
+                    olympiad={o}
+                    index={idx}
+                    expanded={expandedId === o.id}
+                    onToggle={() => setExpandedId(expandedId === o.id ? null : o.id)}
+                    onRequestAccess={handleRequestAccess}
+                    requestingAccess={requestingId === o.id}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          <Link href="/educator" className="full-link">
+            View all olympiads <ArrowRight />
+          </Link>
+        </div>
+
+        {/* Quick actions panel */}
+        <div className="panel calendar-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Quick actions</h2>
+              <p>Common tasks for your school.</p>
+            </div>
+            <Sparkles className="heading-icon" />
+          </div>
+          <div className="quick-actions">
+            <Link href="/educator/school">
+              <div className="quick-icon purple"><Users /></div>
+              <span>
+                <strong>School dashboard</strong>
+                <small>View learner progress and participation</small>
+              </span>
+              <ArrowRight />
+            </Link>
+            <Link href="/educator/archive">
+              <div className="quick-icon blue"><FileText /></div>
+              <span>
+                <strong>Archive</strong>
+                <small>Browse past olympiads and results</small>
+              </span>
+              <ArrowRight />
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                const olympiadSection = document.querySelector('.content-grid .panel:first-child');
+                if (olympiadSection) {
+                  olympiadSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+            >
+              <div className="quick-icon amber"><Trophy /></div>
+              <span>
+                <strong>Browse olympiads</strong>
+                <small>Find the next challenge for your school</small>
+              </span>
+              <ArrowRight />
+            </button>
+          </div>
+        </div>
+      </section>
     </>
   );
 }

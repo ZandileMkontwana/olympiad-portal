@@ -1,13 +1,27 @@
 import StudentSidebar from '@/components/StudentSidebar';
+import '@/app/auth.css';
 
 // Persistent shell for the student dashboard and result pages — the sidebar
 // stays mounted so navigating between them only swaps the main content.
 // The sit (test-taking) page sits outside this group and stays full-screen.
 export default function StudentLayout({ children }) {
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="app-shell">
       <StudentSidebar />
-      <main className="relative ml-60 w-[calc(100%-15rem)] max-w-6xl px-8 py-10">{children}</main>
+      <div className="page-shell">
+        <header className="topbar">
+          <div className="breadcrumbs">
+            <span>Workspace</span>
+            <strong>Student overview</strong>
+          </div>
+          <div className="top-actions">
+            <div className="avatar">AM</div>
+          </div>
+        </header>
+        <main className="dashboard">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

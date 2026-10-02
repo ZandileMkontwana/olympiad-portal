@@ -46,7 +46,7 @@ app.use(
       });
 
       if (isAllowed) {
-        callback(null, true);
+        callback(null, origin);
       } else {
         callback(new Error('Not allowed by CORS'));
       }
