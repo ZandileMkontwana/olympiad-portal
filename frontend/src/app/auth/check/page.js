@@ -12,7 +12,7 @@ function AuthCheckContent() {
 
   useEffect(() => {
     if (!isLoaded) return;
-    
+
     if (!isSignedIn) {
       router.replace('/login');
       return;
@@ -25,19 +25,19 @@ function AuthCheckContent() {
         const token = await getToken();
         const user = await fetchCurrentUser(token);
         const expectedRole = searchParams.get('expectedRole');
-        
+
         if (cancelled) return;
-        
+
         if (!user || !user.role) {
           router.replace('/login?error=not_registered');
           return;
         }
-        
+
         if (expectedRole && user.role !== expectedRole) {
           router.replace(`/login?error=role_mismatch&expected=${expectedRole}&actual=${user.role}`);
           return;
         }
-        
+
         router.replace(dashboardPathForRole(user.role));
       } catch (err) {
         if (cancelled) return;
@@ -52,22 +52,26 @@ function AuthCheckContent() {
   }, [isLoaded, isSignedIn, getToken, router, searchParams]);
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      flexDirection: 'column',
-      gap: '16px',
-    }}>
-      <div style={{
-        width: '40px',
-        height: '40px',
-        border: '3px solid #f0edf6',
-        borderTopColor: '#6c4fd8',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite',
-      }} />
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        flexDirection: 'column',
+        gap: '16px',
+      }}
+    >
+      <div
+        style={{
+          width: '40px',
+          height: '40px',
+          border: '3px solid #f0edf6',
+          borderTopColor: '#6c4fd8',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+        }}
+      />
       <p style={{ color: '#766e89', fontSize: '14px' }}>Signing you in...</p>
       <style>{`
         @keyframes spin {
@@ -80,7 +84,20 @@ function AuthCheckContent() {
 
 export default function AuthCheckPage() {
   return (
-    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}><p style={{ color: '#766e89', fontSize: '14px' }}>Loading...</p></div>}>
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+          }}
+        >
+          <p style={{ color: '#766e89', fontSize: '14px' }}>Loading...</p>
+        </div>
+      }
+    >
       <AuthCheckContent />
     </Suspense>
   );

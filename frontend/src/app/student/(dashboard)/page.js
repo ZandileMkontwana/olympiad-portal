@@ -83,8 +83,18 @@ function todayFormatted() {
 }
 
 const STATUS_STYLES = {
-  'in-progress': { bg: 'rgba(76,175,125,0.1)', color: '#3fae7a', label: 'In progress', tone: 'green' },
-  'not-started': { bg: 'rgba(224,168,62,0.12)', color: '#c99a2e', label: 'Not started', tone: 'amber' },
+  'in-progress': {
+    bg: 'rgba(76,175,125,0.1)',
+    color: '#3fae7a',
+    label: 'In progress',
+    tone: 'green',
+  },
+  'not-started': {
+    bg: 'rgba(224,168,62,0.12)',
+    color: '#c99a2e',
+    label: 'Not started',
+    tone: 'amber',
+  },
   completed: { bg: 'rgba(139,92,246,0.08)', color: '#6d3fd1', label: 'Completed', tone: 'purple' },
   expired: { bg: 'rgba(139,127,168,0.1)', color: '#8b7fa8', label: 'Expired', tone: 'blue' },
   locked: { bg: 'rgba(139,127,168,0.06)', color: '#999', label: 'Locked', tone: 'blue' },
@@ -95,7 +105,9 @@ const STATUS_STYLES = {
 function StatCard({ icon: Icon, label, value, detail, tone }) {
   return (
     <div className="stat-card">
-      <div className={`stat-icon ${tone || 'purple'}`}><Icon /></div>
+      <div className={`stat-icon ${tone || 'purple'}`}>
+        <Icon />
+      </div>
       <div>
         <p>{label}</p>
         <strong>{value}</strong>
@@ -138,7 +150,14 @@ function TrendChart({ results }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px',
+        }}
+      >
         <span style={{ fontSize: '11px', color: '#8b7fa8' }}>Last {sorted.length} results</span>
       </div>
       <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%' }}>
@@ -243,7 +262,9 @@ function AchievementBadges({ results, sittings }) {
           }}
         >
           <span style={{ fontSize: '1.5em' }}>{b.icon}</span>
-          <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: '#241f38' }}>{b.label}</p>
+          <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: '#241f38' }}>
+            {b.label}
+          </p>
         </div>
       ))}
     </div>
@@ -302,7 +323,9 @@ function TestsSection({ tests, rounds }) {
 
             return (
               <div className="test-row" key={item.id}>
-                <div className={`test-symbol ${style.tone}`}><ClipboardCheck /></div>
+                <div className={`test-symbol ${style.tone}`}>
+                  <ClipboardCheck />
+                </div>
                 <div className="test-main">
                   <strong>{item.name}</strong>
                   <span>{dateLabel}</span>
@@ -341,11 +364,13 @@ function TestsSection({ tests, rounds }) {
                   </Link>
                 )}
                 {item.status === 'locked' && item.lockedReason && (
-                  <span style={{ fontSize: '10px', color: '#999', fontStyle: 'italic' }}>{item.lockedReason}</span>
+                  <span style={{ fontSize: '10px', color: '#999', fontStyle: 'italic' }}>
+                    {item.lockedReason}
+                  </span>
                 )}
-                {(item.status !== 'in-progress' && item.status !== 'not-started' && item.status !== 'locked') && (
-                  <ArrowRight className="row-arrow" />
-                )}
+                {item.status !== 'in-progress' &&
+                  item.status !== 'not-started' &&
+                  item.status !== 'locked' && <ArrowRight className="row-arrow" />}
               </div>
             );
           })}
@@ -412,13 +437,17 @@ function ResultsSection({ results }) {
                 className="test-row"
                 style={{ textDecoration: 'none', cursor: 'pointer' }}
               >
-                <div className={`test-symbol ${toneColorMap[tone] || 'purple'}`}><ClipboardCheck /></div>
+                <div className={`test-symbol ${toneColorMap[tone] || 'purple'}`}>
+                  <ClipboardCheck />
+                </div>
                 <div className="test-main">
                   <strong>{result.round.name}</strong>
                   <span>Submitted {formatDate(result.submittedAt)}</span>
                 </div>
                 <div className="test-side">
-                  <span style={{ fontSize: '16px', fontWeight: 700, color: scoreColor(result.score) }}>
+                  <span
+                    style={{ fontSize: '16px', fontWeight: 700, color: scoreColor(result.score) }}
+                  >
                     {Math.round(result.score)}%
                   </span>
                 </div>
@@ -460,7 +489,9 @@ function UpNextSection({ rounds, sittings }) {
       date: new Date(r.round.openTime),
       timeLabel: '',
       day: new Date(r.round.openTime).getDate(),
-      month: new Date(r.round.openTime).toLocaleDateString('en-ZA', { month: 'short' }).toUpperCase(),
+      month: new Date(r.round.openTime)
+        .toLocaleDateString('en-ZA', { month: 'short' })
+        .toUpperCase(),
     })),
   ].slice(0, 2);
 
@@ -468,9 +499,7 @@ function UpNextSection({ rounds, sittings }) {
     return (
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
         <CalendarDays size={20} style={{ color: '#8b7fa8', marginBottom: '6px' }} />
-        <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>
-          No upcoming deadlines.
-        </p>
+        <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>No upcoming deadlines.</p>
       </div>
     );
   }
@@ -487,7 +516,9 @@ function UpNextSection({ rounds, sittings }) {
             <strong>{item.name}</strong>
             <span>{item.subtitle}</span>
             {item.timeLabel && (
-              <small><Clock3 /> {item.timeLabel}</small>
+              <small>
+                <Clock3 /> {item.timeLabel}
+              </small>
             )}
           </div>
         </div>
@@ -528,11 +559,7 @@ export default function StudentDashboard() {
   }, [checking, user, getToken]);
 
   if (checking || !user || status === 'loading') {
-    return (
-      <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>
-        Loading...
-      </div>
-    );
+    return <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>Loading...</div>;
   }
 
   const completed = sittings.filter((s) => testStatus(s) === 'completed').length;
@@ -562,8 +589,8 @@ export default function StudentDashboard() {
             {inProgress.length > 0
               ? `You have ${inProgress.length} test${inProgress.length > 1 ? 's' : ''} in progress — keep going!`
               : availableCount > 0
-              ? `You have ${availableCount} test${availableCount > 1 ? 's' : ''} ready to take.`
-              : 'All caught up — nothing due right now.'}
+                ? `You have ${availableCount} test${availableCount > 1 ? 's' : ''} ready to take.`
+                : 'All caught up — nothing due right now.'}
           </p>
         </div>
         {resumeHref && (
@@ -584,12 +611,18 @@ export default function StudentDashboard() {
       {heroTest && (
         <section className="hero-card">
           <div className="hero-copy">
-            <div className="hero-kicker"><Sparkles /> Your next milestone</div>
+            <div className="hero-kicker">
+              <Sparkles /> Your next milestone
+            </div>
             <h2>Finish strong</h2>
             <p>{heroTest.round.name}</p>
             <div className="hero-meta">
-              <span><Clock3 /> {timeLeft(heroTest.expiresAt)}</span>
-              <span><ClipboardCheck /> In progress</span>
+              <span>
+                <Clock3 /> {timeLeft(heroTest.expiresAt)}
+              </span>
+              <span>
+                <ClipboardCheck /> In progress
+              </span>
             </div>
             <Link
               href={resumeHref}
@@ -615,7 +648,12 @@ export default function StudentDashboard() {
         <div
           role="alert"
           className="panel"
-          style={{ marginTop: '20px', padding: '16px', borderColor: '#f3c2c2', background: '#fdf0f0' }}
+          style={{
+            marginTop: '20px',
+            padding: '16px',
+            borderColor: '#f3c2c2',
+            background: '#fdf0f0',
+          }}
         >
           <p style={{ color: '#8f2f2f', fontSize: '13px', margin: 0 }}>
             Couldn&apos;t load your tests or results. Try refreshing the page.
@@ -660,7 +698,11 @@ export default function StudentDashboard() {
               icon={Sparkles}
               label="Best score"
               value={bestScore}
-              detail={results.length > 0 ? `${results.length} result${results.length !== 1 ? 's' : ''} released` : 'No results yet'}
+              detail={
+                results.length > 0
+                  ? `${results.length} result${results.length !== 1 ? 's' : ''} released`
+                  : 'No results yet'
+              }
               tone="green"
             />
           </section>
@@ -675,14 +717,16 @@ export default function StudentDashboard() {
                   <p>Stay on top of your active and upcoming challenges.</p>
                 </div>
                 {inProgress.length > 0 && (
-                  <span style={{
-                    background: 'rgba(76,175,125,0.1)',
-                    color: '#3fae7a',
-                    padding: '3px 10px',
-                    borderRadius: '20px',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                  }}>
+                  <span
+                    style={{
+                      background: 'rgba(76,175,125,0.1)',
+                      color: '#3fae7a',
+                      padding: '3px 10px',
+                      borderRadius: '20px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                    }}
+                  >
                     {inProgress.length} active
                   </span>
                 )}
@@ -736,16 +780,20 @@ export default function StudentDashboard() {
                 <Award className="heading-icon" />
               </div>
               <TrendChart results={results} />
-              <div style={{ marginTop: '16px', borderTop: '1px solid #f0edf6', paddingTop: '14px' }}>
-                <span style={{
-                  color: '#a0a7b5',
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  letterSpacing: '.12em',
-                  textTransform: 'uppercase',
-                  display: 'block',
-                  marginBottom: '10px',
-                }}>
+              <div
+                style={{ marginTop: '16px', borderTop: '1px solid #f0edf6', paddingTop: '14px' }}
+              >
+                <span
+                  style={{
+                    color: '#a0a7b5',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '.12em',
+                    textTransform: 'uppercase',
+                    display: 'block',
+                    marginBottom: '10px',
+                  }}
+                >
                   Badges
                 </span>
                 <AchievementBadges results={results} sittings={sittings} />
