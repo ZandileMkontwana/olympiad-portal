@@ -527,6 +527,7 @@ export default function SchoolDashboardPage() {
         setOlympiads(olymData.filter((o) => o.schoolAccess === 'approved'));
         setStatus('ready');
       } catch (err) {
+        console.error('Failed to load school dashboard:', err);
         setStatus('error');
       }
     }

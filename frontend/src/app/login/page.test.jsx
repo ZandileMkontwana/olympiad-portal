@@ -8,6 +8,7 @@ const mockReplace = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 // Mutable Clerk state — individual tests override before rendering.
@@ -19,6 +20,7 @@ vi.mock('@clerk/nextjs', () => ({
     isSignedIn: clerkState.isSignedIn,
     getToken: vi.fn().mockResolvedValue('clerk-token'),
   }),
+  useClerk: () => ({ signOut: vi.fn() }),
   SignIn: () => <div data-testid="clerk-signin">Clerk sign-in</div>,
 }));
 

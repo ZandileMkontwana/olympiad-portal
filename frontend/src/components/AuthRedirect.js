@@ -16,6 +16,10 @@ export default function AuthRedirect() {
     let cancelled = false;
 
     async function check() {
+      // Small delay to ensure auth state is stable before redirecting
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (cancelled) return;
+
       const token = await getToken();
       const user = await fetchCurrentUser(token);
       if (cancelled) return;
