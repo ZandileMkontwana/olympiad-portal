@@ -99,7 +99,9 @@ const META_CHIP_STYLE = {
 function StatCard({ icon: Icon, label, value, detail, tone }) {
   return (
     <div className="stat-card">
-      <div className={`stat-icon ${tone || 'purple'}`}><Icon /></div>
+      <div className={`stat-icon ${tone || 'purple'}`}>
+        <Icon />
+      </div>
       <div>
         <p>{label}</p>
         <strong>{value}</strong>
@@ -192,8 +194,12 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
       </p>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <span style={META_CHIP_STYLE}>{'\ud83d\udcc5'} {dateRange}</span>
-        <span style={META_CHIP_STYLE}>{'\ud83c\udf93'} {olympiad.grades || 'TBC'}</span>
+        <span style={META_CHIP_STYLE}>
+          {'\ud83d\udcc5'} {dateRange}
+        </span>
+        <span style={META_CHIP_STYLE}>
+          {'\ud83c\udf93'} {olympiad.grades || 'TBC'}
+        </span>
       </div>
 
       <div>
@@ -324,7 +330,9 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
           if (e.key === 'Enter' || e.key === ' ') onToggle();
         }}
       >
-        <div className={`round-status ${olympiadTone(index)}`}><Trophy /></div>
+        <div className={`round-status ${olympiadTone(index)}`}>
+          <Trophy />
+        </div>
         <div className="test-main">
           <strong>
             {olympiad.name}
@@ -367,8 +375,14 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
             {scheduledCount > 0 && ` · ${scheduledCount} scheduled`}
           </span>
           <div className="round-meta">
-            {dateRange && <span><CalendarDays /> {dateRange}</span>}
-            <span><Users /> {rounds.length} round{rounds.length !== 1 ? 's' : ''}</span>
+            {dateRange && (
+              <span>
+                <CalendarDays /> {dateRange}
+              </span>
+            )}
+            <span>
+              <Users /> {rounds.length} round{rounds.length !== 1 ? 's' : ''}
+            </span>
           </div>
         </div>
         {badge && (
@@ -506,11 +520,7 @@ export default function EducatorDashboard() {
   }, [allRounds]);
 
   if (checking) {
-    return (
-      <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>
-        Loading...
-      </div>
-    );
+    return <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>Loading...</div>;
   }
 
   const openCount = roundsByState.open.length;
@@ -539,14 +549,18 @@ export default function EducatorDashboard() {
       {/* Educator banner */}
       <section className="educator-banner">
         <div>
-          <div className="hero-kicker"><Sparkles /> Educator workspace</div>
+          <div className="hero-kicker">
+            <Sparkles /> Educator workspace
+          </div>
           <h2>Make every learner count.</h2>
           <p>Track participation, share feedback, and help your students find their edge.</p>
         </div>
         <div className="banner-stat">
           <strong>{memberOlympiads.length}</strong>
           <span>olympiads joined</span>
-          <div><i /></div>
+          <div>
+            <i />
+          </div>
         </div>
       </section>
 
@@ -571,7 +585,11 @@ export default function EducatorDashboard() {
           icon={Trophy}
           label="Olympiads joined"
           value={memberOlympiads.length}
-          detail={olympiads.length > memberOlympiads.length ? `${olympiads.length - memberOlympiads.length} pending access` : 'All approved'}
+          detail={
+            olympiads.length > memberOlympiads.length
+              ? `${olympiads.length - memberOlympiads.length} pending access`
+              : 'All approved'
+          }
           tone="amber"
         />
         <StatCard
@@ -600,14 +618,16 @@ export default function EducatorDashboard() {
               <p>Monitor rounds and learner participation.</p>
             </div>
             {status === 'ready' && (
-              <span style={{
-                background: 'rgba(139,92,246,0.08)',
-                color: '#6d3fd1',
-                padding: '3px 10px',
-                borderRadius: '20px',
-                fontSize: '10px',
-                fontWeight: 700,
-              }}>
+              <span
+                style={{
+                  background: 'rgba(139,92,246,0.08)',
+                  color: '#6d3fd1',
+                  padding: '3px 10px',
+                  borderRadius: '20px',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                }}
+              >
                 {olympiads.length}
               </span>
             )}
@@ -669,7 +689,9 @@ export default function EducatorDashboard() {
           </div>
           <div className="quick-actions">
             <Link href="/educator/school">
-              <div className="quick-icon purple"><Users /></div>
+              <div className="quick-icon purple">
+                <Users />
+              </div>
               <span>
                 <strong>School dashboard</strong>
                 <small>View learner progress and participation</small>
@@ -677,7 +699,9 @@ export default function EducatorDashboard() {
               <ArrowRight />
             </Link>
             <Link href="/educator/archive">
-              <div className="quick-icon blue"><FileText /></div>
+              <div className="quick-icon blue">
+                <FileText />
+              </div>
               <span>
                 <strong>Archive</strong>
                 <small>Browse past olympiads and results</small>
@@ -693,7 +717,9 @@ export default function EducatorDashboard() {
                 }
               }}
             >
-              <div className="quick-icon amber"><Trophy /></div>
+              <div className="quick-icon amber">
+                <Trophy />
+              </div>
               <span>
                 <strong>Browse olympiads</strong>
                 <small>Find the next challenge for your school</small>

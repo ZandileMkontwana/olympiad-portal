@@ -33,27 +33,25 @@ const allowedOrigins = [
   /^https:\/\/.*vercel\.app$/,
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
+const apiCors = cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
 
-      const isAllowed = allowedOrigins.some((allowed) => {
-        if (typeof allowed === 'string') return allowed === origin;
-        if (allowed instanceof RegExp) return allowed.test(origin);
-        return false;
-      });
+    const isAllowed = allowedOrigins.some((allowed) => {
+      if (typeof allowed === 'string') return allowed === origin;
+      if (allowed instanceof RegExp) return allowed.test(origin);
+      return false;
+    });
 
-      if (isAllowed) {
-        callback(null, origin);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  })
-);
+    if (isAllowed) {
+      callback(null, origin);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+});
 
 // Rate limiter for external API endpoints — 100 requests per 15 minutes per API key
 const externalRateLimiter = rateLimit({
@@ -69,11 +67,8 @@ const externalRateLimiter = rateLimit({
 app.use(cookieParser());
 app.use(express.json());
 app.use(clerkMiddleware());
+app.use(apiCors);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
-// Public API endpoints — open CORS so anyone can call them from any origin
-app.use('/api/olympiads', cors());
-app.use('/api/external', cors());
 
 app.use('/api', papersRouter);
 app.use('/api', roundsRouter);
@@ -133,7 +128,11 @@ if (require.main === module) {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     console.log(`Backend running on :${PORT}`);
-    startScheduler();
+    if (process.env.DISABLE_SCHEDULER === 'true') {
+      console.log('Round scheduler disabled by DISABLE_SCHEDULER');
+    } else {
+      startScheduler();
+    }
   });
 }
 

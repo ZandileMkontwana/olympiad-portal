@@ -18,9 +18,7 @@ export default function StudentLayout({ children }) {
             <div className="avatar">AM</div>
           </div>
         </header>
-        <main className="dashboard">
-          {children}
-        </main>
+        <main className="dashboard">{children}</main>
       </div>
     </div>
   );

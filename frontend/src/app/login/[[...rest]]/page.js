@@ -38,7 +38,11 @@ export default function LoginPage() {
   // Sign out from Clerk when redirected with an auth error
   useEffect(() => {
     const errorParam = searchParams.get('error');
-    if (errorParam === 'role_mismatch' || errorParam === 'not_registered' || errorParam === 'unknown') {
+    if (
+      errorParam === 'role_mismatch' ||
+      errorParam === 'not_registered' ||
+      errorParam === 'unknown'
+    ) {
       signOut();
     }
   }, [searchParams, signOut]);
@@ -94,7 +98,9 @@ export default function LoginPage() {
             <br />
             <span>best thinking.</span>
           </h1>
-          <p>Pick up your practice, revisit your progress, and keep moving toward the next challenge.</p>
+          <p>
+            Pick up your practice, revisit your progress, and keep moving toward the next challenge.
+          </p>
         </div>
         <div className="auth-story-footer">
           <Image src="/tree-mark.png" alt="" width={46} height={46} />
@@ -127,7 +133,17 @@ export default function LoginPage() {
                 }}
               >
                 <span className="auth-role-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                   </svg>
@@ -146,7 +162,17 @@ export default function LoginPage() {
                 }}
               >
                 <span className="auth-role-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
                     <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
                     <path d="M6 12v5c3 3 9 3 12 0v-5" />
                   </svg>
@@ -165,7 +191,17 @@ export default function LoginPage() {
                 }}
               >
                 <span className="auth-role-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
                     <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
                     <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                   </svg>
@@ -182,7 +218,17 @@ export default function LoginPage() {
               <form className="auth-form" onSubmit={handleStudentSubmit}>
                 <label htmlFor="student-email">Student email</label>
                 <div className="auth-input-wrap">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
                     <rect x="2" y="4" width="20" height="16" rx="2" />
                     <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                   </svg>
@@ -200,7 +246,17 @@ export default function LoginPage() {
 
                 <label htmlFor="student-password">Password</label>
                 <div className="auth-input-wrap">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
@@ -221,14 +277,34 @@ export default function LoginPage() {
                     tabIndex={-1}
                   >
                     {showPassword ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
                         <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
                         <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
                         <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
                         <line x1="2" x2="22" y1="2" y2="22" />
                       </svg>
                     ) : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
                         <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                         <circle cx="12" cy="12" r="3" />
                       </svg>
@@ -262,7 +338,11 @@ export default function LoginPage() {
           ) : (
             <>
               {error && (
-                <div className="auth-alert auth-alert-error" role="alert" style={{ marginBottom: '16px' }}>
+                <div
+                  className="auth-alert auth-alert-error"
+                  role="alert"
+                  style={{ marginBottom: '16px' }}
+                >
                   <strong>Couldn&apos;t sign you in</strong>
                   {error}
                 </div>
@@ -277,30 +357,30 @@ export default function LoginPage() {
                     start: {
                       title: 'Sign In',
                     },
-                },
-              }}
-              appearance={{
-                variables: {
-                  colorPrimary: '#6c4fd8',
-                  colorBackground: '#ffffff',
-                  borderRadius: '10px',
-                },
-                options: {
-                  logoImageUrl: '/tree-mark.png',
-                  socialButtonsPlacement: 'bottom',
-                },
-                elements: {
-                  rootBox: 'auth-clerk-root',
-                  cardBox: 'auth-clerk-cardbox',
-                  card: 'auth-clerk-card',
-                  headerTitle: 'auth-clerk-title auth-clerk-login-title',
-                  headerSubtitle: 'auth-clerk-subtitle',
-                  logoBox: 'auth-clerk-logo',
-                  formButtonPrimary: 'auth-clerk-primary',
-                  socialButtonsBlockButton: 'auth-clerk-social',
-                },
-              }}
-            />
+                  },
+                }}
+                appearance={{
+                  variables: {
+                    colorPrimary: '#6c4fd8',
+                    colorBackground: '#ffffff',
+                    borderRadius: '10px',
+                  },
+                  options: {
+                    logoImageUrl: '/tree-mark.png',
+                    socialButtonsPlacement: 'bottom',
+                  },
+                  elements: {
+                    rootBox: 'auth-clerk-root',
+                    cardBox: 'auth-clerk-cardbox',
+                    card: 'auth-clerk-card',
+                    headerTitle: 'auth-clerk-title auth-clerk-login-title',
+                    headerSubtitle: 'auth-clerk-subtitle',
+                    logoBox: 'auth-clerk-logo',
+                    formButtonPrimary: 'auth-clerk-primary',
+                    socialButtonsBlockButton: 'auth-clerk-social',
+                  },
+                }}
+              />
             </>
           )}
         </div>
