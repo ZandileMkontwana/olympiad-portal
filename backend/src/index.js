@@ -82,10 +82,6 @@ app.use(express.json());
 app.use(clerkMiddleware());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Public API endpoints — open CORS so anyone can call them from any origin
-app.use('/api/olympiads', cors());
-app.use('/api/external', cors());
-
 app.use('/api', papersRouter);
 app.use('/api', roundsRouter);
 app.use('/api', submissionsRouter);
