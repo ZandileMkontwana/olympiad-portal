@@ -449,6 +449,7 @@ describe('Sittings routes', () => {
       expiresAt: new Date('2030-01-01T00:00:00.000Z'),
       completedAt: null,
       round: openRound, // paper.memoAnswers: { 1: 'A', 2: 'C', 3: 'B' }
+      entrant: { name: 'Test Entrant', schoolId: 'school-1' },
     });
 
     const createdSubmission = (result) => ({

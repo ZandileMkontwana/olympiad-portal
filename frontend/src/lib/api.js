@@ -126,6 +126,18 @@ export function fetchAccessRequests(token) {
 }
 
 /**
+ * Builds the SSE stream URL for the live activity feed. EventSource cannot
+ * set Authorization headers, so the Clerk token travels as a query parameter
+ * and the backend promotes it to a Bearer header before auth runs.
+ * Wired to GET /api/activity/stream (backend/src/routes/activity.js).
+ *
+ * @param {string} token - Clerk JWT
+ */
+export function buildActivityStreamUrl(token) {
+  return `${API_BASE_URL}/api/activity/stream?token=${encodeURIComponent(token)}`;
+}
+
+/**
  * Approves a pending school access request.
  * Wired to POST /api/olympiads/access-requests/:id/approve (backend/src/routes/rounds.js).
  *

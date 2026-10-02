@@ -857,6 +857,8 @@ describe('Rounds routes', () => {
         id: 'so-1',
         status: 'pending',
         olympiadId: 'oly-1',
+        school: { name: 'Test School' },
+        olympiad: { name: 'Test Olympiad' },
       });
       prisma.schoolOlympiad.update.mockResolvedValue({ id: 'so-1', status: 'approved' });
 
@@ -876,6 +878,8 @@ describe('Rounds routes', () => {
         id: 'so-1',
         status: 'pending',
         olympiadId: 'oly-1',
+        school: { name: 'Test School' },
+        olympiad: { name: 'Test Olympiad' },
       });
       prisma.schoolOlympiad.update.mockResolvedValue({ id: 'so-1', status: 'declined' });
 
