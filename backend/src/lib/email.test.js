@@ -33,11 +33,30 @@ describe('sendSubmissionReceipt', () => {
 
     expect(sgMail.send).toHaveBeenCalledWith({
       to: 'to@test.com',
-      from: 'from@test.com',
+      from: { email: 'from@test.com', name: 'Olympiad Portal' },
       subject: 'Submission Receipt - Round 1',
       text: expect.stringContaining('Alice'),
       html: expect.stringContaining('Alice'),
     });
+    logSpy.mockRestore();
+  });
+
+  it('wraps the email in the branded portal layout', async () => {
+    sgMail.send.mockResolvedValue({});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await sendSubmissionReceipt({
+      toEmail: 'to@test.com',
+      entrantName: 'Alice',
+      roundName: 'Round 1',
+      submittedAt: '2026-01-01',
+    });
+
+    const call = sgMail.send.mock.calls[0][0];
+    expect(call.from).toEqual({ email: 'from@test.com', name: 'Olympiad Portal' });
+    expect(call.html).toContain('Olympiad Portal');
+    expect(call.html).toContain('Submission received');
+    expect(call.text).toContain('Alice');
     logSpy.mockRestore();
   });
 
@@ -116,7 +135,7 @@ describe('sendRoundOpeningNotification', () => {
 
     expect(sgMail.send).toHaveBeenCalledWith({
       to: 'educator@school.com',
-      from: 'from@test.com',
+      from: { email: 'from@test.com', name: 'Olympiad Portal' },
       subject: 'Round One opens soon',
       text: expect.stringContaining('Round One opens at 2026-01-01T10:00:00.000Z'),
       html: expect.stringContaining('<strong>Round One</strong> opens at 2026-01-01T10:00:00.000Z'),
@@ -211,10 +230,12 @@ describe('sendRoundClosingNotification', () => {
 
     expect(sgMail.send).toHaveBeenCalledWith({
       to: 'educator@school.com',
-      from: 'from@test.com',
+      from: { email: 'from@test.com', name: 'Olympiad Portal' },
       subject: 'Round One closes soon',
       text: expect.stringContaining('Round One closes at 2026-02-01T16:00:00.000Z'),
-      html: expect.stringContaining('<strong>Round One</strong> closes at 2026-02-01T16:00:00.000Z'),
+      html: expect.stringContaining(
+        '<strong>Round One</strong> closes at 2026-02-01T16:00:00.000Z'
+      ),
     });
   });
 
@@ -303,7 +324,7 @@ describe('sendMissingSubmissionNotification', () => {
 
     expect(sgMail.send).toHaveBeenCalledWith({
       to: 'educator@school.com',
-      from: 'from@test.com',
+      from: { email: 'from@test.com', name: 'Olympiad Portal' },
       subject: 'Missing submission for Alice - Round One',
       text: expect.stringContaining('no submission was received for Alice'),
       html: expect.stringContaining('<strong>Alice</strong>'),
@@ -396,7 +417,7 @@ describe('sendResultsReleasedNotification', () => {
 
     expect(sgMail.send).toHaveBeenCalledWith({
       to: 'educator@school.com',
-      from: 'from@test.com',
+      from: { email: 'from@test.com', name: 'Olympiad Portal' },
       subject: 'Results are out for Round One',
       text: expect.stringContaining('Results for Round One have been released'),
       html: expect.stringContaining('<strong>Round One</strong>'),

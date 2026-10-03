@@ -1,15 +1,25 @@
 const sgMail = require('@sendgrid/mail');
 const prisma = require('./prisma');
+const { brandEmailHtml, ctaButton, frontendUrl } = require('./emailTemplates');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+// Branded sender identity — read at call time so tests that set the env var
+// after this module is required still take effect.
+function brandedFrom() {
+  return { email: process.env.SENDGRID_FROM_EMAIL, name: 'Olympiad Portal' };
+}
 
 async function sendSubmissionReceipt({ toEmail, entrantName, roundName, submittedAt }) {
   const msg = {
     to: toEmail,
-    from: process.env.SENDGRID_FROM_EMAIL,
+    from: brandedFrom(),
     subject: `Submission Receipt - ${roundName}`,
     text: `Your submission for ${entrantName} in ${roundName} was received at ${submittedAt}.`,
-    html: `<p>Your submission for <strong>${entrantName}</strong> in <strong>${roundName}</strong> was received at ${submittedAt}.</p>`,
+    html: brandEmailHtml({
+      heading: 'Submission received',
+      bodyHtml: `<p style="margin:0 0 10px;">Your submission for <strong>${entrantName}</strong> in <strong>${roundName}</strong> was received at ${submittedAt}.</p>`,
+    }),
   };
 
   try {
@@ -27,7 +37,10 @@ function buildRoundOpeningMessage({ roundName, opensAt }) {
   return {
     subject: `${roundName} opens soon`,
     text: `${roundName} opens at ${opensAt}. Make sure you're ready to download the paper once it opens.`,
-    html: `<p><strong>${roundName}</strong> opens at ${opensAt}. Make sure you're ready to download the paper once it opens.</p>`,
+    html: brandEmailHtml({
+      heading: 'A round is opening soon',
+      bodyHtml: `<p style="margin:0 0 10px;"><strong>${roundName}</strong> opens at ${opensAt}. Make sure you're ready to download the paper once it opens.</p>`,
+    }),
   };
 }
 
@@ -35,7 +48,7 @@ function buildRoundOpeningMessage({ roundName, opensAt }) {
 async function sendRoundOpeningNotification({ toEmail, roundId, roundName, opensAt, entrantId }) {
   const msg = {
     to: toEmail,
-    from: process.env.SENDGRID_FROM_EMAIL,
+    from: brandedFrom(),
     ...buildRoundOpeningMessage({ roundName, opensAt }),
   };
 
@@ -73,7 +86,10 @@ function buildRoundClosingMessage({ roundName, closesAt }) {
   return {
     subject: `${roundName} closes soon`,
     text: `${roundName} closes at ${closesAt}. Make sure your submission is in before then.`,
-    html: `<p><strong>${roundName}</strong> closes at ${closesAt}. Make sure your submission is in before then.</p>`,
+    html: brandEmailHtml({
+      heading: 'A round is closing soon',
+      bodyHtml: `<p style="margin:0 0 10px;"><strong>${roundName}</strong> closes at ${closesAt}. Make sure your submission is in before then.</p>`,
+    }),
   };
 }
 
@@ -81,7 +97,7 @@ function buildRoundClosingMessage({ roundName, closesAt }) {
 async function sendRoundClosingNotification({ toEmail, roundId, roundName, closesAt, entrantId }) {
   const msg = {
     to: toEmail,
-    from: process.env.SENDGRID_FROM_EMAIL,
+    from: brandedFrom(),
     ...buildRoundClosingMessage({ roundName, closesAt }),
   };
 
@@ -119,7 +135,11 @@ function buildResultsReleasedMessage({ roundName }) {
   return {
     subject: `Results are out for ${roundName}`,
     text: `Results for ${roundName} have been released. Log in to view them.`,
-    html: `<p>Results for <strong>${roundName}</strong> have been released. Log in to view them.</p>`,
+    html: brandEmailHtml({
+      heading: 'Results released',
+      bodyHtml: `<p style="margin:0 0 10px;">Results for <strong>${roundName}</strong> have been released. Log in to view them.</p>`,
+      cta: frontendUrl('/login') ? ctaButton('View results', frontendUrl('/login')) : undefined,
+    }),
   };
 }
 
@@ -127,7 +147,7 @@ function buildResultsReleasedMessage({ roundName }) {
 async function sendResultsReleasedNotification({ toEmail, roundId, roundName, entrantId }) {
   const msg = {
     to: toEmail,
-    from: process.env.SENDGRID_FROM_EMAIL,
+    from: brandedFrom(),
     ...buildResultsReleasedMessage({ roundName }),
   };
 
@@ -165,7 +185,10 @@ function buildMissingSubmissionMessage({ roundName, entrantName }) {
   return {
     subject: `Missing submission for ${entrantName} - ${roundName}`,
     text: `${roundName} has closed and no submission was received for ${entrantName}.`,
-    html: `<p><strong>${roundName}</strong> has closed and no submission was received for <strong>${entrantName}</strong>.</p>`,
+    html: brandEmailHtml({
+      heading: 'Missing submission',
+      bodyHtml: `<p style="margin:0 0 10px;"><strong>${roundName}</strong> has closed and no submission was received for <strong>${entrantName}</strong>.</p>`,
+    }),
   };
 }
 
@@ -179,7 +202,7 @@ async function sendMissingSubmissionNotification({
 }) {
   const msg = {
     to: toEmail,
-    from: process.env.SENDGRID_FROM_EMAIL,
+    from: brandedFrom(),
     ...buildMissingSubmissionMessage({ roundName, entrantName }),
   };
 
@@ -217,7 +240,7 @@ async function sendMissingSubmissionNotification({
 async function sendStudentInvitation({ toEmail, studentName, schoolName, invitationUrl }) {
   const msg = {
     to: toEmail,
-    from: process.env.SENDGRID_FROM_EMAIL,
+    from: brandedFrom(),
     subject: 'Set up your Olympiad Portal account',
     text:
       `Hi ${studentName},\n\n` +
@@ -225,13 +248,14 @@ async function sendStudentInvitation({ toEmail, studentName, schoolName, invitat
       `Set a password to activate your account:\n\n${invitationUrl}\n\n` +
       `This link expires in 48 hours — after that, ask your educator to resend the invitation.\n\n` +
       `If you were not expecting this email, you can ignore it.`,
-    html:
-      `<p>Hi <strong>${studentName}</strong>,</p>` +
-      `<p>Your educator at <strong>${schoolName}</strong> has registered you for the Olympiad Portal. ` +
-      `Set a password to activate your account:</p>` +
-      `<p><a href="${invitationUrl}">Set my password</a></p>` +
-      `<p>This link expires in 48 hours — after that, ask your educator to resend the invitation.</p>` +
-      `<p>If you were not expecting this email, you can ignore it.</p>`,
+    html: brandEmailHtml({
+      heading: 'Activate your account',
+      bodyHtml:
+        `<p style="margin:0 0 10px;">Hi <strong>${studentName}</strong>,</p>` +
+        `<p style="margin:0 0 10px;">Your educator at <strong>${schoolName}</strong> has registered you for the Olympiad Portal. Set a password to activate your account:</p>` +
+        `<p style="margin:0;">This link expires in 48 hours — after that, ask your educator to resend the invitation. If you were not expecting this email, you can ignore it.</p>`,
+      cta: ctaButton('Set my password', invitationUrl),
+    }),
   };
 
   try {
