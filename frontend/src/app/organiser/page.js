@@ -350,7 +350,7 @@ export default function OrganiserDashboard() {
             Set up a new Olympiad
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '12px' }}>
             <div>
               <label
                 htmlFor="olympiad-name"
@@ -407,7 +407,7 @@ export default function OrganiserDashboard() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
               gap: '12px',
               marginTop: '12px',
             }}
@@ -596,7 +596,7 @@ export default function OrganiserDashboard() {
                         background: '#faf8ff',
                       }}
                     >
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '10px' }}>
                         <div>
                           <label
                             htmlFor={`edit-name-${olympiad.id}`}
@@ -665,7 +665,7 @@ export default function OrganiserDashboard() {
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
                           gap: '10px',
                           marginTop: '10px',
                         }}

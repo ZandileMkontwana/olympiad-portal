@@ -125,3 +125,36 @@ describe('StudentSidebar', () => {
     expect(screen.getByText(/not signed in/i)).toBeInTheDocument();
   });
 });
+
+describe('StudentSidebar mobile drawer', () => {
+  beforeEach(() => {
+    authState.user = {
+      id: 'user-1',
+      email: 'student@school.com',
+      name: 'Thabo',
+      school: { id: 'school-1', name: 'Test School' },
+    };
+    authState.checking = false;
+    pathState.pathname = '/student';
+  });
+
+  it('has a stable id and is closed by default', () => {
+    const { container } = render(<StudentSidebar />);
+    const aside = container.querySelector('aside');
+    expect(aside).toHaveAttribute('id', 'app-sidebar');
+    expect(aside).not.toHaveClass('sidebar-open');
+    expect(screen.queryByRole('button', { name: 'Close menu' })).not.toBeInTheDocument();
+  });
+
+  it('shows the open state and calls onClose from the close button and nav links', () => {
+    const onClose = vi.fn();
+    const { container } = render(<StudentSidebar open onClose={onClose} />);
+    expect(container.querySelector('aside')).toHaveClass('sidebar-open');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close menu' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByText('Dashboard').closest('a'));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});

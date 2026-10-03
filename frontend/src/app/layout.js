@@ -1,6 +1,7 @@
 import { ClerkProvider } from '@clerk/nextjs';
 import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import './responsive.css';
 import SiteHeader from '@/components/SiteHeader';
 
 // Display face — headings only, used with restraint.
@@ -28,6 +29,14 @@ export const metadata = {
   title: 'Olympiad Portal | Where curious minds rise',
   description:
     'A home for learners who love a good challenge. Explore olympiads, prepare with confidence and grow beyond the classroom.',
+};
+
+// Without this, mobile browsers lay the page out at ~980px and shrink it.
+// Zoom stays enabled (maximumScale 5) so low-vision users can pinch-zoom.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({ children }) {

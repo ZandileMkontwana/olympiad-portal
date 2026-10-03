@@ -1087,7 +1087,7 @@ export default function SchoolDashboardPage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1.3fr 1fr 1fr',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
               gap: '18px',
               marginTop: '24px',
               alignItems: 'stretch',
@@ -1417,7 +1417,7 @@ export default function SchoolDashboardPage() {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',
                   gap: '14px',
                 }}
               >

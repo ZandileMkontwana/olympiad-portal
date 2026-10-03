@@ -33,7 +33,7 @@ const WORKSPACE_LINKS = [
   { href: '/student#results', icon: Trophy, label: 'Results', match: () => false },
 ];
 
-export default function StudentSidebar() {
+export default function StudentSidebar({ open = false, onClose } = {}) {
   const pathname = usePathname() || '';
   const { user, checking, signOut } = useStudentAuth();
   const [showCalendar, setShowCalendar] = useState(false);
@@ -82,12 +82,22 @@ export default function StudentSidebar() {
 
   return (
     <>
-      <aside className="sidebar">
+      <aside id="app-sidebar" className={`sidebar${open ? ' sidebar-open' : ''}`}>
         <div className="sidebar-top">
           <div className="brand">
             <div className="brand-mark"><GraduationCap /></div>
             <div><strong>Olympiad</strong><span>PORTAL</span></div>
           </div>
+          {onClose && (
+            <button
+              type="button"
+              className="icon-button mobile-close"
+              onClick={onClose}
+              aria-label="Close menu"
+            >
+              <X aria-hidden="true" />
+            </button>
+          )}
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <p className="nav-label">Workspace</p>
@@ -99,15 +109,16 @@ export default function StudentSidebar() {
                 href={href}
                 className={`nav-item${active ? ' nav-selected' : ''}`}
                 aria-current={active ? 'page' : undefined}
+                onClick={onClose}
               >
                 <Icon /> <span>{label}</span>
               </Link>
             );
           })}
-          <button className="nav-item" onClick={() => setShowResources(true)}><BookOpen /><span>Resources</span></button>
+          <button className="nav-item" onClick={() => { onClose?.(); setShowResources(true); }}><BookOpen /><span>Resources</span></button>
           <p className="nav-label nav-label-spaced">Manage</p>
-          <button className="nav-item" onClick={() => setShowCalendar(true)}><CalendarDays /><span>Calendar</span></button>
-          <button className="nav-item" onClick={() => setShowSettings(true)}><Settings2 /><span>Settings</span></button>
+          <button className="nav-item" onClick={() => { onClose?.(); setShowCalendar(true); }}><CalendarDays /><span>Calendar</span></button>
+          <button className="nav-item" onClick={() => { onClose?.(); setShowSettings(true); }}><Settings2 /><span>Settings</span></button>
         </nav>
         <div className="sidebar-help">
           <div className="help-icon"><CircleHelp /></div>

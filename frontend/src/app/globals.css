@@ -599,7 +599,6 @@ body {
 .quick-actions strong { color: #3b4656; font-size: 11px; }
 .quick-actions small { color: #99a1af; font-size: 9px; margin-top: 3px; }
 .quick-actions button > svg { width: 14px; color: #b4bcc8; }
-.scrim { display: none; }
 
 @media (max-width: 1050px) {
   .sidebar { width: 222px; flex-basis: 222px; }
@@ -610,10 +609,6 @@ body {
 }
 
 @media (max-width: 760px) {
-  .sidebar { position: fixed; left: -270px; top: 0; bottom: 0; width: 256px; transition: left .2s ease; box-shadow: 12px 0 30px #17255418; }
-  .sidebar-open { left: 0; }
-  .scrim { display: block; position: fixed; inset: 0; z-index: 10; border: 0; background: #17255455; }
-  .menu-button, .mobile-close { display: grid; }
   .topbar { height: 65px; padding: 0 17px; }
   .breadcrumbs span, .breadcrumbs svg { display: none; }
   .top-actions { gap: 4px; }
