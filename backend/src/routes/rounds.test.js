@@ -1973,7 +1973,7 @@ describe('Rounds routes', () => {
 
       expect(res.body.emailPreview.subject).toBe('Round One opens soon');
 
-      expect(res.body.emailPreview.text).toContain('Round One opens at 2026-01-01T10:00:00.000Z');
+      expect(res.body.emailPreview.text).toContain('Round One opens at 01 Jan 2026, 12:00 SAST');
 
       expect(sgMail.send).not.toHaveBeenCalled();
       expect(prisma.notificationLog.create).not.toHaveBeenCalled();
@@ -2026,7 +2026,7 @@ describe('Rounds routes', () => {
       expect(closing.body.emailPreview.subject).toBe('Round One closes soon');
 
       expect(closing.body.emailPreview.text).toContain(
-        'Round One closes at 2026-01-02T10:00:00.000Z'
+        'Round One closes at 02 Jan 2026, 12:00 SAST'
       );
 
       const released = await request(app)

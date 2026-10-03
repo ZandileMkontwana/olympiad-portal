@@ -137,8 +137,8 @@ describe('sendRoundOpeningNotification', () => {
       to: 'educator@school.com',
       from: { email: 'from@test.com', name: 'Olympiad Portal' },
       subject: 'Round One opens soon',
-      text: expect.stringContaining('Round One opens at 2026-01-01T10:00:00.000Z'),
-      html: expect.stringContaining('<strong>Round One</strong> opens at 2026-01-01T10:00:00.000Z'),
+      text: expect.stringContaining('Round One opens at 01 Jan 2026, 12:00 SAST'),
+      html: expect.stringContaining('<strong>Round One</strong> opens at 01 Jan 2026, 12:00 SAST'),
     });
   });
 
@@ -232,10 +232,8 @@ describe('sendRoundClosingNotification', () => {
       to: 'educator@school.com',
       from: { email: 'from@test.com', name: 'Olympiad Portal' },
       subject: 'Round One closes soon',
-      text: expect.stringContaining('Round One closes at 2026-02-01T16:00:00.000Z'),
-      html: expect.stringContaining(
-        '<strong>Round One</strong> closes at 2026-02-01T16:00:00.000Z'
-      ),
+      text: expect.stringContaining('Round One closes at 01 Feb 2026, 18:00 SAST'),
+      html: expect.stringContaining('<strong>Round One</strong> closes at 01 Feb 2026, 18:00 SAST'),
     });
   });
 

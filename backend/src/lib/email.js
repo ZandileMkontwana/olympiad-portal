@@ -1,6 +1,6 @@
 const sgMail = require('@sendgrid/mail');
 const prisma = require('./prisma');
-const { brandEmailHtml, ctaButton, frontendUrl } = require('./emailTemplates');
+const { brandEmailHtml, ctaButton, frontendUrl, formatDateTime } = require('./emailTemplates');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -11,14 +11,15 @@ function brandedFrom() {
 }
 
 async function sendSubmissionReceipt({ toEmail, entrantName, roundName, submittedAt }) {
+  const receivedAt = formatDateTime(submittedAt);
   const msg = {
     to: toEmail,
     from: brandedFrom(),
     subject: `Submission Receipt - ${roundName}`,
-    text: `Your submission for ${entrantName} in ${roundName} was received at ${submittedAt}.`,
+    text: `Your submission for ${entrantName} in ${roundName} was received at ${receivedAt}.`,
     html: brandEmailHtml({
       heading: 'Submission received',
-      bodyHtml: `<p style="margin:0 0 10px;">Your submission for <strong>${entrantName}</strong> in <strong>${roundName}</strong> was received at ${submittedAt}.</p>`,
+      bodyHtml: `<p style="margin:0 0 10px;">Your submission for <strong>${entrantName}</strong> in <strong>${roundName}</strong> was received at ${receivedAt}.</p>`,
     }),
   };
 
@@ -34,12 +35,13 @@ async function sendSubmissionReceipt({ toEmail, entrantName, roundName, submitte
 // from the send + log logic so the dry-run route can preview the exact
 // email the scheduler would send.
 function buildRoundOpeningMessage({ roundName, opensAt }) {
+  const opens = formatDateTime(opensAt);
   return {
     subject: `${roundName} opens soon`,
-    text: `${roundName} opens at ${opensAt}. Make sure you're ready to download the paper once it opens.`,
+    text: `${roundName} opens at ${opens}. Make sure you're ready to download the paper once it opens.`,
     html: brandEmailHtml({
       heading: 'A round is opening soon',
-      bodyHtml: `<p style="margin:0 0 10px;"><strong>${roundName}</strong> opens at ${opensAt}. Make sure you're ready to download the paper once it opens.</p>`,
+      bodyHtml: `<p style="margin:0 0 10px;"><strong>${roundName}</strong> opens at ${opens}. Make sure you're ready to download the paper once it opens.</p>`,
     }),
   };
 }
@@ -83,12 +85,13 @@ async function sendRoundOpeningNotification({ toEmail, roundId, roundName, opens
 // from the send + log logic so the dry-run route can preview the exact
 // email the scheduler would send.
 function buildRoundClosingMessage({ roundName, closesAt }) {
+  const closes = formatDateTime(closesAt);
   return {
     subject: `${roundName} closes soon`,
-    text: `${roundName} closes at ${closesAt}. Make sure your submission is in before then.`,
+    text: `${roundName} closes at ${closes}. Make sure your submission is in before then.`,
     html: brandEmailHtml({
       heading: 'A round is closing soon',
-      bodyHtml: `<p style="margin:0 0 10px;"><strong>${roundName}</strong> closes at ${closesAt}. Make sure your submission is in before then.</p>`,
+      bodyHtml: `<p style="margin:0 0 10px;"><strong>${roundName}</strong> closes at ${closes}. Make sure your submission is in before then.</p>`,
     }),
   };
 }

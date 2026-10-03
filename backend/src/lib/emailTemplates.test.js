@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
-const { BRAND, frontendUrl, ctaButton, brandEmailHtml } = require('./emailTemplates');
+const {
+  BRAND,
+  frontendUrl,
+  ctaButton,
+  brandEmailHtml,
+  formatDateTime,
+} = require('./emailTemplates');
 
 afterEach(() => {
   delete process.env.FRONTEND_URL;
@@ -49,5 +55,19 @@ describe('brandEmailHtml', () => {
 
     expect(html).toContain('href="https://portal.example.com/login"');
     expect(html).toContain('View results');
+  });
+});
+
+describe('formatDateTime', () => {
+  it('renders a UTC timestamp in South African local time', () => {
+    expect(formatDateTime('2026-01-01T10:00:00.000Z')).toBe('01 Jan 2026, 12:00 SAST');
+  });
+
+  it('accepts Date objects as well as ISO strings', () => {
+    expect(formatDateTime(new Date('2026-10-03T09:41:00.000Z'))).toBe('03 Oct 2026, 11:41 SAST');
+  });
+
+  it('falls back to the raw value when the input is not a valid date', () => {
+    expect(formatDateTime('not-a-date')).toBe('not-a-date');
   });
 });

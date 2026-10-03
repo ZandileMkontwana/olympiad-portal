@@ -49,6 +49,27 @@ function ctaButton(label, href) {
   );
 }
 
+// Renders a timestamp for email copy in South African local time. Round
+// times are stored in UTC and recipients are all South African, so the
+// display timezone is fixed to Africa/Johannesburg instead of following
+// wherever the server happens to run (Render's clock is UTC, which would
+// otherwise shift every time by two hours). SAST is UTC+2 year-round, so
+// the label is hardcoded next to the fixed zone.
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const formatted = new Intl.DateTimeFormat('en-ZA', {
+    timeZone: 'Africa/Johannesburg',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+  return `${formatted} SAST`;
+}
+
 function brandEmailHtml({ heading, bodyHtml, cta }) {
   return `<!DOCTYPE html>
 <html>
@@ -80,4 +101,4 @@ function brandEmailHtml({ heading, bodyHtml, cta }) {
 </html>`;
 }
 
-module.exports = { BRAND, frontendUrl, ctaButton, brandEmailHtml };
+module.exports = { BRAND, frontendUrl, ctaButton, brandEmailHtml, formatDateTime };
