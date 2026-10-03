@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const activityBus = require('../lib/activityBus');
 const { requireRole, requireAuth, loadAuthUser, loadOptionalUser } = require('../middleware/auth');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 const {
@@ -370,7 +371,13 @@ router.get('/olympiads/access-requests', ...requireRole('organiser'), async (req
 // POST /olympiads/access-requests/:id/approve and /decline
 // The organiser's decision on a school's access request.
 async function decideAccessRequest(req, res, status) {
-  const existing = await prisma.schoolOlympiad.findUnique({ where: { id: req.params.id } });
+  const existing = await prisma.schoolOlympiad.findUnique({
+    where: { id: req.params.id },
+    include: {
+      school: { select: { name: true } },
+      olympiad: { select: { name: true } },
+    },
+  });
   if (!existing) {
     return res.status(404).json({ error: 'Access request not found' });
   }
@@ -384,6 +391,18 @@ async function decideAccessRequest(req, res, status) {
     where: { id: req.params.id },
     data: { status, decidedAt: new Date() },
   });
+
+  // Live activity feed (US-4.1): a school's access request was decided.
+  activityBus.broadcast({
+    type: 'access_request_decided',
+    message:
+      status === 'approved'
+        ? `${existing.school.name} was granted access to ${existing.olympiad.name}`
+        : `${existing.school.name}'s request for ${existing.olympiad.name} was declined`,
+    olympiadId: existing.olympiadId,
+    schoolId: existing.schoolId,
+  });
+
   res.json({ id: updated.id, status: updated.status });
 }
 
@@ -982,6 +1001,14 @@ router.post(
           error: 'Round state changed while releasing results - it is no longer closed',
         });
       }
+
+      // Live activity feed (US-4.1): results went out for this round.
+      activityBus.broadcast({
+        type: 'results_released',
+        message: `Results released for ${round.name}`,
+        roundId: round.id,
+        olympiadId: round.olympiadId,
+      });
 
       res.json({ releasedCount: updated.count, releasedAt: now });
     } catch (err) {

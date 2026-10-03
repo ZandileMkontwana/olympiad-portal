@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const prisma = require('./lib/prisma');
+const activityBus = require('./lib/activityBus');
 const { getDbNow } = require('./lib/dbTime');
 const {
   sendRoundOpeningNotification,
@@ -90,7 +91,7 @@ function startScheduler() {
       // Write audit log entries for each newly opened round
       const justOpened = await prisma.round.findMany({
         where: { state: 'open', openTime: { lte: now } },
-        select: { id: true },
+        select: { id: true, name: true, olympiadId: true },
       });
       await prisma.auditLog.createMany({
         data: justOpened.map((r) => ({
@@ -99,6 +100,14 @@ function startScheduler() {
           payload: { openedAt: now.toISOString() },
         })),
       });
+      for (const round of justOpened) {
+        activityBus.broadcast({
+          type: 'round_opened',
+          message: `${round.name} is now open`,
+          roundId: round.id,
+          olympiadId: round.olympiadId,
+        });
+      }
       // Register all existing entrants for newly opened rounds
       await registerEntrantsForNewlyOpenRounds();
     }
@@ -112,7 +121,7 @@ function startScheduler() {
       // Write audit log entries for each newly closed round
       const justClosed = await prisma.round.findMany({
         where: { state: 'closed', closeTime: { lte: now } },
-        select: { id: true },
+        select: { id: true, name: true, olympiadId: true },
       });
       await prisma.auditLog.createMany({
         data: justClosed.map((r) => ({
@@ -121,6 +130,14 @@ function startScheduler() {
           payload: { closedAt: now.toISOString() },
         })),
       });
+      for (const round of justClosed) {
+        activityBus.broadcast({
+          type: 'round_closed',
+          message: `${round.name} has closed`,
+          roundId: round.id,
+          olympiadId: round.olympiadId,
+        });
+      }
     }
 
     await sendBeforeOpenNotifications(now);
@@ -196,6 +213,12 @@ async function processAutoAdvance() {
                 score: entrant.submissions.find((s) => s.roundId === round.id)?.result?.score,
               },
             },
+          });
+          activityBus.broadcast({
+            type: 'auto_advanced',
+            message: `${entrant.name} advanced to ${nextRound.name}`,
+            roundId: nextRound.id,
+            olympiadId: round.olympiadId,
           });
         }
       }

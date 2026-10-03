@@ -34,6 +34,7 @@ import {
   updateNotificationRule,
   testNotificationTrigger,
   assignRemarkRequest,
+  buildActivityStreamUrl,
   dashboardPathForRole,
   releaseResults,
   unreleaseResults,
@@ -1045,6 +1046,14 @@ describe('api client', () => {
 
     it('returns /login for undefined role', () => {
       expect(dashboardPathForRole(undefined)).toBe('/login');
+    });
+  });
+
+  describe('buildActivityStreamUrl', () => {
+    it('builds the SSE stream URL with an encoded query token', () => {
+      expect(buildActivityStreamUrl('abc/123+def=')).toBe(
+        'http://localhost:5000/api/activity/stream?token=abc%2F123%2Bdef%3D'
+      );
     });
   });
 

@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const activityBus = require('../lib/activityBus');
 const { requireAuth } = require('../middleware/auth');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 const { getDbNow } = require('../lib/dbTime');
@@ -200,7 +201,10 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
   try {
     const sitting = await prisma.sitting.findUnique({
       where: { id: req.params.id },
-      include: { round: { include: { paper: true } } },
+      include: {
+        round: { include: { paper: true } },
+        entrant: { select: { name: true, schoolId: true } },
+      },
     });
 
     if (!sitting) {
@@ -288,6 +292,15 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
     }
 
     res.status(201).json({ submission, result: submission.result });
+
+    // Live activity feed (US-4.1): an online sitting was submitted.
+    activityBus.broadcast({
+      type: 'sitting_submitted',
+      message: `${sitting.entrant.name} submitted for ${sitting.round.name}`,
+      roundId: sitting.roundId,
+      olympiadId: sitting.round.olympiadId,
+      schoolId: sitting.entrant.schoolId,
+    });
   } catch (err) {
     if (isDbBusyError(err)) {
       return respondDbBusy(req, res, err);

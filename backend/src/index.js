@@ -20,6 +20,7 @@ const certificatesRouter = require('./routes/certificates');
 const olympiadOrganisersRouter = require('./routes/olympiadOrganisers');
 const apiKeysRouter = require('./routes/apiKeys');
 const externalRouter = require('./routes/external');
+const activityRouter = require('./routes/activity');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
 
@@ -65,6 +66,16 @@ const externalRateLimiter = rateLimit({
 });
 
 app.use(cookieParser());
+// EventSource (SSE) cannot set Authorization headers, so the live activity
+// feed passes its token as a query parameter. Promote it to a Bearer header
+// BEFORE clerkMiddleware runs so the standard auth chain applies unchanged.
+app.use((req, _res, next) => {
+  const token = req.query && req.query.token;
+  if (typeof token === 'string' && token && !req.headers.authorization) {
+    req.headers.authorization = `Bearer ${token}`;
+  }
+  next();
+});
 app.use(express.json());
 app.use(clerkMiddleware());
 app.use(apiCors);
@@ -83,6 +94,7 @@ app.use('/api', authRouter);
 app.use('/api', studentAuthRouter);
 app.use('/api', certificatesRouter);
 app.use('/api', olympiadOrganisersRouter);
+app.use('/api', activityRouter);
 app.use('/api/api-keys', apiKeysRouter);
 
 // External read-only API with rate limiting

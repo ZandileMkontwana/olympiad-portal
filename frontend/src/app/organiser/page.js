@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import OrganiserShell from '@/components/OrganiserShell';
+import ActivityFeed from '@/components/ActivityFeed';
 import {
   listOlympiads,
   createOlympiad,
@@ -328,9 +329,7 @@ export default function OrganiserDashboard() {
           <h1>
             {greetingFor()}, {firstName}.
           </h1>
-          <p className="organiser-subtitle">
-            Here is what is happening across your Olympiads.
-          </p>
+          <p className="organiser-subtitle">Here is what is happening across your Olympiads.</p>
         </div>
         <button className="primary-action" onClick={() => setShowCreateForm(!showCreateForm)}>
           <Plus size={17} /> {showCreateForm ? 'Close form' : 'Create Olympiad'}
@@ -405,7 +404,14 @@ export default function OrganiserDashboard() {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '12px',
+              marginTop: '12px',
+            }}
+          >
             <div>
               <label
                 htmlFor="olympiad-grades"
@@ -426,7 +432,12 @@ export default function OrganiserDashboard() {
               <div style={{ flex: 1 }}>
                 <label
                   htmlFor="olympiad-start-date"
-                  style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}
+                  style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}
                 >
                   Start date
                 </label>
@@ -441,7 +452,12 @@ export default function OrganiserDashboard() {
               <div style={{ flex: 1 }}>
                 <label
                   htmlFor="olympiad-end-date"
-                  style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}
+                  style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}
                 >
                   End date
                 </label>
@@ -461,7 +477,11 @@ export default function OrganiserDashboard() {
           )}
 
           <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
-            <button type="submit" disabled={createStatus === 'submitting'} className="primary-action">
+            <button
+              type="submit"
+              disabled={createStatus === 'submitting'}
+              className="primary-action"
+            >
               {createStatus === 'submitting' ? 'Creating...' : 'Create Olympiad'}
             </button>
             <button
@@ -580,7 +600,12 @@ export default function OrganiserDashboard() {
                         <div>
                           <label
                             htmlFor={`edit-name-${olympiad.id}`}
-                            style={{ display: 'block', marginBottom: '4px', fontSize: '11px', fontWeight: 600 }}
+                            style={{
+                              display: 'block',
+                              marginBottom: '4px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                            }}
                           >
                             Name
                           </label>
@@ -596,7 +621,12 @@ export default function OrganiserDashboard() {
                         <div>
                           <label
                             htmlFor={`edit-timezone-${olympiad.id}`}
-                            style={{ display: 'block', marginBottom: '4px', fontSize: '11px', fontWeight: 600 }}
+                            style={{
+                              display: 'block',
+                              marginBottom: '4px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                            }}
                           >
                             Timezone
                           </label>
@@ -614,7 +644,12 @@ export default function OrganiserDashboard() {
                       <div style={{ marginTop: '10px' }}>
                         <label
                           htmlFor={`edit-description-${olympiad.id}`}
-                          style={{ display: 'block', marginBottom: '4px', fontSize: '11px', fontWeight: 600 }}
+                          style={{
+                            display: 'block',
+                            marginBottom: '4px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                          }}
                         >
                           Description
                         </label>
@@ -627,11 +662,23 @@ export default function OrganiserDashboard() {
                         />
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '10px',
+                          marginTop: '10px',
+                        }}
+                      >
                         <div>
                           <label
                             htmlFor={`edit-grades-${olympiad.id}`}
-                            style={{ display: 'block', marginBottom: '4px', fontSize: '11px', fontWeight: 600 }}
+                            style={{
+                              display: 'block',
+                              marginBottom: '4px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                            }}
                           >
                             Grades
                           </label>
@@ -648,7 +695,12 @@ export default function OrganiserDashboard() {
                           <div style={{ flex: 1 }}>
                             <label
                               htmlFor={`edit-start-date-${olympiad.id}`}
-                              style={{ display: 'block', marginBottom: '4px', fontSize: '11px', fontWeight: 600 }}
+                              style={{
+                                display: 'block',
+                                marginBottom: '4px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                              }}
                             >
                               Start
                             </label>
@@ -663,7 +715,12 @@ export default function OrganiserDashboard() {
                           <div style={{ flex: 1 }}>
                             <label
                               htmlFor={`edit-end-date-${olympiad.id}`}
-                              style={{ display: 'block', marginBottom: '4px', fontSize: '11px', fontWeight: 600 }}
+                              style={{
+                                display: 'block',
+                                marginBottom: '4px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                              }}
                             >
                               End
                             </label>
@@ -679,10 +736,19 @@ export default function OrganiserDashboard() {
                       </div>
 
                       {editStatus === 'error' && (
-                        <p style={{ color: 'red', fontSize: '11px', marginTop: '8px' }}>{editError}</p>
+                        <p style={{ color: 'red', fontSize: '11px', marginTop: '8px' }}>
+                          {editError}
+                        </p>
                       )}
 
-                      <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div
+                        style={{
+                          marginTop: '12px',
+                          display: 'flex',
+                          gap: '8px',
+                          alignItems: 'center',
+                        }}
+                      >
                         <button
                           type="submit"
                           disabled={editStatus === 'submitting'}
@@ -709,7 +775,14 @@ export default function OrganiserDashboard() {
                       {/* Rounds list */}
                       {olympiad.rounds.length > 0 && (
                         <div style={{ marginTop: '14px' }}>
-                          <p style={{ fontSize: '11px', fontWeight: 700, marginBottom: '6px', color: '#766e89' }}>
+                          <p
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              marginBottom: '6px',
+                              color: '#766e89',
+                            }}
+                          >
                             Rounds
                           </p>
                           <ul style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -721,7 +794,10 @@ export default function OrganiserDashboard() {
                                 href = `/rounds/${round.id}/closed_round`;
                               }
                               return (
-                                <li key={round.id} style={{ display: 'flex', gap: '4px', alignItems: 'stretch' }}>
+                                <li
+                                  key={round.id}
+                                  style={{ display: 'flex', gap: '4px', alignItems: 'stretch' }}
+                                >
                                   <Link
                                     href={href}
                                     style={{
@@ -737,7 +813,13 @@ export default function OrganiserDashboard() {
                                     }}
                                   >
                                     <span>{round.name}</span>
-                                    <span style={{ textTransform: 'capitalize', opacity: 0.6, fontSize: '11px' }}>
+                                    <span
+                                      style={{
+                                        textTransform: 'capitalize',
+                                        opacity: 0.6,
+                                        fontSize: '11px',
+                                      }}
+                                    >
                                       {round.state}
                                     </span>
                                   </Link>
@@ -777,12 +859,31 @@ export default function OrganiserDashboard() {
                       )}
 
                       {/* Co-organisers section */}
-                      <div style={{ marginTop: '14px', borderTop: '1px solid #f0edf6', paddingTop: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <strong style={{ fontSize: '11px', color: '#766e89' }}>Co-organisers</strong>
+                      <div
+                        style={{
+                          marginTop: '14px',
+                          borderTop: '1px solid #f0edf6',
+                          paddingTop: '12px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '6px',
+                          }}
+                        >
+                          <strong style={{ fontSize: '11px', color: '#766e89' }}>
+                            Co-organisers
+                          </strong>
                           <button
                             type="button"
-                            onClick={() => setShowAddOrganiser(showAddOrganiser === olympiad.id ? null : olympiad.id)}
+                            onClick={() =>
+                              setShowAddOrganiser(
+                                showAddOrganiser === olympiad.id ? null : olympiad.id
+                              )
+                            }
                             style={{
                               background: 'none',
                               border: 'none',
@@ -797,7 +898,14 @@ export default function OrganiserDashboard() {
                         </div>
 
                         {(organisersByOlympiad[olympiad.id] || []).length === 0 ? (
-                          <p style={{ fontSize: '11px', fontStyle: 'italic', color: '#92899f', margin: '2px 0' }}>
+                          <p
+                            style={{
+                              fontSize: '11px',
+                              fontStyle: 'italic',
+                              color: '#92899f',
+                              margin: '2px 0',
+                            }}
+                          >
                             No organisers yet.
                           </p>
                         ) : (
@@ -817,7 +925,13 @@ export default function OrganiserDashboard() {
                                 <span>
                                   {org.name} ({org.email})
                                   {org.isCreator && (
-                                    <span style={{ marginLeft: '4px', fontSize: '9px', color: 'rgba(139, 92, 246, 0.6)' }}>
+                                    <span
+                                      style={{
+                                        marginLeft: '4px',
+                                        fontSize: '9px',
+                                        color: 'rgba(139, 92, 246, 0.6)',
+                                      }}
+                                    >
                                       creator
                                     </span>
                                   )}
@@ -825,7 +939,9 @@ export default function OrganiserDashboard() {
                                 {!org.isCreator && (
                                   <button
                                     type="button"
-                                    onClick={() => handleRemoveOrganiser(olympiad.id, org.organiserId)}
+                                    onClick={() =>
+                                      handleRemoveOrganiser(olympiad.id, org.organiserId)
+                                    }
                                     style={{
                                       background: 'none',
                                       border: 'none',
@@ -845,7 +961,12 @@ export default function OrganiserDashboard() {
                         {showAddOrganiser === olympiad.id && (
                           <form
                             onSubmit={(e) => handleAddOrganiser(e, olympiad.id)}
-                            style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}
+                            style={{
+                              display: 'flex',
+                              gap: '6px',
+                              alignItems: 'center',
+                              marginTop: '6px',
+                            }}
                           >
                             <select
                               value={selectedOrganiserId}
@@ -885,7 +1006,9 @@ export default function OrganiserDashboard() {
                         )}
 
                         {organiserError && (
-                          <p style={{ color: 'red', fontSize: '10px', margin: '4px 0 0' }}>{organiserError}</p>
+                          <p style={{ color: 'red', fontSize: '10px', margin: '4px 0 0' }}>
+                            {organiserError}
+                          </p>
                         )}
                       </div>
                     </form>
@@ -896,7 +1019,14 @@ export default function OrganiserDashboard() {
           )}
 
           {status === 'ready' && olympiads.length > 0 && (
-            <Link href="/organiser" className="panel-create" onClick={(e) => { e.preventDefault(); setShowCreateForm(true); }}>
+            <Link
+              href="/organiser"
+              className="panel-create"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowCreateForm(true);
+              }}
+            >
               <Plus size={15} /> Post a new Olympiad
             </Link>
           )}
@@ -994,44 +1124,7 @@ export default function OrganiserDashboard() {
           </Link>
         </div>
 
-        <div className="activity-items">
-          {olympiads.length > 0 && (
-            <span>
-              <i className="activity-dot violet" />
-              <strong>
-                {olympiads[0].name} has {olympiads[0].rounds.length} round
-                {olympiads[0].rounds.length !== 1 ? 's' : ''}
-              </strong>
-              <small>Current</small>
-            </span>
-          )}
-          {accessRequests.length > 0 && (
-            <span>
-              <i className="activity-dot green" />
-              <strong>
-                {accessRequests.length} access request{accessRequests.length !== 1 ? 's' : ''}{' '}
-                awaiting review
-              </strong>
-              <small>Pending</small>
-            </span>
-          )}
-          {olympiads.length > 1 && (
-            <span>
-              <i className="activity-dot amber" />
-              <strong>
-                {olympiads[1].name} is {olympiads[1].timezone}
-              </strong>
-              <small>Configured</small>
-            </span>
-          )}
-          {olympiads.length === 0 && accessRequests.length === 0 && (
-            <span>
-              <i className="activity-dot green" />
-              <strong>Your workspace is ready</strong>
-              <small>No pending items</small>
-            </span>
-          )}
-        </div>
+        <ActivityFeed />
       </section>
     </OrganiserShell>
   );
