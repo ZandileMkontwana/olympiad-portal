@@ -49,7 +49,7 @@ const WORKSPACE_LINKS = [
   },
 ];
 
-export default function EducatorSidebar({ collapsed = false, onToggle }) {
+export default function EducatorSidebar({ collapsed = false, onToggle, open = false, onClose }) {
   const pathname = usePathname() || '';
   const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
@@ -82,12 +82,26 @@ export default function EducatorSidebar({ collapsed = false, onToggle }) {
 
   return (
     <>
-      <aside className="sidebar" style={collapsed ? { width: '60px' } : undefined}>
+      <aside
+        id="app-sidebar"
+        className={`sidebar${open ? ' sidebar-open' : ''}`}
+        style={collapsed ? { width: '60px' } : undefined}
+      >
         <div className="sidebar-top">
           <div className="brand">
             <div className="brand-mark"><GraduationCap /></div>
             {!collapsed && <div><strong>Olympiad</strong><span>PORTAL</span></div>}
           </div>
+          {onClose && (
+            <button
+              type="button"
+              className="icon-button mobile-close"
+              onClick={onClose}
+              aria-label="Close menu"
+            >
+              <X aria-hidden="true" />
+            </button>
+          )}
           {onToggle && (
             <button
               onClick={onToggle}
@@ -110,14 +124,15 @@ export default function EducatorSidebar({ collapsed = false, onToggle }) {
                 className={`nav-item${active ? ' nav-selected' : ''}`}
                 aria-current={active ? 'page' : undefined}
                 title={collapsed ? label : undefined}
+                onClick={onClose}
               >
                 <Icon /> {!collapsed && <span>{label}</span>}
               </Link>
             );
           })}
           {!collapsed && <p className="nav-label nav-label-spaced">Manage</p>}
-          <button className="nav-item" onClick={() => setShowCalendar(true)} title={collapsed ? 'Calendar' : undefined}><CalendarDays />{!collapsed && <span>Calendar</span>}</button>
-          <button className="nav-item" onClick={() => setShowSettings(true)} title={collapsed ? 'Settings' : undefined}><Settings2 />{!collapsed && <span>Settings</span>}</button>
+          <button className="nav-item" onClick={() => { onClose?.(); setShowCalendar(true); }} title={collapsed ? 'Calendar' : undefined}><CalendarDays />{!collapsed && <span>Calendar</span>}</button>
+          <button className="nav-item" onClick={() => { onClose?.(); setShowSettings(true); }} title={collapsed ? 'Settings' : undefined}><Settings2 />{!collapsed && <span>Settings</span>}</button>
         </nav>
         {!collapsed && (
           <>

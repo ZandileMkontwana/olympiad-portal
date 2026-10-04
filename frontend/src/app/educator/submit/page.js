@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import * as XLSX from 'xlsx';
+import TableScroll from '@/components/TableScroll';
 
 function SubmissionTableContent() {
   const searchParams = useSearchParams();
@@ -422,6 +423,7 @@ function SubmissionTableContent() {
 
           {uploadError && <p className="message">{uploadError}</p>}
 
+          <TableScroll label="Entrant answers">
           <table className="card" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -490,6 +492,7 @@ function SubmissionTableContent() {
               })}
             </tbody>
           </table>
+          </TableScroll>
         </>
       )}
 
@@ -498,6 +501,7 @@ function SubmissionTableContent() {
           <h2>
             Receipt — {receipt.length} of {entrants.length} accepted
           </h2>
+          <TableScroll label="Submission receipt">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -535,6 +539,7 @@ function SubmissionTableContent() {
               ))}
             </tbody>
           </table>
+          </TableScroll>
         </div>
       )}
     </div>

@@ -1,6 +1,8 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import '@/app/auth.css';
 import {
@@ -12,8 +14,10 @@ import {
   History,
   LayoutDashboard,
   MessageSquareQuote,
+  Menu,
   MoreHorizontal,
   Search,
+  X,
 } from 'lucide-react';
 
 const ClerkSignOutButton = dynamic(
@@ -40,10 +44,54 @@ const NAV_ITEMS = [
  */
 export default function OrganiserShell({ activeNav, breadcrumb, user, children }) {
   const initials = initialsFrom(user?.name || user?.email || '?');
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const menuButtonRef = useRef(null);
+  const wasOpen = useRef(false);
+  const close = useCallback(() => setOpen(false), []);
+
+  // Close the mobile drawer whenever the route changes. (state adjusted during render, not in an effect)
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname);
+    setOpen(false);
+  }
+
+  useEffect(() => {
+    if (!open) {
+      if (wasOpen.current) menuButtonRef.current?.focus();
+      wasOpen.current = false;
+      return undefined;
+    }
+    wasOpen.current = true;
+    document.getElementById('organiser-sidebar')?.querySelector('a, button')?.focus();
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   return (
     <main className="organiser-shell">
-      <aside className="organiser-sidebar">
+      <aside
+        id="organiser-sidebar"
+        className={`organiser-sidebar${open ? ' is-open' : ''}`}
+      >
+        <button
+          type="button"
+          className="icon-button organiser-sidebar-close"
+          onClick={close}
+          aria-label="Close menu"
+        >
+          <X size={20} aria-hidden="true" />
+        </button>
         <Link href="/" className="organiser-brand">
           <span className="organiser-brand-mark">
             <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-hidden="true">
@@ -75,7 +123,13 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
             const Icon = item.icon;
             const isActive = activeNav === item.key;
             return (
-              <Link key={item.key} href={item.href} className={isActive ? 'is-active' : ''}>
+              <Link
+                key={item.key}
+                href={item.href}
+                className={isActive ? 'is-active' : ''}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={close}
+              >
                 <Icon size={17} /> {item.label}
               </Link>
             );
@@ -101,9 +155,30 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
         </div>
       </aside>
 
+      {open && (
+        <button
+          type="button"
+          className="organiser-scrim"
+          aria-label="Close menu"
+          tabIndex={-1}
+          onClick={close}
+        />
+      )}
+
       <section className="organiser-content">
         <header className="organiser-topbar">
           <div className="organiser-breadcrumb">
+            <button
+              ref={menuButtonRef}
+              type="button"
+              className="icon-button organiser-menu-button"
+              aria-label="Open menu"
+              aria-expanded={open}
+              aria-controls="organiser-sidebar"
+              onClick={() => setOpen(true)}
+            >
+              <Menu size={22} aria-hidden="true" />
+            </button>
             <span>Workspace</span>
             <ChevronRight size={14} />
             <strong>{breadcrumb || 'Overview'}</strong>

@@ -226,7 +226,7 @@ function SitContent() {
       {sittingData && !submitted && (
         <>
           <p
-            className="description"
+            className="description sit-status"
             style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '1.1rem' }}
           >
             <span>
@@ -273,6 +273,9 @@ function SitContent() {
                   <strong style={{ minWidth: '56px', fontSize: '1.15rem' }}>Q{q}</strong>
                   <input
                     type="text"
+                    className="sit-answer"
+                    autoComplete="off"
+                    autoCapitalize="characters"
                     maxLength={1}
                     placeholder="—"
                     value={answers[q] || ''}

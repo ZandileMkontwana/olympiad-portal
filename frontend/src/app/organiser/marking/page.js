@@ -193,7 +193,10 @@ export default function MarkingPage() {
             style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '12px' }}
           >
             {Object.keys(breakdown).map((qId) => (
-              <div key={qId} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                key={qId}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}
+              >
                 <label htmlFor={`q-${qId}`} style={{ minWidth: '100px', fontSize: '0.9em' }}>
                   Question {qId}
                 </label>

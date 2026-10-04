@@ -242,7 +242,7 @@ function AchievementBadges({ results, sittings }) {
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '8px', marginTop: '4px' }}>
       {badges.map((b) => (
         <div
           key={b.id}

@@ -1089,41 +1089,9 @@
   margin: 0;
 }
 
-/* Responsive organiser shell */
+/* Responsive organiser shell — the drawer/hamburger rules live in
+   responsive.css (breakpoint 860px). Only content tweaks stay here. */
 @media (max-width: 760px) {
-  .organiser-sidebar {
-    flex-basis: 66px;
-    padding: 20px 9px;
-  }
-  .organiser-brand {
-    justify-content: center;
-    padding: 0;
-  }
-  .organiser-brand > span:last-child,
-  .organiser-nav-label,
-  .organiser-nav a span:not(.nav-count),
-  .organiser-sidebar-bottom > a {
-    display: none;
-  }
-  .organiser-nav a {
-    justify-content: center;
-    padding: 12px;
-  }
-  .nav-count {
-    display: none;
-  }
-  .organiser-profile {
-    justify-content: center;
-    padding-left: 0;
-    padding-right: 0;
-  }
-  .organiser-profile span:nth-child(2),
-  .organiser-profile > svg {
-    display: none;
-  }
-  .organiser-main {
-    padding-top: 34px;
-  }
   .organiser-welcome-row {
     align-items: flex-start;
     flex-direction: column;
