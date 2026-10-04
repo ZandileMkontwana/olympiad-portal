@@ -20,7 +20,7 @@ export default function EducatorArchivePage() {
           justifyContent: 'center',
         }}
       >
-        <p style={{ color: '#706391' }}>Loading...</p>
+        <p style={{ color: 'var(--c-t-706391)' }}>Loading...</p>
       </div>
     );
   }

@@ -47,16 +47,15 @@ function testStatus(test) {
   return 'in-progress';
 }
 
+// CSS variables (see theme.css): readable (WCAG AA) in both themes.
 function scoreHex(score) {
-  if (score >= 70) return '#4caf7d';
-  if (score >= 50) return '#c99a2e';
-  return '#dc2626';
+  if (score >= 70) return 'var(--score-good)';
+  if (score >= 50) return 'var(--score-mid)';
+  return 'var(--score-low)';
 }
 
 function scoreColor(score) {
-  if (score >= 70) return '#4caf7d';
-  if (score >= 50) return '#c99a2e';
-  return '#dc2626';
+  return scoreHex(score);
 }
 
 function timeLeft(expiresAt) {
@@ -85,19 +84,34 @@ function todayFormatted() {
 const STATUS_STYLES = {
   'in-progress': {
     bg: 'rgba(76,175,125,0.1)',
-    color: '#2b7854',
+    color: 'var(--c-t-2b7854)',
     label: 'In progress',
     tone: 'green',
   },
   'not-started': {
     bg: 'rgba(224,168,62,0.12)',
-    color: '#85661e',
+    color: 'var(--c-t-85661e)',
     label: 'Not started',
     tone: 'amber',
   },
-  completed: { bg: 'rgba(139,92,246,0.08)', color: '#6d3fd1', label: 'Completed', tone: 'purple' },
-  expired: { bg: 'rgba(139,127,168,0.1)', color: '#706391', label: 'Expired', tone: 'blue' },
-  locked: { bg: 'rgba(139,127,168,0.06)', color: '#6a6a6a', label: 'Locked', tone: 'blue' },
+  completed: {
+    bg: 'rgba(139,92,246,0.08)',
+    color: 'var(--c-t-6d3fd1)',
+    label: 'Completed',
+    tone: 'purple',
+  },
+  expired: {
+    bg: 'rgba(139,127,168,0.1)',
+    color: 'var(--c-t-706391)',
+    label: 'Expired',
+    tone: 'blue',
+  },
+  locked: {
+    bg: 'rgba(139,127,168,0.06)',
+    color: 'var(--c-t-6a6a6a)',
+    label: 'Locked',
+    tone: 'blue',
+  },
 };
 
 /* ── Stat card ────────────────────────────────────────────────────────── */
@@ -128,8 +142,8 @@ function TrendChart({ results }) {
   if (sorted.length < 2) {
     return (
       <div style={{ textAlign: 'center', padding: '24px 0' }}>
-        <BarChart3 size={24} style={{ color: '#706391', marginBottom: '8px' }} />
-        <p style={{ color: '#706391', fontSize: '12px', margin: 0 }}>
+        <BarChart3 size={24} style={{ color: 'var(--c-t-706391)', marginBottom: '8px' }} />
+        <p style={{ color: 'var(--c-t-706391)', fontSize: '12px', margin: 0 }}>
           Your performance trend will appear here once you have at least two released results.
         </p>
       </div>
@@ -158,7 +172,9 @@ function TrendChart({ results }) {
           marginBottom: '12px',
         }}
       >
-        <span style={{ fontSize: '11px', color: '#706391' }}>Last {sorted.length} results</span>
+        <span style={{ fontSize: '11px', color: 'var(--c-t-706391)' }}>
+          Last {sorted.length} results
+        </span>
       </div>
       <svg
         viewBox={`0 0 ${w} ${h}`}
@@ -179,14 +195,14 @@ function TrendChart({ results }) {
             x2={w - pad}
             y1={h - pad - (v / 100) * (h - pad * 2)}
             y2={h - pad - (v / 100) * (h - pad * 2)}
-            stroke="rgba(139,92,246,0.08)"
+            className="chart-grid"
           />
         ))}
         <path d={areaPath} fill="url(#trendFill)" />
         <path
           d={path}
           fill="none"
-          stroke="#7c3aed"
+          className="chart-line"
           strokeWidth="2.5"
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -197,8 +213,8 @@ function TrendChart({ results }) {
               cx={p.x}
               cy={p.y}
               r="4"
-              fill="white"
-              stroke={scoreHex(p.score)}
+              className="chart-dot"
+              style={{ stroke: scoreHex(p.score) }}
               strokeWidth="2.5"
             />
             <title>{`${p.name}: ${Math.round(p.score)}%`}</title>
@@ -247,7 +263,14 @@ function AchievementBadges({ results, sittings }) {
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: '8px', marginTop: '4px' }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))',
+        gap: '8px',
+        marginTop: '4px',
+      }}
+    >
       {badges.map((b) => (
         <div
           key={b.id}
@@ -267,7 +290,7 @@ function AchievementBadges({ results, sittings }) {
           }}
         >
           <span style={{ fontSize: '1.5em' }}>{b.icon}</span>
-          <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: '#241f38' }}>
+          <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: 'var(--c-t-241f38)' }}>
             {b.label}
           </p>
         </div>
@@ -297,14 +320,18 @@ function TestsSection({ tests, rounds }) {
         round: r.round,
         lockedReason: r.lockedReason,
       }));
-    const order = { 'in-progress': 0, 'not-started': 1, completed: 2, expired: 3 };
+    // 'locked' items are rounds (no sitting), so the final fallback must not
+    // read .test off them — that crashed the dashboard when 2+ rounds were locked.
+    const order = { 'in-progress': 0, 'not-started': 1, locked: 2, completed: 3, expired: 4 };
     return [...started, ...notStarted].sort((a, b) => {
       if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
       if (a.status === 'in-progress')
         return new Date(a.test.expiresAt) - new Date(b.test.expiresAt);
       if (a.status === 'not-started')
         return new Date(a.round.closeTime) - new Date(b.round.closeTime);
-      return new Date(b.test.startedAt) - new Date(a.test.startedAt);
+      const aStarted = a.test ? new Date(a.test.startedAt) : 0;
+      const bStarted = b.test ? new Date(b.test.startedAt) : 0;
+      return bStarted - aStarted;
     });
   }, [tests, rounds]);
 
@@ -312,8 +339,8 @@ function TestsSection({ tests, rounds }) {
     <div>
       {items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '24px 0' }}>
-          <ClipboardList size={24} style={{ color: '#706391', marginBottom: '8px' }} />
-          <p style={{ color: '#706391', fontSize: '12px', margin: 0 }}>
+          <ClipboardList size={24} style={{ color: 'var(--c-t-706391)', marginBottom: '8px' }} />
+          <p style={{ color: 'var(--c-t-706391)', fontSize: '12px', margin: 0 }}>
             No tests yet. They will appear here once a round opens.
           </p>
         </div>
@@ -369,7 +396,9 @@ function TestsSection({ tests, rounds }) {
                   </Link>
                 )}
                 {item.status === 'locked' && item.lockedReason && (
-                  <span style={{ fontSize: '10px', color: '#6a6a6a', fontStyle: 'italic' }}>
+                  <span
+                    style={{ fontSize: '10px', color: 'var(--c-t-6a6a6a)', fontStyle: 'italic' }}
+                  >
                     {item.lockedReason}
                   </span>
                 )}
@@ -403,10 +432,10 @@ function ResultsSection({ results }) {
               border: '1px solid rgba(139,92,246,0.15)',
               borderRadius: '9px',
               padding: '8px 12px',
-              background: '#fff',
+              background: 'var(--c-bg-ffffff)',
             }}
           >
-            <Search size={14} style={{ color: '#706391' }} />
+            <Search size={14} style={{ color: 'var(--c-t-706391)' }} />
             <input
               aria-label="Search tests by round name"
               type="text"
@@ -418,7 +447,7 @@ function ResultsSection({ results }) {
                 outline: 'none',
                 flex: 1,
                 fontSize: '12px',
-                color: '#241f38',
+                color: 'var(--c-t-241f38)',
                 background: 'transparent',
               }}
             />
@@ -428,8 +457,10 @@ function ResultsSection({ results }) {
 
       {results.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '24px 0' }}>
-          <Trophy size={24} style={{ color: '#706391', marginBottom: '8px' }} />
-          <p style={{ color: '#706391', fontSize: '12px', margin: 0 }}>No results released yet.</p>
+          <Trophy size={24} style={{ color: 'var(--c-t-706391)', marginBottom: '8px' }} />
+          <p style={{ color: 'var(--c-t-706391)', fontSize: '12px', margin: 0 }}>
+            No results released yet.
+          </p>
         </div>
       ) : (
         <div className="test-list">
@@ -504,8 +535,10 @@ function UpNextSection({ rounds, sittings }) {
   if (upcoming.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
-        <CalendarDays size={20} style={{ color: '#706391', marginBottom: '6px' }} />
-        <p style={{ color: '#706391', fontSize: '12px', margin: 0 }}>No upcoming deadlines.</p>
+        <CalendarDays size={20} style={{ color: 'var(--c-t-706391)', marginBottom: '6px' }} />
+        <p style={{ color: 'var(--c-t-706391)', fontSize: '12px', margin: 0 }}>
+          No upcoming deadlines.
+        </p>
       </div>
     );
   }
@@ -565,7 +598,11 @@ export default function StudentDashboard() {
   }, [checking, user, getToken]);
 
   if (checking || !user || status === 'loading') {
-    return <div style={{ padding: '48px 0', fontSize: '14px', color: '#6d667c' }}>Loading...</div>;
+    return (
+      <div style={{ padding: '48px 0', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>
+        Loading...
+      </div>
+    );
   }
 
   const completed = sittings.filter((s) => testStatus(s) === 'completed').length;
@@ -657,11 +694,11 @@ export default function StudentDashboard() {
           style={{
             marginTop: '20px',
             padding: '16px',
-            borderColor: '#f3c2c2',
-            background: '#fdf0f0',
+            borderColor: 'var(--c-bd-f3c2c2)',
+            background: 'var(--c-bg-fdf0f0)',
           }}
         >
-          <p style={{ color: '#8f2f2f', fontSize: '13px', margin: 0 }}>
+          <p style={{ color: 'var(--c-t-8f2f2f)', fontSize: '13px', margin: 0 }}>
             Couldn&apos;t load your tests or results. Try refreshing the page.
           </p>
         </div>
@@ -726,7 +763,7 @@ export default function StudentDashboard() {
                   <span
                     style={{
                       background: 'rgba(76,175,125,0.1)',
-                      color: '#2b7854',
+                      color: 'var(--c-t-2b7854)',
                       padding: '3px 10px',
                       borderRadius: '20px',
                       fontSize: '10px',
@@ -787,11 +824,15 @@ export default function StudentDashboard() {
               </div>
               <TrendChart results={results} />
               <div
-                style={{ marginTop: '16px', borderTop: '1px solid #f0edf6', paddingTop: '14px' }}
+                style={{
+                  marginTop: '16px',
+                  borderTop: '1px solid var(--c-bd-f0edf6)',
+                  paddingTop: '14px',
+                }}
               >
                 <span
                   style={{
-                    color: '#626b7e',
+                    color: 'var(--c-t-626b7e)',
                     fontSize: '10px',
                     fontWeight: 700,
                     letterSpacing: '.12em',

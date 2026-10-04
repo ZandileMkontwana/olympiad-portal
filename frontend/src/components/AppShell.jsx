@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export const SIDEBAR_ID = 'app-sidebar';
 
@@ -93,6 +94,7 @@ export default function AppShell({ renderSidebar, section, initials = 'AM', chil
             </div>
           </div>
           <div className="top-actions">
+            <ThemeToggle />
             <div className="avatar" aria-hidden="true">
               {initials}
             </div>

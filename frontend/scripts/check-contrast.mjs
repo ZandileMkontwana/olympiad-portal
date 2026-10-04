@@ -1,23 +1,32 @@
 #!/usr/bin/env node
 /**
- * WCAG AA contrast checker (#326).
+ * WCAG AA contrast checker for BOTH themes (#326, #338).
  *
- * 1. Every hex colour used as a text `color:` in src must reach 4.5:1 against
- *    the lightest-tinted surface it can sit on (worst case of the app's light
- *    backgrounds). Light text (luminance > 0.55) is assumed to sit on the dark
- *    hero/gradient areas and is skipped.
- * 2. Every rule or inline style that sets BOTH a colour and a background is
- *    checked as an exact pair.
+ * Colours in src are hex literals or CSS variables (--c-*, --ink, ...). The
+ * light and dark value of every variable comes from the stylesheets: light
+ * from any `--x: #hex` declaration, dark from the overrides inside
+ * `:root[data-theme='dark']` blocks in src/app/theme.css.
  *
- * Usage: node scripts/check-contrast.mjs        (exit code 1 on failures)
+ * For each theme the script checks that
+ *   1. every text colour reaches 4.5:1 on the worst surface it can sit on
+ *      (the lightest of that theme's surfaces for dark; the tinted light
+ *      surfaces for light). Light text (luminance > 0.55) is assumed to sit on
+ *      brand/gradient areas and is skipped; and
+ *   2. every rule or inline style that sets both a text colour and a
+ *      background is an exact pair of at least 4.5:1.
+ * Colours without a resolvable value are ignored.
+ *
+ * Usage:  node scripts/check-contrast.mjs          (exit 1 on failures)
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const SRC = join(__dirname, '..', 'src');
-const LIGHT_BGS = [
+// fileURLToPath instead of URL.pathname: pathname leaves "%20" encoded and can
+// double the drive letter on Windows.
+const SRC = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'src');
+const MIN = 4.5;
+const LIGHT_SURFACES = [
   '#ffffff',
   '#faf7fd',
   '#f0edff',
@@ -43,7 +52,6 @@ function ratio(a, b) {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
-
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {
     const p = join(dir, name);
@@ -52,33 +60,119 @@ function walk(dir) {
   });
 }
 
-const failures = [];
-const HEX = '(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})\\b';
-const textColour = new RegExp(`(?<![-\\w])color:\\s*['"]?${HEX}`, 'g');
+const files = walk(SRC).map((path) => ({
+  path,
+  // Forward slashes so `rel === 'app/theme.css'` also matches on Windows.
+  rel: relative(SRC, path).split(sep).join('/'),
+  src: readFileSync(path, 'utf8'),
+}));
 
-for (const file of walk(SRC)) {
-  const src = readFileSync(file, 'utf8');
-  const rel = relative(SRC, file);
-
-  for (const m of src.matchAll(textColour)) {
-    const c = expand(m[1]);
-    if (luminance(c) > 0.55) continue;
-    const worst = Math.min(...LIGHT_BGS.map((bg) => ratio(c, bg)));
-    if (worst < 4.5) {
-      const line = src.slice(0, m.index).split('\n').length;
-      failures.push(`${rel}:${line}  text ${c} → ${worst.toFixed(2)}:1 on its worst light surface`);
-    }
+// ── Variable tables ─────────────────────────────────────────────────────────
+const light = new Map();
+const dark = new Map();
+const HEXDECL = /(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})\s*;/g;
+for (const f of files.filter((f) => f.path.endsWith('.css'))) {
+  const isTheme = f.rel === 'app/theme.css';
+  // Split theme.css into the dark override blocks and everything else.
+  const darkBlocks = [];
+  let rest = f.src;
+  if (isTheme) {
+    rest = f.src.replace(/:root\[data-theme=["']dark["']\][^{]*\{[^}]*\}/g, (block) => {
+      darkBlocks.push(block);
+      return '';
+    });
   }
+  for (const m of rest.matchAll(HEXDECL)) if (!light.has(m[1])) light.set(m[1], expand(m[2]));
+  for (const block of darkBlocks)
+    for (const m of block.matchAll(HEXDECL)) dark.set(m[1], expand(m[2]));
+}
+for (const [k, v] of light) if (!dark.has(k)) dark.set(k, v);
 
-  const blocks = /\{([^{}]{0,700})\}/g;
-  for (const m of src.matchAll(blocks)) {
-    const fg = m[1].match(new RegExp(`(?<![-\\w])color:\\s*['"]?${HEX}`));
-    const bg = m[1].match(new RegExp(`background(?:Color)?:\\s*['"]?${HEX}`));
-    if (!fg || !bg) continue;
-    const r = ratio(expand(fg[1]), expand(bg[1]));
-    if (r < 4.5) {
-      const line = src.slice(0, m.index).split('\n').length;
-      failures.push(`${rel}:${line}  ${expand(fg[1])} on ${expand(bg[1])} → ${r.toFixed(2)}:1`);
+function resolve(token, vars) {
+  token = token.trim();
+  if (/^#[0-9a-fA-F]{3,6}$/.test(token)) return expand(token);
+  const m = token.match(/^var\(\s*(--[\w-]+)\s*(?:,\s*([\s\S]+))?\)$/);
+  if (!m) return null;
+  if (vars.has(m[1])) return vars.get(m[1]);
+  return m[2] ? resolve(m[2], vars) : null;
+}
+
+const darkSurfaces = [...dark]
+  .filter(
+    ([k]) => k.startsWith('--c-bg-') || ['--t-surface', '--t-paper', '--background'].includes(k)
+  )
+  .map(([, v]) => v);
+const DARK_WORST = darkSurfaces.sort((a, b) => luminance(b) - luminance(a))[0];
+
+// Colours chosen at runtime in JS (score badges/rings) are exposed as variables;
+// check them as text on every surface of the theme.
+const RUNTIME_TEXT_VARS = ['--score-good', '--score-mid', '--score-low', '--score-none'];
+
+// ── Collect colour declarations ─────────────────────────────────────────────
+const VAL = String.raw`(var\(\s*--[\w-]+(?:\s*,\s*var\(\s*--[\w-]+\s*\))?(?:\s*,\s*#[0-9a-fA-F]{3,6})?\s*\)|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b)`;
+const textRe = new RegExp(String.raw`(?<![-\w])color:\s*['"]?${VAL}`, 'g');
+const fgRe = new RegExp(String.raw`(?<![-\w])color:\s*['"]?${VAL}`);
+const bgRe = new RegExp(
+  String.raw`(?<![-\w])(?:background(?:-color)?|backgroundColor|bg):\s*['"]?${VAL}`
+);
+
+const failures = [];
+const seen = new Set();
+function report(theme, rel, line, msg) {
+  const key = `${theme}|${rel}|${line}|${msg}`;
+  if (!seen.has(key)) {
+    seen.add(key);
+    failures.push(`[${theme}] ${rel}:${line}  ${msg}`);
+  }
+}
+
+for (const [theme, vars] of [
+  ['light', light],
+  ['dark', dark],
+]) {
+  const surfaces = theme === 'dark' ? darkSurfaces : LIGHT_SURFACES;
+  for (const name of RUNTIME_TEXT_VARS) {
+    const c = vars.get(name);
+    if (!c) continue;
+    const worst = Math.min(...surfaces.map((bg) => ratio(c, bg)));
+    if (worst < MIN)
+      report(
+        theme,
+        'app/theme.css',
+        0,
+        `${name} ${c} → ${worst.toFixed(2)}:1 on its worst surface`
+      );
+  }
+  for (const f of files) {
+    if (f.rel === 'app/theme.css') continue;
+    // 1. text on the worst surface
+    for (const m of f.src.matchAll(textRe)) {
+      const c = resolve(m[1], vars);
+      if (!c || luminance(c) > 0.55) continue;
+      if (theme === 'dark') {
+        // Literal dark colours in dark mode are brand/paired colours; only
+        // variables are expected to flip, so judge literals via the pair check.
+        if (!m[1].startsWith('var(')) continue;
+      }
+      const worst = Math.min(...surfaces.map((bg) => ratio(c, bg)));
+      if (worst < MIN) {
+        const line = f.src.slice(0, m.index).split('\n').length;
+        report(theme, f.rel, line, `text ${c} → ${worst.toFixed(2)}:1 on its worst surface`);
+      }
+    }
+    // 2. exact pairs inside one rule / style object
+    for (const m of f.src.matchAll(/\{([^{}]{0,900})\}/g)) {
+      const fg = m[1].match(fgRe);
+      const bg = m[1].match(bgRe);
+      if (!fg || !bg) continue;
+      const a = resolve(fg[1], vars);
+      const b = resolve(bg[1], vars);
+      if (!a || !b) continue;
+      const r = ratio(a, b);
+      if (r < MIN) {
+        const line = f.src.slice(0, m.index).split('\n').length;
+        report(theme, f.rel, line, `${a} on ${b} → ${r.toFixed(2)}:1`);
+      }
     }
   }
 }
@@ -87,4 +181,6 @@ if (failures.length) {
   console.error(`Contrast: ${failures.length} failure(s)\n` + failures.join('\n'));
   process.exit(1);
 }
-console.log('Contrast: all text colours meet WCAG AA (4.5:1).');
+console.log(
+  `Contrast: light and dark themes meet WCAG AA (${light.size} variables, darkest-surface check against ${DARK_WORST}).`
+);

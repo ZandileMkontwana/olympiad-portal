@@ -1,9 +1,12 @@
 import { ClerkProvider } from '@clerk/nextjs';
 import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import './theme.css';
 import './responsive.css';
 import './accessibility.css';
 import SiteHeader from '@/components/SiteHeader';
+import { ThemeProvider } from '@/components/ThemeProvider';
+import { themeInitScript } from '@/lib/theme';
 
 // Display face — headings only, used with restraint.
 const fraunces = Fraunces({
@@ -43,16 +46,24 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <ClerkProvider>
+      {/* suppressHydrationWarning: the init script sets data-theme and
+          color-scheme on <html> before React hydrates. */}
       <html
         lang="en"
+        suppressHydrationWarning
         className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} h-full antialiased`}
       >
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        </head>
         <body className="min-h-full flex flex-col">
-          <a href="#main-content" className="skip-link">
-            Skip to main content
-          </a>
-          <SiteHeader />
-          {children}
+          <ThemeProvider>
+            <a href="#main-content" className="skip-link">
+              Skip to main content
+            </a>
+            <SiteHeader />
+            {children}
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

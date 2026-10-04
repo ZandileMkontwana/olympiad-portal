@@ -33,7 +33,7 @@ function PaperCard({ paper }) {
   return (
     <div
       style={{
-        background: 'white',
+        background: 'var(--t-surface)',
         borderRadius: '16px',
         padding: '18px 20px',
         border: '1px solid rgba(139,92,246,0.1)',
@@ -70,18 +70,18 @@ function PaperCard({ paper }) {
       </div>
 
       <div style={{ flex: 1, minWidth: '200px' }}>
-        <p style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: '#2d2640' }}>
+        <p style={{ margin: 0, fontWeight: 700, fontSize: '1em', color: 'var(--c-t-2d2640)' }}>
           {paper.roundName}
         </p>
-        <p style={{ margin: '2px 0 0', fontSize: '0.82em', color: '#706391' }}>
+        <p style={{ margin: '2px 0 0', fontSize: '0.82em', color: 'var(--c-t-706391)' }}>
           {paper.olympiadName}
         </p>
         <div style={{ display: 'flex', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.72em', color: '#6e5fa5' }}>
+          <span style={{ fontSize: '0.72em', color: 'var(--c-t-6e5fa5)' }}>
             Closed {formatDate(paper.closeTime)}
           </span>
-          <span style={{ fontSize: '0.72em', color: '#6e5fa5' }}>·</span>
-          <span style={{ fontSize: '0.72em', color: '#6e5fa5' }}>{timeAgo(paper.closeTime)}</span>
+          <span style={{ fontSize: '0.72em', color: 'var(--c-t-6e5fa5)' }}>·</span>
+          <span style={{ fontSize: '0.72em', color: 'var(--c-t-6e5fa5)' }}>{timeAgo(paper.closeTime)}</span>
         </div>
       </div>
 
@@ -113,7 +113,7 @@ function PaperCard({ paper }) {
               fontSize: '0.85em',
               fontWeight: 700,
               background: 'rgba(139,92,246,0.08)',
-              color: '#6d3fd1',
+              color: 'var(--c-t-6d3fd1)',
               textDecoration: 'none',
               border: '1px solid rgba(139,92,246,0.25)',
             }}
@@ -232,14 +232,14 @@ export default function ArchiveBrowser() {
         )}
       </div>
 
-      {status === 'loading' && <p style={{ color: '#706391', marginTop: '24px' }}>Loading...</p>}
+      {status === 'loading' && <p style={{ color: 'var(--c-t-706391)', marginTop: '24px' }}>Loading...</p>}
       {status === 'empty' && (
-        <p style={{ color: '#706391', textAlign: 'center', marginTop: '32px' }}>
+        <p style={{ color: 'var(--c-t-706391)', textAlign: 'center', marginTop: '32px' }}>
           No archived papers yet — papers appear here once their rounds close.
         </p>
       )}
       {status === 'error' && (
-        <p style={{ color: '#b42318', textAlign: 'center', marginTop: '32px' }}>
+        <p style={{ color: 'var(--c-t-b42318)', textAlign: 'center', marginTop: '32px' }}>
           Couldn&apos;t load the archive.
         </p>
       )}
@@ -272,7 +272,7 @@ export default function ArchiveBrowser() {
                 borderRadius: '10px',
                 border: '1px solid rgba(139,92,246,0.25)',
                 fontSize: '0.9em',
-                background: 'white',
+                background: 'var(--t-surface)',
               }}
             >
               <option value="all">All olympiads</option>
@@ -286,7 +286,7 @@ export default function ArchiveBrowser() {
 
           {/* Timeline grouped by year */}
           {filteredPapers.length === 0 ? (
-            <p style={{ color: '#706391', textAlign: 'center', marginTop: '32px' }}>
+            <p style={{ color: 'var(--c-t-706391)', textAlign: 'center', marginTop: '32px' }}>
               No papers match your search.
             </p>
           ) : (
@@ -314,7 +314,7 @@ export default function ArchiveBrowser() {
                       {year}
                     </span>
                     <div style={{ flex: 1, height: '1px', background: 'rgba(139,92,246,0.15)' }} />
-                    <span style={{ fontSize: '0.78em', color: '#6e5fa5' }}>
+                    <span style={{ fontSize: '0.78em', color: 'var(--c-t-6e5fa5)' }}>
                       {yearPapers.length} paper{yearPapers.length !== 1 ? 's' : ''}
                     </span>
                   </div>

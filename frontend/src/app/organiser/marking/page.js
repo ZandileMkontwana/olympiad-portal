@@ -123,7 +123,7 @@ export default function MarkingPage() {
   if (checking) {
     return (
       <main id="main-content" tabIndex={-1} className="organiser-shell">
-        <p style={{ padding: '48px', fontSize: '14px', color: '#6d667c' }}>Loading...</p>
+        <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
       </main>
     );
   }
@@ -220,7 +220,7 @@ export default function MarkingPage() {
           <p style={{ fontWeight: 600 }}>Total: {totalScore()}</p>
 
           {formStatus === 'error' && (
-            <p role="alert" style={{ color: '#b42318', fontSize: '0.9em', marginBottom: '8px' }}>{formError}</p>
+            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', marginBottom: '8px' }}>{formError}</p>
           )}
 
           <div style={{ display: 'flex', gap: '10px' }}>

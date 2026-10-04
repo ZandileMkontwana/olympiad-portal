@@ -168,7 +168,7 @@ export default function RemarksPage() {
   if (checking) {
     return (
       <main id="main-content" tabIndex={-1} className="organiser-shell">
-        <p style={{ padding: '48px', fontSize: '14px', color: '#6d667c' }}>Loading...</p>
+        <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
       </main>
     );
   }
@@ -244,7 +244,7 @@ export default function RemarksPage() {
                 </div>
               </div>
               {assignErrorId === r.id && (
-                <p role="alert" style={{ color: '#b42318', fontSize: '0.9em', margin: '8px 0 0 0' }}>
+                <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', margin: '8px 0 0 0' }}>
                   {assignError}
                 </p>
               )}
@@ -315,7 +315,7 @@ export default function RemarksPage() {
                         justifyContent: 'space-between',
                         gap: '10px',
                         fontSize: '0.9em',
-                        borderBottom: '1px solid #eee',
+                        borderBottom: '1px solid var(--c-bd-eeeeee)',
                         paddingBottom: '4px',
                       }}
                     >
@@ -386,7 +386,7 @@ export default function RemarksPage() {
           </div>
 
           {formStatus === 'error' && (
-            <p role="alert" style={{ color: '#b42318', fontSize: '0.9em', marginBottom: '8px' }}>
+            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', marginBottom: '8px' }}>
               {formError}
             </p>
           )}

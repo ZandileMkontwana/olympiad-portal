@@ -8,9 +8,14 @@ import { SignIn, useAuth, useClerk } from '@clerk/nextjs';
 import { studentLogin, dashboardPathForRole, fetchCurrentUser } from '@/lib/api';
 import { getStudentSession, setStudentSession } from '@/lib/studentSession';
 import '../../auth.css';
+import ThemeToggle from '@/components/ThemeToggle';
+import { useTheme } from '@/components/ThemeProvider';
+import { dark } from '@clerk/themes';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const searchParams = useSearchParams();
   const { isSignedIn, getToken } = useAuth();
   const { signOut } = useClerk();
@@ -78,6 +83,7 @@ export default function LoginPage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="auth-page auth-page-login">
+      <ThemeToggle className="theme-toggle-floating" />
       <aside className="auth-story" aria-label="Olympiad Portal introduction">
         <span className="auth-story-watermark" aria-hidden="true">
           <Image src="/tree-mark.png" alt="" width={360} height={360} />
@@ -360,9 +366,10 @@ export default function LoginPage() {
                   },
                 }}
                 appearance={{
+                  baseTheme: isDark ? dark : undefined,
                   variables: {
-                    colorPrimary: '#6c4fd8',
-                    colorBackground: '#ffffff',
+                    colorPrimary: isDark ? '#a897f7' : '#6c4fd8',
+                    colorBackground: isDark ? '#1e1a33' : '#ffffff',
                     borderRadius: '10px',
                   },
                   options: {

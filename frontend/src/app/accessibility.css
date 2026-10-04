@@ -50,7 +50,7 @@ main:focus {
 .educator-banner :focus-visible,
 .cta-band :focus-visible,
 .auth-story :focus-visible {
-  outline-color: #fff !important;
+  outline-color: var(--c-bd-ffffff) !important;
 }
 
 /* A file input hidden with sr-only inside a <label class="button"> still
@@ -71,9 +71,9 @@ label:has(> input[type='file'].sr-only:focus-visible) {
   z-index: 1000;
 }
 .modal-panel {
-  background: #fff;
+  background: var(--c-bg-ffffff);
   border-radius: 12px;
-  color: #172554;
+  color: var(--c-t-172554);
   max-height: 80vh;
   max-width: 500px;
   overflow: auto;
@@ -95,7 +95,7 @@ label:has(> input[type='file'].sr-only:focus-visible) {
   background: none;
   border: 0;
   border-radius: 8px;
-  color: #172554;
+  color: var(--c-t-172554);
   cursor: pointer;
   display: inline-flex;
   justify-content: center;
@@ -103,25 +103,25 @@ label:has(> input[type='file'].sr-only:focus-visible) {
   min-width: 44px;
 }
 .modal-close:hover {
-  background: #f0edff;
+  background: var(--c-bg-f0edff);
 }
 .modal-intro {
-  color: #5a6478;
+  color: var(--c-t-5a6478);
   font-size: 14px;
   margin: 0 0 16px;
 }
 .modal-empty {
-  background: #f7f8fc;
+  background: var(--c-bg-f7f8fc);
   border-radius: 8px;
   padding: 32px;
   text-align: center;
 }
 .modal-empty svg {
-  color: #6546d8;
+  color: var(--c-t-6546d8);
   margin-bottom: 12px;
 }
 .modal-empty p {
-  color: #5a6478;
+  color: var(--c-t-5a6478);
   font-size: 14px;
   margin: 0;
 }
@@ -131,17 +131,17 @@ label:has(> input[type='file'].sr-only:focus-visible) {
   gap: 12px;
 }
 .modal-card {
-  background: #f7f8fc;
+  background: var(--c-bg-f7f8fc);
   border-radius: 8px;
   padding: 16px;
 }
 .modal-card h3 {
-  color: #172554;
+  color: var(--c-t-172554);
   font-size: 14px;
   margin: 0 0 8px;
 }
 .modal-card p {
-  color: #5a6478;
+  color: var(--c-t-5a6478);
   font-size: 13px;
   margin: 0;
 }

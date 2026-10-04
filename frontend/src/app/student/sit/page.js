@@ -203,7 +203,7 @@ function SitContent() {
             borderRadius: '8px',
             padding: '16px',
             background: 'rgba(224,97,95,0.05)',
-            color: '#b42318',
+            color: 'var(--c-t-b42318)',
           }}
         >
           {error}
@@ -235,7 +235,7 @@ function SitContent() {
           >
             <span>
               Time remaining:{' '}
-              <strong style={{ color: timeRemaining === 'expired' ? '#dc2626' : undefined }}>
+              <strong style={{ color: timeRemaining === 'expired' ? 'var(--c-t-dc2626)' : undefined }}>
                 {timeRemaining === 'expired' ? 'EXPIRED' : timeRemaining}
               </strong>
             </span>

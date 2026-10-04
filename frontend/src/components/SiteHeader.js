@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const PUBLIC_PATHS = ['/', '/login', '/register'];
 
@@ -36,16 +37,19 @@ export default function SiteHeader() {
           Olympiad Portal
         </Link>
 
-        {isPublicPage ? (
-          <div className="flex items-center gap-6 text-sm">
-            <Link href="/register" className="nav-link-light text-white/90">
-              Register
-            </Link>
-            <Link href="/login" className="nav-link-light font-medium text-white">
-              Log in
-            </Link>
-          </div>
-        ) : null}
+        <div className="flex items-center gap-4 text-sm">
+          {isPublicPage ? (
+            <>
+              <Link href="/register" className="nav-link-light text-white/90">
+                Register
+              </Link>
+              <Link href="/login" className="nav-link-light font-medium text-white">
+                Log in
+              </Link>
+            </>
+          ) : null}
+          <ThemeToggle className="theme-toggle-on-dark" />
+        </div>
       </nav>
     </header>
   );
