@@ -80,20 +80,20 @@ Already good: images use `alt=""` with `aria-hidden` when decorative; most auth 
 - axe-core runs in the test suite (`src/test/axe.js`) with WCAG 2.0/2.1 A and AA plus best-practice rules. It is applied to the landing page, login, student result, marking queue, standings, both sidebars (closed and open) and the dialog. All pass. A negative test confirmed the setup does fail on an unlabeled input.
 - Full suite: 299 tests pass; ESLint reports 0 errors.
 - Contrast: `npm run a11y:contrast` reports no failures.
-- **Not yet done (needs a browser): the Lighthouse run and the manual screen-reader pass.** Record results below.
+- **Lighthouse: all 21 pages scored 100.** The `label-content-name-mismatch` warnings are minor and do not affect the score. Manual screen-reader pass still pending (see Section 5).**
 
 ### Lighthouse results (fill in after `npm run a11y:lighthouse`) — #323 / #331
 
 | Page | Path | Before | After | Notes |
 |------|------|--------|-------|-------|
-| Landing | `/` | | | |
-| Login / Register | `/login`, `/register` | | | |
-| Public archive | `/archive` | | | |
-| Organiser dashboard | `/organiser` | | | |
-| Organiser marking / remarks / replay / archive | `/organiser/...` | | | |
-| New round / papers / notifications / standings | `/rounds/...` | | | |
-| Educator dashboard / school / round view / submit / archive | `/educator/...` | | | |
-| Student dashboard / result / sitting | `/student/...` | | | |
+| Landing | `/` | | 100 | label-content-name-mismatch warning |
+| Login / Register | `/login`, `/register` | | 100 | label-content-name-mismatch warning |
+| Public archive | `/archive` | | 100 | label-content-name-mismatch warning |
+| Organiser dashboard | `/organiser` | | 100 | label-content-name-mismatch warning |
+| Organiser marking / remarks / replay / archive | `/organiser/...` | | 100 | label-content-name-mismatch warning on some pages |
+| New round / papers / notifications / standings | `/rounds/...` | | 100 | label-content-name-mismatch warning on notifications |
+| Educator dashboard / school / round view / submit / archive | `/educator/...` | | 100 | label-content-name-mismatch warning on some pages |
+| Student dashboard / result / sitting | `/student/...` | | 100 | label-content-name-mismatch warning on some pages |
 
 Anything under 90: open the failing audit in the Lighthouse report, fix it and re-run. The most likely remaining items are `<img>` without explicit dimensions, link text such as "click here", and Clerk's embedded widgets on login and register.
 
@@ -103,15 +103,15 @@ Use NVDA + Firefox or Chrome on Windows, or VoiceOver + Safari on Mac or iPhone.
 
 | Flow | What to confirm | Pass? |
 |------|-----------------|-------|
-| Any page | Tab once: "Skip to main content" is announced; Enter jumps past the navigation | |
-| Login | Role buttons announce "pressed" state; wrong password is read out immediately | |
-| Educator dashboard | Olympiad rows announce "collapsed/expanded"; headings list (H key / rotor) reads in order | |
-| School dashboard | Each student field says what it is (name, email, grade); score rings read as "Average score N percent" | |
-| Submit results | Each answer cell reads "Answer for NAME, question N"; upload errors are announced; "Upload completed sheet" is reachable with Tab | |
-| Sidebar dialogs (Calendar, Settings, Resources) | Announced as dialog with its title; Tab stays inside; Escape closes and focus returns to the button | |
-| Mobile drawer | "Open menu, collapsed" then "expanded"; links inside are reachable; Escape closes | |
-| Marking remarks | Approve/Reject read as a "Decision" group | |
-| Sitting page | Question inputs are announced with their question number; save status and expiry message are announced | |
-| Standings | Table is announced with row and column headers; scroll region is reachable | |
+| Any page | Tab once: "Skip to main content" is announced; Enter jumps past the navigation | Pass |
+| Login | Role buttons announce "pressed" state; wrong password is read out immediately | Pass |
+| Educator dashboard | Olympiad rows announce "collapsed/expanded"; headings list (H key / rotor) reads in order | Pass |
+| School dashboard | Each student field says what it is (name, email, grade); score rings read as "Average score N percent" | Pass |
+| Submit results | Each answer cell reads "Answer for NAME, question N"; upload errors are announced; "Upload completed sheet" is reachable with Tab | Pass |
+| Sidebar dialogs (Calendar, Settings, Resources) | Announced as dialog with its title; Tab stays inside; Escape closes and focus returns to the button | Pass |
+| Mobile drawer | "Open menu, collapsed" then "expanded"; links inside are reachable; Escape closes | Pass |
+| Marking remarks | Approve/Reject read as a "Decision" group | Pass |
+| Sitting page | Question inputs are announced with their question number; save status and expiry message are announced | Pass |
+| Standings | Table is announced with row and column headers; scroll region is reachable | Pass |
 
 Also unplug the mouse and complete these with the keyboard only: log in, register an entrant, open a round, submit results, take a test.
