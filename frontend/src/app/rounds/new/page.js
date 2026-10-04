@@ -185,7 +185,7 @@ function NewRoundForm() {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-8 py-12">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl px-8 py-12">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
         Set up a round
       </h1>
@@ -554,7 +554,7 @@ export default function NewRoundPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto max-w-xl px-8 py-12">
+        <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl px-8 py-12">
           <p>Loading...</p>
         </main>
       }

@@ -54,7 +54,7 @@ function TreeMark({ size = 26, tone = 'ink' }) {
 
 export default function LandingPage() {
   return (
-    <main className="landing">
+    <main id="main-content" tabIndex={-1} className="landing">
       <AuthRedirect />
       <div className="grain" aria-hidden="true" />
       <header className="site-header">

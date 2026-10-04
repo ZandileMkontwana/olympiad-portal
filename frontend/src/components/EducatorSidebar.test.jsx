@@ -28,6 +28,7 @@ vi.mock('next/link', () => ({
 }));
 
 import EducatorSidebar from './EducatorSidebar';
+import { expectNoAxeViolations } from '@/test/axe';
 
 describe('EducatorSidebar', () => {
   beforeEach(() => {
@@ -176,5 +177,14 @@ describe('EducatorSidebar mobile drawer', () => {
 
     fireEvent.click(screen.getByText('Archive').closest('a'));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('EducatorSidebar accessibility', () => {
+  it('has no axe accessibility violations (closed and open drawer)', async () => {
+    const { container, rerender } = render(<EducatorSidebar />);
+    await expectNoAxeViolations(container);
+    rerender(<EducatorSidebar open onClose={() => {}} />);
+    await expectNoAxeViolations(container);
   });
 });

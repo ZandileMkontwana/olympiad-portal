@@ -77,7 +77,7 @@ export default function LoginPage() {
   const isNotActivated = error?.includes('not activated');
 
   return (
-    <main className="auth-page auth-page-login">
+    <main id="main-content" tabIndex={-1} className="auth-page auth-page-login">
       <aside className="auth-story" aria-label="Olympiad Portal introduction">
         <span className="auth-story-watermark" aria-hidden="true">
           <Image src="/tree-mark.png" alt="" width={360} height={360} />

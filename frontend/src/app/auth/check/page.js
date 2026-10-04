@@ -52,7 +52,9 @@ function AuthCheckContent() {
   }, [isLoaded, isSignedIn, getToken, router, searchParams]);
 
   return (
-    <div
+    <main
+      id="main-content"
+      tabIndex={-1}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -62,7 +64,9 @@ function AuthCheckContent() {
         gap: '16px',
       }}
     >
+      <h1 className="sr-only">Signing you in</h1>
       <div
+        aria-hidden="true"
         style={{
           width: '40px',
           height: '40px',
@@ -72,13 +76,15 @@ function AuthCheckContent() {
           animation: 'spin 1s linear infinite',
         }}
       />
-      <p style={{ color: '#766e89', fontSize: '14px' }}>Signing you in...</p>
+      <p role="status" style={{ color: '#6d667f', fontSize: '14px' }}>
+        Signing you in...
+      </p>
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </div>
+    </main>
   );
 }
 
@@ -94,7 +100,7 @@ export default function AuthCheckPage() {
             minHeight: '100vh',
           }}
         >
-          <p style={{ color: '#766e89', fontSize: '14px' }}>Loading...</p>
+          <p style={{ color: '#6d667f', fontSize: '14px' }}>Loading...</p>
         </div>
       }
     >

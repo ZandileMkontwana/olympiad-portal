@@ -85,19 +85,19 @@ function todayFormatted() {
 const STATUS_STYLES = {
   'in-progress': {
     bg: 'rgba(76,175,125,0.1)',
-    color: '#3fae7a',
+    color: '#2b7854',
     label: 'In progress',
     tone: 'green',
   },
   'not-started': {
     bg: 'rgba(224,168,62,0.12)',
-    color: '#c99a2e',
+    color: '#85661e',
     label: 'Not started',
     tone: 'amber',
   },
   completed: { bg: 'rgba(139,92,246,0.08)', color: '#6d3fd1', label: 'Completed', tone: 'purple' },
-  expired: { bg: 'rgba(139,127,168,0.1)', color: '#8b7fa8', label: 'Expired', tone: 'blue' },
-  locked: { bg: 'rgba(139,127,168,0.06)', color: '#999', label: 'Locked', tone: 'blue' },
+  expired: { bg: 'rgba(139,127,168,0.1)', color: '#706391', label: 'Expired', tone: 'blue' },
+  locked: { bg: 'rgba(139,127,168,0.06)', color: '#6a6a6a', label: 'Locked', tone: 'blue' },
 };
 
 /* ── Stat card ────────────────────────────────────────────────────────── */
@@ -128,8 +128,8 @@ function TrendChart({ results }) {
   if (sorted.length < 2) {
     return (
       <div style={{ textAlign: 'center', padding: '24px 0' }}>
-        <BarChart3 size={24} style={{ color: '#8b7fa8', marginBottom: '8px' }} />
-        <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>
+        <BarChart3 size={24} style={{ color: '#706391', marginBottom: '8px' }} />
+        <p style={{ color: '#706391', fontSize: '12px', margin: 0 }}>
           Your performance trend will appear here once you have at least two released results.
         </p>
       </div>
@@ -158,9 +158,14 @@ function TrendChart({ results }) {
           marginBottom: '12px',
         }}
       >
-        <span style={{ fontSize: '11px', color: '#8b7fa8' }}>Last {sorted.length} results</span>
+        <span style={{ fontSize: '11px', color: '#706391' }}>Last {sorted.length} results</span>
       </div>
-      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%' }}>
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        style={{ width: '100%' }}
+        role="img"
+        aria-label={`Line chart of your last ${sorted.length} results, from ${Math.round(points[0].score)} percent to ${Math.round(points[points.length - 1].score)} percent`}
+      >
         <defs>
           <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.18" />
@@ -307,8 +312,8 @@ function TestsSection({ tests, rounds }) {
     <div>
       {items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '24px 0' }}>
-          <ClipboardList size={24} style={{ color: '#8b7fa8', marginBottom: '8px' }} />
-          <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>
+          <ClipboardList size={24} style={{ color: '#706391', marginBottom: '8px' }} />
+          <p style={{ color: '#706391', fontSize: '12px', margin: 0 }}>
             No tests yet. They will appear here once a round opens.
           </p>
         </div>
@@ -364,7 +369,7 @@ function TestsSection({ tests, rounds }) {
                   </Link>
                 )}
                 {item.status === 'locked' && item.lockedReason && (
-                  <span style={{ fontSize: '10px', color: '#999', fontStyle: 'italic' }}>
+                  <span style={{ fontSize: '10px', color: '#6a6a6a', fontStyle: 'italic' }}>
                     {item.lockedReason}
                   </span>
                 )}
@@ -401,8 +406,9 @@ function ResultsSection({ results }) {
               background: '#fff',
             }}
           >
-            <Search size={14} style={{ color: '#8b7fa8' }} />
+            <Search size={14} style={{ color: '#706391' }} />
             <input
+              aria-label="Search tests by round name"
               type="text"
               placeholder="Search by round name..."
               value={search}
@@ -422,8 +428,8 @@ function ResultsSection({ results }) {
 
       {results.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '24px 0' }}>
-          <Trophy size={24} style={{ color: '#8b7fa8', marginBottom: '8px' }} />
-          <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>No results released yet.</p>
+          <Trophy size={24} style={{ color: '#706391', marginBottom: '8px' }} />
+          <p style={{ color: '#706391', fontSize: '12px', margin: 0 }}>No results released yet.</p>
         </div>
       ) : (
         <div className="test-list">
@@ -498,8 +504,8 @@ function UpNextSection({ rounds, sittings }) {
   if (upcoming.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
-        <CalendarDays size={20} style={{ color: '#8b7fa8', marginBottom: '6px' }} />
-        <p style={{ color: '#8b7fa8', fontSize: '12px', margin: 0 }}>No upcoming deadlines.</p>
+        <CalendarDays size={20} style={{ color: '#706391', marginBottom: '6px' }} />
+        <p style={{ color: '#706391', fontSize: '12px', margin: 0 }}>No upcoming deadlines.</p>
       </div>
     );
   }
@@ -559,7 +565,7 @@ export default function StudentDashboard() {
   }, [checking, user, getToken]);
 
   if (checking || !user || status === 'loading') {
-    return <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>Loading...</div>;
+    return <div style={{ padding: '48px 0', fontSize: '14px', color: '#6d667c' }}>Loading...</div>;
   }
 
   const completed = sittings.filter((s) => testStatus(s) === 'completed').length;
@@ -720,7 +726,7 @@ export default function StudentDashboard() {
                   <span
                     style={{
                       background: 'rgba(76,175,125,0.1)',
-                      color: '#3fae7a',
+                      color: '#2b7854',
                       padding: '3px 10px',
                       borderRadius: '20px',
                       fontSize: '10px',
@@ -785,7 +791,7 @@ export default function StudentDashboard() {
               >
                 <span
                   style={{
-                    color: '#a0a7b5',
+                    color: '#626b7e',
                     fontSize: '10px',
                     fontWeight: 700,
                     letterSpacing: '.12em',

@@ -9,8 +9,8 @@ export default function OrganiserArchivePage() {
 
   if (checking) {
     return (
-      <main className="organiser-shell">
-        <p style={{ padding: '48px', fontSize: '14px', color: '#817a91' }}>Loading...</p>
+      <main id="main-content" tabIndex={-1} className="organiser-shell">
+        <p style={{ padding: '48px', fontSize: '14px', color: '#6d667c' }}>Loading...</p>
       </main>
     );
   }

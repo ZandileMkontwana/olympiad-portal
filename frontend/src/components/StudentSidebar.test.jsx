@@ -36,6 +36,7 @@ vi.mock('next/link', () => ({
 }));
 
 import StudentSidebar from './StudentSidebar';
+import { expectNoAxeViolations } from '@/test/axe';
 
 describe('StudentSidebar', () => {
   beforeEach(() => {
@@ -156,5 +157,14 @@ describe('StudentSidebar mobile drawer', () => {
 
     fireEvent.click(screen.getByText('Dashboard').closest('a'));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('StudentSidebar accessibility', () => {
+  it('has no axe accessibility violations (closed and open drawer)', async () => {
+    const { container, rerender } = render(<StudentSidebar />);
+    await expectNoAxeViolations(container);
+    rerender(<StudentSidebar open onClose={() => {}} />);
+    await expectNoAxeViolations(container);
   });
 });

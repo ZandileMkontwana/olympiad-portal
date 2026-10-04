@@ -432,7 +432,7 @@
   padding: 13px 14px 13px 40px;
 }
 .auth-page .auth-input-wrap input::placeholder {
-  color: #a79ec4;
+  color: #6f609e;
 }
 .auth-page .auth-input-wrap > svg {
   left: 13px;
@@ -687,7 +687,7 @@
   margin-top: 4px;
 }
 .organiser-nav-label {
-  color: #9a93ae;
+  color: #6e6687;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -702,7 +702,7 @@
 .organiser-sidebar-bottom > a {
   align-items: center;
   border-radius: 9px;
-  color: #766e89;
+  color: #6d667f;
   display: flex;
   font-size: 13px;
   font-weight: 600;
@@ -733,7 +733,7 @@
 .organiser-logout {
   background: transparent;
   border: 0;
-  color: #9b94aa;
+  color: #6f6681;
   cursor: pointer;
   font-size: 11px;
   font-weight: 700;
@@ -742,7 +742,7 @@
   width: 100%;
 }
 .organiser-logout:hover {
-  color: #c45d54;
+  color: #b4473e;
 }
 .organiser-profile {
   align-items: center;
@@ -775,7 +775,7 @@
   font-size: 11px;
 }
 .organiser-profile small {
-  color: #958da5;
+  color: #6f6682;
   font-size: 10px;
 }
 .organiser-content {
@@ -796,7 +796,7 @@
   gap: 8px;
 }
 .organiser-breadcrumb {
-  color: #9b94aa;
+  color: #6f6681;
   font-size: 12px;
 }
 .organiser-breadcrumb strong {
@@ -808,7 +808,7 @@
 .icon-button {
   background: transparent;
   border: 0;
-  color: #80778e;
+  color: #70677c;
   cursor: pointer;
   position: relative;
 }
@@ -855,7 +855,7 @@
   margin: 0;
 }
 .organiser-subtitle {
-  color: #817a91;
+  color: #6d667c;
   font-size: 14px;
   margin: 10px 0 0;
 }
@@ -903,7 +903,7 @@
   margin: 8px 0 4px;
 }
 .dashboard-panel-heading p {
-  color: #8b8496;
+  color: #6e6778;
   font-size: 12px;
   margin: 0;
 }
@@ -958,14 +958,14 @@
 }
 .mini-event small,
 .request-row small {
-  color: #92899f;
+  color: #6f667d;
   font-size: 10px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .mini-event > svg {
-  color: #aaa1b7;
+  color: #716583;
 }
 .event-dot {
   border-radius: 50%;
@@ -1010,7 +1010,7 @@
   align-items: center;
   background: #f4e2d4;
   border-radius: 10px;
-  color: #a96643;
+  color: #8a4f31;
   display: flex;
   flex: 0 0 34px;
   font-size: 10px;
@@ -1054,7 +1054,7 @@
   line-height: 1.35;
 }
 .activity-items small {
-  color: #92899f;
+  color: #6f667d;
   font-size: 10px;
   grid-column: 2;
 }
@@ -1084,7 +1084,7 @@
   margin: 0 0 8px;
 }
 .organiser-page-heading p {
-  color: #817a91;
+  color: #6d667c;
   font-size: 14px;
   margin: 0;
 }

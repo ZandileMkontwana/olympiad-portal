@@ -11,7 +11,7 @@ export default function RegisterPage() {
   useRedirectIfAuthenticated();
 
   return (
-    <main className="auth-page auth-page-register">
+    <main id="main-content" tabIndex={-1} className="auth-page auth-page-register">
       <aside className="auth-story" aria-label="Olympiad Portal introduction">
         <span className="auth-story-watermark" aria-hidden="true">
           <Image src="/tree-mark.png" alt="" width={360} height={360} />

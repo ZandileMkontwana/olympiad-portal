@@ -122,8 +122,8 @@ export default function MarkingPage() {
 
   if (checking) {
     return (
-      <main className="organiser-shell">
-        <p style={{ padding: '48px', fontSize: '14px', color: '#817a91' }}>Loading...</p>
+      <main id="main-content" tabIndex={-1} className="organiser-shell">
+        <p style={{ padding: '48px', fontSize: '14px', color: '#6d667c' }}>Loading...</p>
       </main>
     );
   }
@@ -137,7 +137,7 @@ export default function MarkingPage() {
 
       {status === 'loading' && <p className="description">Loading marking queue...</p>}
       {status === 'error' && (
-        <p className="message">Couldn&apos;t load the marking queue. Try refreshing.</p>
+        <p className="message" role="alert">Couldn&apos;t load the marking queue. Try refreshing.</p>
       )}
       {status === 'empty' && <p className="description">No submissions waiting to be marked.</p>}
 
@@ -220,7 +220,7 @@ export default function MarkingPage() {
           <p style={{ fontWeight: 600 }}>Total: {totalScore()}</p>
 
           {formStatus === 'error' && (
-            <p style={{ color: 'red', fontSize: '0.9em', marginBottom: '8px' }}>{formError}</p>
+            <p role="alert" style={{ color: '#b42318', fontSize: '0.9em', marginBottom: '8px' }}>{formError}</p>
           )}
 
           <div style={{ display: 'flex', gap: '10px' }}>

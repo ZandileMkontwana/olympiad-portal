@@ -38,7 +38,7 @@ export default function SiteHeader() {
 
         {isPublicPage ? (
           <div className="flex items-center gap-6 text-sm">
-            <Link href="/register" className="nav-link-light text-white/70">
+            <Link href="/register" className="nav-link-light text-white/90">
               Register
             </Link>
             <Link href="/login" className="nav-link-light font-medium text-white">

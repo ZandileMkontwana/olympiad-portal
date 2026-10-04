@@ -98,7 +98,9 @@ export default function AppShell({ renderSidebar, section, initials = 'AM', chil
             </div>
           </div>
         </header>
-        <main className="dashboard">{children}</main>
+        <main id="main-content" tabIndex={-1} className="dashboard">
+          {children}
+        </main>
       </div>
     </div>
   );

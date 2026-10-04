@@ -310,8 +310,8 @@ export default function OrganiserDashboard() {
 
   if (checking) {
     return (
-      <main className="organiser-shell">
-        <p style={{ padding: '48px', fontSize: '14px', color: '#817a91' }}>Loading...</p>
+      <main id="main-content" tabIndex={-1} className="organiser-shell">
+        <p style={{ padding: '48px', fontSize: '14px', color: '#6d667c' }}>Loading...</p>
       </main>
     );
   }
@@ -350,7 +350,13 @@ export default function OrganiserDashboard() {
             Set up a new Olympiad
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '12px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+              gap: '12px',
+            }}
+          >
             <div>
               <label
                 htmlFor="olympiad-name"
@@ -473,7 +479,9 @@ export default function OrganiserDashboard() {
           </div>
 
           {createStatus === 'error' && (
-            <p style={{ color: 'red', fontSize: '12px', marginTop: '10px' }}>{createError}</p>
+            <p role="alert" style={{ color: '#b42318', fontSize: '12px', marginTop: '10px' }}>
+              {createError}
+            </p>
           )}
 
           <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
@@ -495,7 +503,7 @@ export default function OrganiserDashboard() {
                 fontSize: '12px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                color: '#766e89',
+                color: '#6d667f',
               }}
             >
               Cancel
@@ -524,20 +532,20 @@ export default function OrganiserDashboard() {
           </div>
 
           {status === 'loading' && (
-            <p style={{ color: '#817a91', fontSize: '13px', marginTop: '18px' }}>
+            <p style={{ color: '#6d667c', fontSize: '13px', marginTop: '18px' }}>
               Loading olympiads...
             </p>
           )}
 
           {status === 'error' && (
-            <p style={{ color: 'red', fontSize: '13px', marginTop: '18px' }}>
+            <p role="alert" style={{ color: '#b42318', fontSize: '13px', marginTop: '18px' }}>
               Couldn&apos;t load olympiads. Try refreshing.
             </p>
           )}
 
           {status === 'empty' && !showCreateForm && (
             <div style={{ marginTop: '18px' }}>
-              <p style={{ color: '#817a91', fontSize: '13px' }}>
+              <p style={{ color: '#6d667c', fontSize: '13px' }}>
                 No olympiads yet. Create one to get started.
               </p>
               <button
@@ -568,8 +576,12 @@ export default function OrganiserDashboard() {
                     onClick={() => toggleEdit(olympiad)}
                     role="button"
                     tabIndex={0}
+                    aria-expanded={editingId === olympiad.id}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') toggleEdit(olympiad);
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleEdit(olympiad);
+                      }
                     }}
                   >
                     <span className={`event-dot ${olympiadTone(idx)}`} />
@@ -596,7 +608,13 @@ export default function OrganiserDashboard() {
                         background: '#faf8ff',
                       }}
                     >
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '10px' }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+                          gap: '10px',
+                        }}
+                      >
                         <div>
                           <label
                             htmlFor={`edit-name-${olympiad.id}`}
@@ -736,7 +754,10 @@ export default function OrganiserDashboard() {
                       </div>
 
                       {editStatus === 'error' && (
-                        <p style={{ color: 'red', fontSize: '11px', marginTop: '8px' }}>
+                        <p
+                          role="alert"
+                          style={{ color: '#b42318', fontSize: '11px', marginTop: '8px' }}
+                        >
                           {editError}
                         </p>
                       )}
@@ -763,7 +784,7 @@ export default function OrganiserDashboard() {
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: '#766e89',
+                            color: '#6d667f',
                             fontSize: '11px',
                             cursor: 'pointer',
                           }}
@@ -780,7 +801,7 @@ export default function OrganiserDashboard() {
                               fontSize: '11px',
                               fontWeight: 700,
                               marginBottom: '6px',
-                              color: '#766e89',
+                              color: '#6d667f',
                             }}
                           >
                             Rounds
@@ -874,7 +895,7 @@ export default function OrganiserDashboard() {
                             marginBottom: '6px',
                           }}
                         >
-                          <strong style={{ fontSize: '11px', color: '#766e89' }}>
+                          <strong style={{ fontSize: '11px', color: '#6d667f' }}>
                             Co-organisers
                           </strong>
                           <button
@@ -902,7 +923,7 @@ export default function OrganiserDashboard() {
                             style={{
                               fontSize: '11px',
                               fontStyle: 'italic',
-                              color: '#92899f',
+                              color: '#6f667d',
                               margin: '2px 0',
                             }}
                           >
@@ -945,7 +966,7 @@ export default function OrganiserDashboard() {
                                     style={{
                                       background: 'none',
                                       border: 'none',
-                                      color: 'red',
+                                      color: '#b42318',
                                       cursor: 'pointer',
                                       fontSize: '10px',
                                     }}
@@ -969,6 +990,7 @@ export default function OrganiserDashboard() {
                             }}
                           >
                             <select
+                              aria-label="Organiser to add as co-organiser"
                               value={selectedOrganiserId}
                               onChange={(e) => setSelectedOrganiserId(e.target.value)}
                               style={{
@@ -1006,7 +1028,10 @@ export default function OrganiserDashboard() {
                         )}
 
                         {organiserError && (
-                          <p style={{ color: 'red', fontSize: '10px', margin: '4px 0 0' }}>
+                          <p
+                            role="alert"
+                            style={{ color: '#b42318', fontSize: '10px', margin: '4px 0 0' }}
+                          >
                             {organiserError}
                           </p>
                         )}
@@ -1048,19 +1073,19 @@ export default function OrganiserDashboard() {
           </div>
 
           {accessStatus === 'loading' && (
-            <p style={{ color: '#817a91', fontSize: '13px', marginTop: '18px' }}>
+            <p style={{ color: '#6d667c', fontSize: '13px', marginTop: '18px' }}>
               Loading access requests...
             </p>
           )}
 
           {accessStatus === 'error' && (
-            <p style={{ color: 'red', fontSize: '13px', marginTop: '18px' }}>
+            <p role="alert" style={{ color: '#b42318', fontSize: '13px', marginTop: '18px' }}>
               Couldn&apos;t load requests.
             </p>
           )}
 
           {accessStatus === 'ready' && accessRequests.length === 0 && (
-            <p style={{ color: '#92899f', fontSize: '12px', marginTop: '18px' }}>
+            <p style={{ color: '#6f667d', fontSize: '12px', marginTop: '18px' }}>
               No pending access requests.
             </p>
           )}
@@ -1105,7 +1130,9 @@ export default function OrganiserDashboard() {
           )}
 
           {decisionError && (
-            <p style={{ color: 'red', fontSize: '11px', marginTop: '8px' }}>{decisionError}</p>
+            <p role="alert" style={{ color: '#b42318', fontSize: '11px', marginTop: '8px' }}>
+              {decisionError}
+            </p>
           )}
         </article>
       </section>

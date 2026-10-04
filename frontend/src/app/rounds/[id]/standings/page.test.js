@@ -26,6 +26,7 @@ vi.mock('@/lib/api', () => ({
 
 import { fetchStandings, getSchoolStandings } from '@/lib/api';
 import StandingsPage from './page';
+import { expectNoAxeViolations } from '@/test/axe';
 
 describe('StandingsPage', () => {
   beforeEach(() => {
@@ -47,6 +48,22 @@ describe('StandingsPage', () => {
       render(<StandingsPage />);
 
       expect(await screen.findByText(/no scored submissions yet/i)).toBeInTheDocument();
+    });
+
+    it('has no axe accessibility violations', async () => {
+      fetchStandings.mockResolvedValue([
+        {
+          rank: 1,
+          entrantId: 'entrant-1',
+          entrantName: 'Thabo',
+          schoolName: 'Wits High School',
+          score: 20,
+          submittedAt: '2026-09-12T20:56:55.855Z',
+        },
+      ]);
+      const { container } = render(<StandingsPage />);
+      await screen.findByText('Thabo');
+      await expectNoAxeViolations(container);
     });
 
     it('renders the ranked table when standings are returned', async () => {

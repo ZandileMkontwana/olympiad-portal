@@ -18,10 +18,10 @@ const TYPE_COLORS = {
 };
 
 const STATUS_META = {
-  connecting: { label: 'Connecting\u2026', color: '#8b7fa8', bg: 'rgba(139,127,168,0.12)' },
-  live: { label: 'Live', color: '#2d8a5e', bg: 'rgba(63,174,122,0.14)' },
-  reconnecting: { label: 'Reconnecting\u2026', color: '#b07d1e', bg: 'rgba(224,168,62,0.15)' },
-  error: { label: 'Offline', color: '#e0615f', bg: 'rgba(224,97,95,0.12)' },
+  connecting: { label: 'Connecting\u2026', color: '#706391', bg: 'rgba(139,127,168,0.12)' },
+  live: { label: 'Live', color: '#277751', bg: 'rgba(63,174,122,0.14)' },
+  reconnecting: { label: 'Reconnecting\u2026', color: '#8b6318', bg: 'rgba(224,168,62,0.15)' },
+  error: { label: 'Offline', color: '#b42318', bg: 'rgba(224,97,95,0.12)' },
 };
 
 function timeAgo(iso) {
@@ -119,7 +119,7 @@ export default function ActivityFeed() {
           marginBottom: '12px',
         }}
       >
-        <span style={{ fontSize: '0.78em', color: '#817a91' }}>Real-time feed</span>
+        <span style={{ fontSize: '0.78em', color: '#6d667c' }}>Real-time feed</span>
         <span
           data-testid="activity-status"
           style={{
@@ -136,7 +136,7 @@ export default function ActivityFeed() {
       </div>
 
       {events.length === 0 ? (
-        <p style={{ margin: 0, fontSize: '0.8em', color: '#a89fc9' }}>
+        <p style={{ margin: 0, fontSize: '0.8em', color: '#6e5fa5' }}>
           No activity yet — new submissions, round changes, and results will appear here the
           moment they happen.
         </p>
@@ -180,7 +180,7 @@ export default function ActivityFeed() {
                 >
                   {event.message}
                 </p>
-                <small style={{ fontSize: '0.72em', color: '#a89fc9' }}>
+                <small style={{ fontSize: '0.72em', color: '#6e5fa5' }}>
                   {timeAgo(event.createdAt)}
                 </small>
               </div>

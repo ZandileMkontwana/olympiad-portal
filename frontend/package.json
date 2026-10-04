@@ -10,6 +10,8 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "lint": "eslint",
+    "a11y:contrast": "node scripts/check-contrast.mjs",
+    "a11y:lighthouse": "node scripts/lighthouse-audit.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -28,12 +30,16 @@
     "@testing-library/user-event": "^14.6.7",
     "@vitejs/plugin-react": "^6.1.0",
     "@vitest/coverage-v8": "^4.1.11",
+    "axe-core": "^4.13.0",
+    "chrome-launcher": "^1.2.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^29.1.1",
+    "lighthouse": "^13.5.0",
     "prettier": "^3.9.6",
     "tailwindcss": "^4",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "vitest-axe": "^0.1.0"
   }
 }

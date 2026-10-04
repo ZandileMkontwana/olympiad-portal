@@ -49,13 +49,15 @@ export default function ArchivePage() {
           background: 'var(--background)',
         }}
       >
-        <p style={{ color: '#8b7fa8' }}>Loading...</p>
+        <p style={{ color: '#706391' }}>Loading...</p>
       </div>
     );
   }
 
   return (
     <main
+      id="main-content"
+      tabIndex={-1}
       style={{
         maxWidth: '1000px',
         margin: '0 auto',

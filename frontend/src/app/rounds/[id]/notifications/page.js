@@ -98,20 +98,24 @@ export default function NotificationsConfigPage() {
 
   if (checking || status === 'loading') {
     return (
-      <main className="round-page">
+      <main id="main-content" tabIndex={-1} className="round-page">
         <p>Loading...</p>
       </main>
     );
   }
 
   return (
-    <main className="round-page">
+    <main id="main-content" tabIndex={-1} className="round-page">
       <h1>Notification Rules</h1>
       <p className="description">
         Round <strong>{roundId}</strong> — configure which automatic emails are sent, and to whom.
       </p>
 
-      {status === 'error' && <p className="message">{errorMessage}</p>}
+      {status === 'error' && (
+        <p className="message" role="alert">
+          {errorMessage}
+        </p>
+      )}
 
       {status === 'ready' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
@@ -137,6 +141,7 @@ export default function NotificationsConfigPage() {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <select
+                      aria-label={`Recipients for ${TRIGGER_LABELS[rule.triggerType] || rule.triggerType}`}
                       value={rule.recipientRole}
                       disabled={!rule.enabled || isSaving}
                       onChange={(e) => handleRecipientChange(rule.triggerType, e.target.value)}
@@ -197,16 +202,16 @@ export default function NotificationsConfigPage() {
                     <div style={{ marginBottom: '8px' }}>
                       <strong>Status: </strong>
                       {testResult.enabled ? (
-                        <span style={{ color: '#16a34a' }}>Enabled</span>
+                        <span style={{ color: '#117b38' }}>Enabled</span>
                       ) : (
-                        <span style={{ color: '#dc2626' }}>Disabled</span>
+                        <span style={{ color: '#cf2121' }}>Disabled</span>
                       )}
                     </div>
 
                     <div style={{ marginBottom: '8px' }}>
                       <strong>Recipients: </strong>
                       {testResult.recipients.length === 0 ? (
-                        <span style={{ color: '#6b7280' }}>None</span>
+                        <span style={{ color: '#646b78' }}>None</span>
                       ) : (
                         <span>{testResult.recipients.length} recipient(s)</span>
                       )}
@@ -218,12 +223,12 @@ export default function NotificationsConfigPage() {
                           <li key={i}>
                             {r.email}
                             {r.entrantName && (
-                              <span style={{ color: '#6b7280' }}> (re: {r.entrantName})</span>
+                              <span style={{ color: '#646b78' }}> (re: {r.entrantName})</span>
                             )}
                             {r.alreadyNotified && (
                               <span
                                 style={{
-                                  color: '#d97706',
+                                  color: '#a05804',
                                   fontSize: '0.8rem',
                                   marginLeft: '6px',
                                 }}
@@ -272,7 +277,7 @@ export default function NotificationsConfigPage() {
       )}
 
       {errorMessage && status === 'ready' && (
-        <p className="message" style={{ marginTop: '12px' }}>
+        <p className="message" role="alert" style={{ marginTop: '12px' }}>
           {errorMessage}
         </p>
       )}

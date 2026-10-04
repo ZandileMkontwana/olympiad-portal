@@ -310,7 +310,9 @@ function SubmissionTableContent() {
   if (error) {
     return (
       <div className="round-page">
-        <div className="message">{error}</div>
+        <div className="message" role="alert">
+          {error}
+        </div>
       </div>
     );
   }
@@ -407,7 +409,7 @@ function SubmissionTableContent() {
                 type="file"
                 accept=".xlsx,.csv"
                 onChange={handleFileUpload}
-                style={{ display: 'none' }}
+                className="sr-only"
               />
             </label>
 
@@ -421,7 +423,11 @@ function SubmissionTableContent() {
             </button>
           </div>
 
-          {uploadError && <p className="message">{uploadError}</p>}
+          {uploadError && (
+            <p className="message" role="alert">
+              {uploadError}
+            </p>
+          )}
 
           <TableScroll label="Entrant answers">
           <table className="card" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -453,6 +459,7 @@ function SubmissionTableContent() {
                     {questions.map((q) => (
                       <td key={q} style={{ padding: '8px 16px', textAlign: 'center' }}>
                         <input
+                          aria-label={`Answer for ${entrant.name}, question ${q}`}
                           type="text"
                           maxLength={1}
                           placeholder="—"
@@ -485,7 +492,11 @@ function SubmissionTableContent() {
                             ? 'Resubmit'
                             : 'Submit'}
                       </button>
-                      {status.state === 'error' && <p className="message">{status.message}</p>}
+                      {status.state === 'error' && (
+                        <p className="message" role="alert">
+                          {status.message}
+                        </p>
+                      )}
                     </td>
                   </tr>
                 );
