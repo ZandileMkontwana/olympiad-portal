@@ -168,7 +168,11 @@ async function timedRequest(scenario, method, apiPath, { token, body } = {}) {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(15000),
+      // 30s abort: generous enough that only true hangs (not tail latency
+      // on a slow network path to the database) count as client errors —
+      // a tighter cap truncates in-flight requests that the server is
+      // still processing and manufactures false scenario failures.
+      signal: AbortSignal.timeout(30000),
     });
     status = response.status;
     ok = response.ok;
@@ -314,6 +318,12 @@ async function cleanupFixtures() {
   await prisma.submission.deleteMany({ where: { roundId: ROUND_ID } });
   await prisma.sitting.deleteMany({ where: { roundId: ROUND_ID } });
   await prisma.roundEntrant.deleteMany({ where: { roundId: ROUND_ID } });
+  // The deployed scheduler writes NotificationLog/AuditLog rows for this
+  // round while it sits open on the shared database (auto-registered real
+  // demo entrants made real educators eligible for its notifications), so
+  // both must go before the round itself or the FK blocks the delete.
+  await prisma.notificationLog.deleteMany({ where: { roundId: ROUND_ID } });
+  await prisma.auditLog.deleteMany({ where: { roundId: ROUND_ID } });
   await prisma.paper.deleteMany({ where: { roundId: ROUND_ID } });
   await prisma.round.deleteMany({ where: { id: ROUND_ID } });
   await prisma.olympiad.deleteMany({ where: { id: OLYMPIAD_ID } });
