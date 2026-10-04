@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
+const { isDbBusyError, respondDbBusy } = require('../lib/dbErrors');
 
 /**
  * Extracts a Bearer token from the Authorization header, if any.
@@ -121,6 +122,13 @@ function requireRole(role) {
         req.user = user;
         next();
       } catch (err) {
+        // Pool exhaustion during the role lookup is a capacity problem,
+        // not an authorisation failure — surface it as the #202 busy
+        // contract (503 + Retry-After) so retry-capable clients recover
+        // instead of treating it as a hard 500.
+        if (isDbBusyError(err)) {
+          return respondDbBusy(req, res, err);
+        }
         console.error('Role check failed:', err);
         res.status(500).json({ error: 'Authorization check failed' });
       }
