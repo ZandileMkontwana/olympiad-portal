@@ -64,7 +64,17 @@ function ScoreRing({ score, size = 52 }) {
   const color = scoreColor(score);
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <svg
+        width={size}
+        height={size}
+        style={{ transform: 'rotate(-90deg)' }}
+        role="img"
+        aria-label={
+          score === null || score === undefined
+            ? 'No score yet'
+            : `Average score ${Math.round(pct)} percent`
+        }
+      >
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -167,10 +177,10 @@ function StatCard({ icon, label, value, sub, accent, trend }) {
         >
           {value}
         </p>
-        <p style={{ margin: '6px 0 0', fontSize: '0.82em', color: '#8b7fa8', fontWeight: 500 }}>
+        <p style={{ margin: '6px 0 0', fontSize: '0.82em', color: '#706391', fontWeight: 500 }}>
           {label}
         </p>
-        {sub && <p style={{ margin: 0, fontSize: '0.72em', color: '#a89fc9' }}>{sub}</p>}
+        {sub && <p style={{ margin: 0, fontSize: '0.72em', color: '#6e5fa5' }}>{sub}</p>}
       </div>
     </div>
   );
@@ -211,9 +221,9 @@ function GradeChart({ entrants }) {
         height: '100%',
       }}
     >
-      <h3 style={{ margin: '0 0 22px', fontSize: '1.05em', fontWeight: 700, color: '#2d2640' }}>
+      <h2 style={{ margin: '0 0 22px', fontSize: '1.05em', fontWeight: 700, color: '#2d2640' }}>
         Average Score by Grade
-      </h3>
+      </h2>
       <div
         style={{
           display: 'flex',
@@ -262,7 +272,7 @@ function GradeChart({ entrants }) {
             >
               {g.grade}
             </span>
-            <span style={{ fontSize: '0.68em', color: '#a89fc9' }}>{g.count} students</span>
+            <span style={{ fontSize: '0.68em', color: '#6e5fa5' }}>{g.count} students</span>
           </div>
         ))}
       </div>
@@ -279,22 +289,22 @@ function DistributionPanel({ entrants }) {
     return [
       {
         label: 'Excellent',
-        color: '#3fae7a',
+        color: '#2b7854',
         count: scored.filter((e) => e.averageScore >= 75).length,
       },
       {
         label: 'Good',
-        color: '#e0a83e',
+        color: '#8b6216',
         count: scored.filter((e) => e.averageScore >= 50 && e.averageScore < 75).length,
       },
       {
         label: 'Developing',
-        color: '#d97855',
+        color: '#b04c27',
         count: scored.filter((e) => e.averageScore >= 25 && e.averageScore < 50).length,
       },
       {
         label: 'Needs support',
-        color: '#e0615f',
+        color: '#b42318',
         count: scored.filter((e) => e.averageScore < 25).length,
       },
     ].map((b) => ({ ...b, pct: (b.count / total) * 100 }));
@@ -312,9 +322,9 @@ function DistributionPanel({ entrants }) {
         height: '100%',
       }}
     >
-      <h3 style={{ margin: '0 0 22px', fontSize: '1.05em', fontWeight: 700, color: '#2d2640' }}>
+      <h2 style={{ margin: '0 0 22px', fontSize: '1.05em', fontWeight: 700, color: '#2d2640' }}>
         Performance Distribution
-      </h3>
+      </h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {bands.map((b) => (
           <div key={b.label}>
@@ -350,7 +360,7 @@ function DistributionPanel({ entrants }) {
           </div>
         ))}
         {unscored > 0 && (
-          <p style={{ margin: '4px 0 0', fontSize: '0.75em', color: '#a89fc9' }}>
+          <p style={{ margin: '4px 0 0', fontSize: '0.75em', color: '#6e5fa5' }}>
             +{unscored} entrant{unscored !== 1 ? 's' : ''} with no submissions yet
           </p>
         )}
@@ -384,7 +394,7 @@ function TopPodium({ entrants }) {
           justifyContent: 'center',
         }}
       >
-        <p style={{ color: '#a89fc9', fontSize: '0.85em' }}>No scores yet</p>
+        <p style={{ color: '#6e5fa5', fontSize: '0.85em' }}>No scores yet</p>
       </div>
     );
   const medals = ['🥇', '🥈', '🥉'];
@@ -400,9 +410,9 @@ function TopPodium({ entrants }) {
         height: '100%',
       }}
     >
-      <h3 style={{ margin: '0 0 24px', fontSize: '1.05em', fontWeight: 700, color: '#2d2640' }}>
+      <h2 style={{ margin: '0 0 24px', fontSize: '1.05em', fontWeight: 700, color: '#2d2640' }}>
         Top Performers
-      </h3>
+      </h2>
       <div
         style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: '14px' }}
       >
@@ -788,7 +798,7 @@ export default function SchoolDashboardPage() {
           <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>
             {noSchool ? 'No School Linked' : 'Something went wrong'}
           </h2>
-          <p style={{ color: '#8b7fa8' }}>
+          <p style={{ color: '#706391' }}>
             {noSchool
               ? 'Complete your educator profile to link a school.'
               : "Couldn't load the dashboard. Try refreshing."}
@@ -954,7 +964,7 @@ export default function SchoolDashboardPage() {
           <p style={{ fontSize: '3em', margin: '0 0 12px' }}>🎓</p>
           <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>No Students Yet</h2>
           <p
-            style={{ color: '#8b7fa8', maxWidth: '420px', margin: '0 auto 24px', lineHeight: 1.6 }}
+            style={{ color: '#706391', maxWidth: '420px', margin: '0 auto 24px', lineHeight: 1.6 }}
           >
             Add your first student below and their performance will appear here.
           </p>
@@ -970,6 +980,7 @@ export default function SchoolDashboardPage() {
             }}
           >
             <input
+              aria-label="Student name"
               type="text"
               placeholder="Student name"
               value={newName}
@@ -984,6 +995,7 @@ export default function SchoolDashboardPage() {
               }}
             />
             <input
+              aria-label="Student email"
               type="email"
               placeholder="Student email"
               value={newEmail}
@@ -998,6 +1010,7 @@ export default function SchoolDashboardPage() {
               }}
             />
             <select
+              aria-label="Student grade"
               value={newGrade}
               onChange={(e) => setNewGrade(e.target.value)}
               style={{
@@ -1019,6 +1032,7 @@ export default function SchoolDashboardPage() {
               ))}
             </select>
             <select
+              aria-label="Olympiad to register for"
               value={selectedOlympiadId}
               onChange={(e) => setSelectedOlympiadId(e.target.value)}
               style={{
@@ -1061,7 +1075,7 @@ export default function SchoolDashboardPage() {
             style={{
               margin: '12px auto 0',
               fontSize: '0.75em',
-              color: '#a89fc9',
+              color: '#6e5fa5',
               maxWidth: '480px',
             }}
           >
@@ -1109,9 +1123,9 @@ export default function SchoolDashboardPage() {
               gap: '12px',
             }}
           >
-            <h3 style={{ margin: 0, fontSize: '1.1em', fontWeight: 700, color: '#2d2640' }}>
+            <h2 style={{ margin: 0, fontSize: '1.1em', fontWeight: 700, color: '#2d2640' }}>
               Students by Olympiad ({filteredEntrants.length})
-            </h3>
+            </h2>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setShowAddForm(!showAddForm)}
@@ -1130,6 +1144,7 @@ export default function SchoolDashboardPage() {
                 {showAddForm ? 'Cancel' : '+ Add Student'}
               </button>
               <input
+                aria-label="Search students by name"
                 type="text"
                 placeholder="🔍  Search by name..."
                 value={search}
@@ -1144,6 +1159,7 @@ export default function SchoolDashboardPage() {
                 }}
               />
               <select
+                aria-label="Filter by grade"
                 value={gradeFilter}
                 onChange={(e) => setGradeFilter(e.target.value)}
                 style={{
@@ -1162,6 +1178,7 @@ export default function SchoolDashboardPage() {
                 ))}
               </select>
               <select
+                aria-label="Filter by olympiad"
                 value={olympiadFilter}
                 onChange={(e) => setOlympiadFilter(e.target.value)}
                 style={{
@@ -1180,6 +1197,7 @@ export default function SchoolDashboardPage() {
                 ))}
               </select>
               <select
+                aria-label="Sort students"
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value)}
                 style={{
@@ -1223,7 +1241,7 @@ export default function SchoolDashboardPage() {
                 boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
               }}
             >
-              <h4
+              <h3
                 style={{
                   margin: '0 0 12px',
                   fontSize: '0.95em',
@@ -1232,12 +1250,13 @@ export default function SchoolDashboardPage() {
                 }}
               >
                 Add a New Student
-              </h4>
+              </h3>
               <form
                 onSubmit={handleAddStudent}
                 style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}
               >
                 <input
+                  aria-label="Student name"
                   type="text"
                   placeholder="Student name"
                   value={newName}
@@ -1252,6 +1271,7 @@ export default function SchoolDashboardPage() {
                   }}
                 />
                 <input
+                  aria-label="Student email"
                   type="email"
                   placeholder="Student email"
                   value={newEmail}
@@ -1266,6 +1286,7 @@ export default function SchoolDashboardPage() {
                   }}
                 />
                 <select
+                  aria-label="Student grade"
                   value={newGrade}
                   onChange={(e) => setNewGrade(e.target.value)}
                   style={{
@@ -1287,6 +1308,7 @@ export default function SchoolDashboardPage() {
                   ))}
                 </select>
                 <select
+                  aria-label="Olympiad to register for"
                   value={selectedOlympiadId}
                   onChange={(e) => setSelectedOlympiadId(e.target.value)}
                   style={{
@@ -1325,7 +1347,7 @@ export default function SchoolDashboardPage() {
                   {adding ? 'Adding...' : 'Add Student'}
                 </button>
               </form>
-              <p style={{ margin: '10px 0 0', fontSize: '0.75em', color: '#a89fc9' }}>
+              <p style={{ margin: '10px 0 0', fontSize: '0.75em', color: '#6e5fa5' }}>
                 The student is emailed a link to set their password — they then sign in with their
                 email and password.
               </p>
@@ -1356,7 +1378,7 @@ export default function SchoolDashboardPage() {
               }}
             >
               <p style={{ fontSize: '2em', margin: '0 0 8px' }}>🔍</p>
-              <p style={{ margin: 0, color: '#8b7fa8', fontWeight: 600 }}>
+              <p style={{ margin: 0, color: '#706391', fontWeight: 600 }}>
                 No students match your filters
               </p>
               <button
@@ -1392,7 +1414,7 @@ export default function SchoolDashboardPage() {
           )}
           {entrantsByOlympiad.map((group) => (
             <div key={group.olympiadName} style={{ marginTop: '20px' }}>
-              <h4
+              <h3
                 style={{
                   margin: '0 0 10px',
                   fontSize: '0.95em',
@@ -1413,7 +1435,7 @@ export default function SchoolDashboardPage() {
                   }}
                 />
                 {group.olympiadName} ({group.entrants.length})
-              </h4>
+              </h3>
               <div
                 style={{
                   display: 'grid',
@@ -1480,7 +1502,7 @@ export default function SchoolDashboardPage() {
                         style={{
                           margin: '2px 0 0',
                           fontSize: '0.72em',
-                          color: '#a89fc9',
+                          color: '#6e5fa5',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -1510,7 +1532,7 @@ export default function SchoolDashboardPage() {
                             fontSize: '0.68em',
                             fontWeight: 600,
                             background: 'rgba(139,92,246,0.05)',
-                            color: '#8b7fa8',
+                            color: '#706391',
                           }}
                         >
                           {entrant.submissionCount} sub{entrant.submissionCount !== 1 ? 's' : ''}
@@ -1537,7 +1559,7 @@ export default function SchoolDashboardPage() {
                               fontSize: '0.68em',
                               fontWeight: 600,
                               background: 'rgba(63,174,122,0.12)',
-                              color: '#2d8a5e',
+                              color: '#277751',
                             }}
                           >
                             Active
@@ -1551,7 +1573,7 @@ export default function SchoolDashboardPage() {
                               fontSize: '0.68em',
                               fontWeight: 600,
                               background: 'rgba(224,168,62,0.15)',
-                              color: '#b07d1e',
+                              color: '#8b6318',
                             }}
                           >
                             Invite pending
@@ -1565,7 +1587,7 @@ export default function SchoolDashboardPage() {
                               fontSize: '0.68em',
                               fontWeight: 600,
                               background: 'rgba(139,92,246,0.05)',
-                              color: '#8b7fa8',
+                              color: '#706391',
                             }}
                           >
                             No account
@@ -1607,7 +1629,7 @@ export default function SchoolDashboardPage() {
                             borderRadius: '8px',
                             border: '1px solid rgba(224,97,95,0.35)',
                             background: 'rgba(224,97,95,0.06)',
-                            color: '#e0615f',
+                            color: '#b42318',
                             fontWeight: 600,
                             fontSize: '0.72em',
                             cursor: removingId === entrant.id ? 'wait' : 'pointer',

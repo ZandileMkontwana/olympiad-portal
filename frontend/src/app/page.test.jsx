@@ -24,8 +24,14 @@ vi.mock('@/lib/api', () => ({
 }));
 
 import LandingPage from './page';
+import { expectNoAxeViolations } from '@/test/axe';
 
 describe('Landing page', () => {
+  it('has no axe accessibility violations', async () => {
+    const { container } = render(<LandingPage />);
+    await expectNoAxeViolations(container);
+  });
+
   it('renders the hero headline and supporting copy', () => {
     render(<LandingPage />);
 

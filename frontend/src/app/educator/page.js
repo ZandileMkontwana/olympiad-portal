@@ -31,9 +31,9 @@ import {
 
 const STATE_STYLES = {
   scheduled: { bg: 'rgba(139,92,246,0.08)', color: '#6d3fd1', label: 'Scheduled' },
-  open: { bg: 'rgba(63,174,122,0.1)', color: '#3fae7a', label: 'Open now' },
-  closed: { bg: 'rgba(139,92,246,0.06)', color: '#8b7fa8', label: 'Closed' },
-  released: { bg: 'rgba(224,168,62,0.12)', color: '#c99a2e', label: 'Released' },
+  open: { bg: 'rgba(63,174,122,0.1)', color: '#2b7854', label: 'Open now' },
+  closed: { bg: 'rgba(139,92,246,0.06)', color: '#706391', label: 'Closed' },
+  released: { bg: 'rgba(224,168,62,0.12)', color: '#85661e', label: 'Released' },
 };
 
 function timeUntil(iso) {
@@ -77,8 +77,8 @@ function todayFormatted() {
 }
 
 const ACCESS_BADGES = {
-  pending: { label: 'Requested', bg: 'rgba(245,158,11,0.12)', color: '#b45309' },
-  declined: { label: 'Declined', bg: 'rgba(224,97,95,0.1)', color: '#e0615f' },
+  pending: { label: 'Requested', bg: 'rgba(245,158,11,0.12)', color: '#aa4f09' },
+  declined: { label: 'Declined', bg: 'rgba(224,97,95,0.1)', color: '#b42318' },
 };
 
 const META_CHIP_STYLE = {
@@ -160,7 +160,7 @@ function RoundRow({ round }) {
         {style.label}
       </span>
       {actionLabel && countdown && (
-        <span style={{ fontSize: '0.7em', color: '#8b7fa8', flexShrink: 0 }}>
+        <span style={{ fontSize: '0.7em', color: '#706391', flexShrink: 0 }}>
           {actionLabel} {countdown}
         </span>
       )}
@@ -210,13 +210,13 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             fontWeight: 700,
-            color: '#8b7fa8',
+            color: '#706391',
           }}
         >
           Learners per school
         </p>
         {counts.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '0.82em', color: '#8b7fa8' }}>
+          <p style={{ margin: 0, fontSize: '0.82em', color: '#706391' }}>
             No learners registered yet.
           </p>
         ) : (
@@ -243,7 +243,7 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
                 }}
               >
                 <span style={{ fontWeight: 600 }}>{entry.schoolName}</span>
-                <span style={{ color: '#8b7fa8' }}>
+                <span style={{ color: '#706391' }}>
                   {entry.entrantCount} learner{entry.entrantCount !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -269,7 +269,7 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
       ) : (
         <div>
           {declined && (
-            <p style={{ margin: '0 0 6px', fontSize: '0.78em', color: '#e0615f' }}>
+            <p style={{ margin: '0 0 6px', fontSize: '0.78em', color: '#b42318' }}>
               Your previous request was declined — you can ask again.
             </p>
           )}
@@ -326,8 +326,12 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
         onClick={onToggle}
         role="button"
         tabIndex={0}
+        aria-expanded={expanded}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') onToggle();
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
         }}
       >
         <div className={`round-status ${olympiadTone(index)}`}>
@@ -340,7 +344,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
               <span
                 style={{
                   background: 'rgba(245,158,11,0.1)',
-                  color: '#b45309',
+                  color: '#aa4f09',
                   padding: '1px 8px',
                   borderRadius: '10px',
                   fontSize: '0.85em',
@@ -355,7 +359,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
               <span
                 style={{
                   background: 'rgba(63,174,122,0.1)',
-                  color: '#2d8a5e',
+                  color: '#277751',
                   padding: '1px 8px',
                   borderRadius: '10px',
                   fontSize: '0.85em',
@@ -403,7 +407,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
         <ChevronRight
           size={15}
           style={{
-            color: '#aaa1b7',
+            color: '#716583',
             transform: expanded ? 'rotate(90deg)' : 'none',
             transition: 'transform 0.15s ease',
             flexShrink: 0,
@@ -426,7 +430,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
             }}
           >
             {rounds.length === 0 ? (
-              <p style={{ margin: 0, color: '#8b7fa8', fontSize: '0.85em', padding: '6px 4px' }}>
+              <p style={{ margin: 0, color: '#706391', fontSize: '0.85em', padding: '6px 4px' }}>
                 No rounds in this olympiad yet.
               </p>
             ) : (
@@ -520,7 +524,7 @@ export default function EducatorDashboard() {
   }, [allRounds]);
 
   if (checking) {
-    return <div style={{ padding: '48px 0', fontSize: '14px', color: '#817a91' }}>Loading...</div>;
+    return <div style={{ padding: '48px 0', fontSize: '14px', color: '#6d667c' }}>Loading...</div>;
   }
 
   const openCount = roundsByState.open.length;
@@ -634,19 +638,19 @@ export default function EducatorDashboard() {
           </div>
 
           {status === 'loading' && (
-            <p style={{ color: '#817a91', fontSize: '13px', marginTop: '18px' }}>
+            <p style={{ color: '#6d667c', fontSize: '13px', marginTop: '18px' }}>
               Loading olympiads...
             </p>
           )}
 
           {status === 'empty' && (
-            <p style={{ color: '#92899f', fontSize: '12px', marginTop: '18px' }}>
+            <p style={{ color: '#6f667d', fontSize: '12px', marginTop: '18px' }}>
               No olympiads available yet.
             </p>
           )}
 
           {status === 'error' && (
-            <p style={{ color: 'red', fontSize: '13px', marginTop: '18px' }}>
+            <p role="alert" style={{ color: '#b42318', fontSize: '13px', marginTop: '18px' }}>
               Couldn&apos;t load olympiads. Try refreshing.
             </p>
           )}
@@ -654,7 +658,7 @@ export default function EducatorDashboard() {
           {status === 'ready' && (
             <>
               {accessError && (
-                <p style={{ color: '#e0615f', margin: '12px 0 0', fontSize: '12px' }}>
+                <p style={{ color: '#b42318', margin: '12px 0 0', fontSize: '12px' }}>
                   {accessError}
                 </p>
               )}

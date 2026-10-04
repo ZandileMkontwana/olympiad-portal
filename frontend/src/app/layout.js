@@ -2,6 +2,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import './responsive.css';
+import './accessibility.css';
 import SiteHeader from '@/components/SiteHeader';
 
 // Display face — headings only, used with restraint.
@@ -47,6 +48,9 @@ export default function RootLayout({ children }) {
         className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col">
+          <a href="#main-content" className="skip-link">
+            Skip to main content
+          </a>
           <SiteHeader />
           {children}
         </body>

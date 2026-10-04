@@ -306,7 +306,9 @@ function RoundViewContent() {
   if (error) {
     return (
       <div className="round-page">
-        <div className="message">{error}</div>
+        <div className="message" role="alert">
+          {error}
+        </div>
       </div>
     );
   }
@@ -329,7 +331,7 @@ function RoundViewContent() {
               timeStyle: 'short',
             })}
             {round.olympiad?.timezone && (
-              <small style={{ marginLeft: '6px', color: '#8b7fa8' }}>
+              <small style={{ marginLeft: '6px', color: '#706391' }}>
                 ({round.olympiad.timezone})
               </small>
             )}
@@ -345,7 +347,7 @@ function RoundViewContent() {
               timeStyle: 'short',
             })}
             {round.olympiad?.timezone && (
-              <small style={{ marginLeft: '6px', color: '#8b7fa8' }}>
+              <small style={{ marginLeft: '6px', color: '#706391' }}>
                 ({round.olympiad.timezone})
               </small>
             )}
@@ -367,7 +369,11 @@ function RoundViewContent() {
             <button className="button" onClick={handleDownload}>
               Download Paper
             </button>
-            {downloadError && <p className="message">{downloadError}</p>}
+            {downloadError && (
+              <p className="message" role="alert">
+                {downloadError}
+              </p>
+            )}
 
             <p className="description">Submissions are open. Closes in {timeRemaining}.</p>
 
@@ -383,7 +389,11 @@ function RoundViewContent() {
 
             {certificateLoading && <p className="description">Loading results...</p>}
 
-            {certificateError && <p className="message">{certificateError}</p>}
+            {certificateError && (
+              <p className="message" role="alert">
+                {certificateError}
+              </p>
+            )}
 
             {!certificateLoading && certificateEntrants.length === 0 && !certificateError && (
               <p className="description">
@@ -415,7 +425,7 @@ function RoundViewContent() {
                   >
                     <div>
                       <strong>{entrant.name}</strong>
-                      <span style={{ marginLeft: '12px', color: '#6b7280', fontSize: '0.9em' }}>
+                      <span style={{ marginLeft: '12px', color: '#646b78', fontSize: '0.9em' }}>
                         Score: {entrant.score}
                       </span>
                     </div>
@@ -435,7 +445,7 @@ function RoundViewContent() {
               style={{
                 marginTop: '16px',
                 background: 'transparent',
-                color: '#e0615f',
+                color: '#b42318',
                 border: '1px solid rgba(224,97,95,0.3)',
               }}
               disabled={releaseStatus === 'unreleasing'}
@@ -444,7 +454,7 @@ function RoundViewContent() {
               {releaseStatus === 'unreleasing' ? 'Hiding\u2026' : 'Hide Results from Students'}
             </button>
             {releaseStatus === 'error' && (
-              <p className="message" style={{ marginTop: '8px' }}>
+              <p className="message" role="alert" style={{ marginTop: '8px' }}>
                 {releaseMessage}
               </p>
             )}
@@ -461,7 +471,7 @@ function RoundViewContent() {
               {releaseStatus === 'releasing' ? 'Releasing\u2026' : 'Release Results to Students'}
             </button>
             {releaseStatus === 'error' && (
-              <p className="message" style={{ marginTop: '8px' }}>
+              <p className="message" role="alert" style={{ marginTop: '8px' }}>
                 {releaseMessage}
               </p>
             )}
@@ -474,7 +484,9 @@ function RoundViewContent() {
 
         {submissionsStatus === 'loading' && <p className="description">Loading submissions...</p>}
         {submissionsStatus === 'error' && (
-          <p className="message">Couldn&apos;t load submissions for this round.</p>
+          <p className="message" role="alert">
+            Couldn&apos;t load submissions for this round.
+          </p>
         )}
         {submissionsStatus === 'ready' && submissions.length === 0 && (
           <p className="description">No submissions yet for this round.</p>
@@ -542,7 +554,7 @@ function RoundViewContent() {
               className="block rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
             />
             {remarkStatus === 'error' && (
-              <p id="remark-error" role="alert" style={{ color: 'red', fontSize: '0.9em' }}>
+              <p id="remark-error" role="alert" style={{ color: '#b42318', fontSize: '0.9em' }}>
                 {remarkError}
               </p>
             )}

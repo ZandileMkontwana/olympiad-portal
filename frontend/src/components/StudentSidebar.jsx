@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Modal from '@/components/Modal';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
@@ -28,8 +29,18 @@ function initials(name) {
 }
 
 const WORKSPACE_LINKS = [
-  { href: '/student', icon: LayoutDashboard, label: 'Dashboard', match: (p) => p === '/student' || p.startsWith('/student/result') },
-  { href: '/student#tests', icon: ClipboardCheck, label: 'My tests', match: (p) => p === '/student' },
+  {
+    href: '/student',
+    icon: LayoutDashboard,
+    label: 'Dashboard',
+    match: (p) => p === '/student' || p.startsWith('/student/result'),
+  },
+  {
+    href: '/student#tests',
+    icon: ClipboardCheck,
+    label: 'My tests',
+    match: (p) => p === '/student',
+  },
   { href: '/student#results', icon: Trophy, label: 'Results', match: () => false },
 ];
 
@@ -50,11 +61,16 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="brand">
-            <div className="brand-mark"><GraduationCap /></div>
-            <div><strong>Olympiad</strong><span>PORTAL</span></div>
+            <div className="brand-mark">
+              <GraduationCap />
+            </div>
+            <div>
+              <strong>Olympiad</strong>
+              <span>PORTAL</span>
+            </div>
           </div>
         </div>
-        <div style={{ padding: '20px', textAlign: 'center', color: '#8b7fa8', fontSize: '13px' }}>
+        <div style={{ padding: '20px', textAlign: 'center', color: '#706391', fontSize: '13px' }}>
           Loading account...
         </div>
       </aside>
@@ -66,11 +82,16 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="brand">
-            <div className="brand-mark"><GraduationCap /></div>
-            <div><strong>Olympiad</strong><span>PORTAL</span></div>
+            <div className="brand-mark">
+              <GraduationCap />
+            </div>
+            <div>
+              <strong>Olympiad</strong>
+              <span>PORTAL</span>
+            </div>
           </div>
         </div>
-        <div style={{ padding: '20px', textAlign: 'center', color: '#8b7fa8', fontSize: '13px' }}>
+        <div style={{ padding: '20px', textAlign: 'center', color: '#706391', fontSize: '13px' }}>
           Not signed in
         </div>
       </aside>
@@ -85,8 +106,13 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
       <aside id="app-sidebar" className={`sidebar${open ? ' sidebar-open' : ''}`}>
         <div className="sidebar-top">
           <div className="brand">
-            <div className="brand-mark"><GraduationCap /></div>
-            <div><strong>Olympiad</strong><span>PORTAL</span></div>
+            <div className="brand-mark">
+              <GraduationCap />
+            </div>
+            <div>
+              <strong>Olympiad</strong>
+              <span>PORTAL</span>
+            </div>
           </div>
           {onClose && (
             <button
@@ -115,14 +141,46 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
               </Link>
             );
           })}
-          <button className="nav-item" onClick={() => { onClose?.(); setShowResources(true); }}><BookOpen /><span>Resources</span></button>
+          <button
+            className="nav-item"
+            onClick={() => {
+              onClose?.();
+              setShowResources(true);
+            }}
+          >
+            <BookOpen />
+            <span>Resources</span>
+          </button>
           <p className="nav-label nav-label-spaced">Manage</p>
-          <button className="nav-item" onClick={() => { onClose?.(); setShowCalendar(true); }}><CalendarDays /><span>Calendar</span></button>
-          <button className="nav-item" onClick={() => { onClose?.(); setShowSettings(true); }}><Settings2 /><span>Settings</span></button>
+          <button
+            className="nav-item"
+            onClick={() => {
+              onClose?.();
+              setShowCalendar(true);
+            }}
+          >
+            <CalendarDays />
+            <span>Calendar</span>
+          </button>
+          <button
+            className="nav-item"
+            onClick={() => {
+              onClose?.();
+              setShowSettings(true);
+            }}
+          >
+            <Settings2 />
+            <span>Settings</span>
+          </button>
         </nav>
         <div className="sidebar-help">
-          <div className="help-icon"><CircleHelp /></div>
-          <div><strong>Need a hand?</strong><span>Visit the help centre</span></div>
+          <div className="help-icon">
+            <CircleHelp />
+          </div>
+          <div>
+            <strong>Need a hand?</strong>
+            <span>Visit the help centre</span>
+          </div>
           <ArrowRight />
         </div>
         <div className="sidebar-profile">
@@ -130,10 +188,20 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
           <div>
             <strong>{name}</strong>
             <span>
-              {checking ? 'Loading...' : (
+              {checking ? (
+                'Loading...'
+              ) : (
                 <button
                   onClick={handleLogout}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#e0615f', fontSize: '9px', fontWeight: 600 }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    color: '#b42318',
+                    fontSize: '9px',
+                    fontWeight: 600,
+                  }}
                 >
                   Log out
                 </button>
@@ -145,57 +213,39 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
       </aside>
 
       {showCalendar && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowCalendar(false)}>
-          <div style={{ background: 'white', borderRadius: '12px', padding: '24px', maxWidth: '500px', width: '90%', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '18px', color: '#172554' }}>Calendar</h2>
-              <button onClick={() => setShowCalendar(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><X size={20} /></button>
-            </div>
-            <p style={{ color: '#667085', fontSize: '14px', marginBottom: '16px' }}>Your upcoming deadlines and events will appear here.</p>
-            <div style={{ padding: '32px', textAlign: 'center', background: '#f7f8fc', borderRadius: '8px' }}>
-              <CalendarDays size={48} style={{ color: '#6546d8', marginBottom: '12px' }} />
-              <p style={{ color: '#667085', fontSize: '14px', margin: 0 }}>No upcoming events</p>
-            </div>
+        <Modal title="Calendar" onClose={() => setShowCalendar(false)}>
+          <p className="modal-intro">Your upcoming deadlines and events will appear here.</p>
+          <div className="modal-empty">
+            <CalendarDays size={48} aria-hidden="true" />
+            <p>No upcoming events</p>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showSettings && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowSettings(false)}>
-          <div style={{ background: 'white', borderRadius: '12px', padding: '24px', maxWidth: '500px', width: '90%', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '18px', color: '#172554' }}>Settings</h2>
-              <button onClick={() => setShowSettings(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><X size={20} /></button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ padding: '16px', background: '#f7f8fc', borderRadius: '8px' }}>
-                <h3 style={{ margin: '0 0 8px', fontSize: '14px', color: '#172554' }}>Profile</h3>
-                <p style={{ margin: 0, color: '#667085', fontSize: '13px' }}>Name: {name}</p>
-                <p style={{ margin: '4px 0 0', color: '#667085', fontSize: '13px' }}>Email: {user?.email || 'N/A'}</p>
-              </div>
-              <div style={{ padding: '16px', background: '#f7f8fc', borderRadius: '8px' }}>
-                <h3 style={{ margin: '0 0 8px', fontSize: '14px', color: '#172554' }}>Preferences</h3>
-                <p style={{ margin: 0, color: '#667085', fontSize: '13px' }}>Notification settings and preferences will be available here.</p>
-              </div>
-            </div>
+        <Modal title="Settings" onClose={() => setShowSettings(false)}>
+          <div className="modal-stack">
+            <section className="modal-card" aria-labelledby="settings-profile">
+              <h3 id="settings-profile">Profile</h3>
+              <p>Name: {name}</p>
+              <p>Email: {user?.email || 'N/A'}</p>
+            </section>
+            <section className="modal-card" aria-labelledby="settings-prefs">
+              <h3 id="settings-prefs">Preferences</h3>
+              <p>Notification settings and preferences will be available here.</p>
+            </section>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showResources && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowResources(false)}>
-          <div style={{ background: 'white', borderRadius: '12px', padding: '24px', maxWidth: '500px', width: '90%', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '18px', color: '#172554' }}>Resources</h2>
-              <button onClick={() => setShowResources(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}><X size={20} /></button>
-            </div>
-            <p style={{ color: '#667085', fontSize: '14px', marginBottom: '16px' }}>Study materials and resources will be available here.</p>
-            <div style={{ padding: '32px', textAlign: 'center', background: '#f7f8fc', borderRadius: '8px' }}>
-              <BookOpen size={48} style={{ color: '#6546d8', marginBottom: '12px' }} />
-              <p style={{ color: '#667085', fontSize: '14px', margin: 0 }}>No resources available yet</p>
-            </div>
+        <Modal title="Resources" onClose={() => setShowResources(false)}>
+          <p className="modal-intro">Study materials and resources will be available here.</p>
+          <div className="modal-empty">
+            <BookOpen size={48} aria-hidden="true" />
+            <p>No resources available yet</p>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );

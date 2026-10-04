@@ -93,7 +93,7 @@ export default function PaperUploadPage() {
 
   if (status === 'success' && uploadedPaper) {
     return (
-      <main className="mx-auto max-w-xl px-8 py-12">
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl px-8 py-12">
         <div
           role="status"
           className="certificate-card rounded-lg border border-lavender/20 bg-surface p-6 shadow-sm"
@@ -140,7 +140,7 @@ export default function PaperUploadPage() {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-8 py-12">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl px-8 py-12">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Upload paper</h1>
       <div className="mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-3 text-sm text-ink-soft">
@@ -204,6 +204,7 @@ export default function PaperUploadPage() {
             {answerRows.map((row, index) => (
               <div key={index} className="flex items-center gap-2">
                 <input
+                  aria-label={`Question number, row ${index + 1}`}
                   type="text"
                   placeholder="Q#"
                   value={row.question}
@@ -211,6 +212,7 @@ export default function PaperUploadPage() {
                   className="w-16 rounded-md border border-lavender/30 bg-surface px-2 py-1.5 text-sm text-ink text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
                 />
                 <input
+                  aria-label={`Correct answer, row ${index + 1}`}
                   type="text"
                   placeholder="Answer (e.g. B)"
                   value={row.answer}

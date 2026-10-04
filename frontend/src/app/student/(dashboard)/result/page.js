@@ -154,13 +154,13 @@ function ResultContent() {
       {/* Score hero */}
       <section className="mt-6 overflow-hidden rounded-2xl border border-lavender/25 bg-surface shadow-sm">
         <div className="bg-gradient-to-br from-lavender-deep to-lavender px-8 py-10 text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-white/80">
+          <h1 className="text-sm font-semibold uppercase tracking-widest text-white">
             {result.round.name}
-          </p>
+          </h1>
           <p className="font-display text-7xl font-semibold leading-tight text-white">
             {roundedScore}%
           </p>
-          <p className="mt-1 text-lg font-medium text-white/90">{scoreMessage(result.score)}</p>
+          <p className="mt-1 text-lg font-medium text-white">{scoreMessage(result.score)}</p>
         </div>
 
         <div className="grid gap-4 px-8 py-6 text-center sm:grid-cols-3">

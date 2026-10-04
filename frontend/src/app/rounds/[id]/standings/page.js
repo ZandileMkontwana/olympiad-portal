@@ -77,7 +77,7 @@ export default function StandingsPage() {
   }, [activeTab, roundId, getToken]);
 
   return (
-    <main className="mx-auto max-w-3xl px-8 py-12">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl px-8 py-12">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Standings</h1>
       <div className="mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-3 text-sm text-ink-soft">

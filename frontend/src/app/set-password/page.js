@@ -131,7 +131,7 @@ function SetPasswordContent() {
 
 export default function SetPasswordPage() {
   return (
-    <main className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
+    <main id="main-content" tabIndex={-1} className="relative mx-auto max-w-md px-8 py-24 overflow-hidden">
       <Watermark />
       <Suspense fallback={<p className="text-center text-base text-ink-soft">Loading…</p>}>
         <SetPasswordContent />

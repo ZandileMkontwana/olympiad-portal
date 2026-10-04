@@ -24,6 +24,7 @@ vi.mock('@/lib/api', () => ({
 
 import { listMarkingQueue, assignMarkingTask, submitMarking } from '@/lib/api';
 import MarkingPage from './page';
+import { expectNoAxeViolations } from '@/test/axe';
 
 const organiserUser = { id: 'organiser-1', email: 'marker@school.com', role: 'organiser' };
 
@@ -54,6 +55,13 @@ describe('/organiser/marking page', () => {
     render(<MarkingPage />);
 
     expect(await screen.findByText(/no submissions waiting/i)).toBeInTheDocument();
+  });
+
+  it('has no axe accessibility violations', async () => {
+    listMarkingQueue.mockResolvedValue([sampleTask]);
+    const { container } = render(<MarkingPage />);
+    await screen.findByText('Jane Entrant');
+    await expectNoAxeViolations(container);
   });
 
   it('lists queued tasks with entrant and round info', async () => {

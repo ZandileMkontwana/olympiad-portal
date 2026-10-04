@@ -20,10 +20,9 @@ import {
   X,
 } from 'lucide-react';
 
-const ClerkSignOutButton = dynamic(
-  () => import('@clerk/nextjs').then((mod) => mod.SignOutButton),
-  { ssr: false }
-);
+const ClerkSignOutButton = dynamic(() => import('@clerk/nextjs').then((mod) => mod.SignOutButton), {
+  ssr: false,
+});
 
 const NAV_ITEMS = [
   { href: '/organiser', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
@@ -79,9 +78,10 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
   }, [open]);
 
   return (
-    <main className="organiser-shell">
+    <div className="organiser-shell">
       <aside
         id="organiser-sidebar"
+        aria-label="Sidebar"
         className={`organiser-sidebar${open ? ' is-open' : ''}`}
       >
         <button
@@ -195,9 +195,11 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
           </div>
         </header>
 
-        <div className="organiser-main">{children}</div>
+        <main id="main-content" tabIndex={-1} className="organiser-main">
+          {children}
+        </main>
       </section>
-    </main>
+    </div>
   );
 }
 
