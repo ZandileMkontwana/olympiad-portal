@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import OrganiserShell from '@/components/OrganiserShell';
 import { listOlympiads, fetchRoundReplay, ApiError } from '@/lib/api';
 
 const ACTION_STYLES = {
@@ -106,11 +105,7 @@ export default function ReplayPage() {
   }, [selectedRoundId, getToken]);
 
   if (checking) {
-    return (
-      <OrganiserShell activeNav="replay" breadcrumb="Replay" user={user}>
-        <p>Loading...</p>
-      </OrganiserShell>
-    );
+    return <p>Loading...</p>;
   }
 
   // Build a flat list of all rounds across olympiads for the dropdown.
@@ -119,7 +114,7 @@ export default function ReplayPage() {
   );
 
   return (
-    <OrganiserShell activeNav="replay" breadcrumb="Replay" user={user}>
+    <>
       <div className="organiser-page-heading">
         <h1>Round Replay</h1>
         <p>View the timeline of automatic actions the scheduler performed on a round.</p>
@@ -295,6 +290,6 @@ export default function ReplayPage() {
           )}
         </div>
       )}
-    </OrganiserShell>
+    </>
   );
 }

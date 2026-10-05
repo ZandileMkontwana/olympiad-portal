@@ -172,7 +172,7 @@ function TrendChart({ results }) {
           marginBottom: '12px',
         }}
       >
-        <span style={{ fontSize: '11px', color: 'var(--c-t-706391)' }}>
+        <span style={{ fontSize: '13px', color: 'var(--c-t-706391)' }}>
           Last {sorted.length} results
         </span>
       </div>
@@ -290,7 +290,7 @@ function AchievementBadges({ results, sittings }) {
           }}
         >
           <span style={{ fontSize: '1.5em' }}>{b.icon}</span>
-          <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: 'var(--c-t-241f38)' }}>
+          <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--c-t-241f38)' }}>
             {b.label}
           </p>
         </div>
@@ -397,7 +397,7 @@ function TestsSection({ tests, rounds }) {
                 )}
                 {item.status === 'locked' && item.lockedReason && (
                   <span
-                    style={{ fontSize: '10px', color: 'var(--c-t-6a6a6a)', fontStyle: 'italic' }}
+                    style={{ fontSize: '12px', color: 'var(--c-t-6a6a6a)', fontStyle: 'italic' }}
                   >
                     {item.lockedReason}
                   </span>
@@ -766,7 +766,7 @@ export default function StudentDashboard() {
                       color: 'var(--c-t-2b7854)',
                       padding: '3px 10px',
                       borderRadius: '20px',
-                      fontSize: '10px',
+                      fontSize: '12px',
                       fontWeight: 700,
                     }}
                   >
@@ -833,7 +833,7 @@ export default function StudentDashboard() {
                 <span
                   style={{
                     color: 'var(--c-t-626b7e)',
-                    fontSize: '10px',
+                    fontSize: '12px',
                     fontWeight: 700,
                     letterSpacing: '.12em',
                     textTransform: 'uppercase',

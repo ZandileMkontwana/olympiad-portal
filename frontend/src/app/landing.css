@@ -165,7 +165,7 @@
 }
 .landing .section-kicker {
   color: var(--violet);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -281,7 +281,7 @@
 }
 .landing .panel-tag {
   color: rgba(255, 255, 255, 0.78);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -358,7 +358,7 @@
 }
 .landing .panel-foot span {
   color: rgba(255, 255, 255, 0.68);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -507,7 +507,7 @@
   border-top: 1px solid var(--line);
   color: var(--ink-soft);
   display: flex;
-  font-size: 11px;
+  font-size: 12px;
   justify-content: space-between;
   margin: 0 auto;
   max-width: 1156px;

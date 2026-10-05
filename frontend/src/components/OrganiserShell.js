@@ -8,7 +8,6 @@ import '@/app/auth.css';
 import {
   Archive as ArchiveIcon,
   Bell,
-  CalendarDays,
   ChevronRight,
   ClipboardCheck,
   History,
@@ -16,7 +15,6 @@ import {
   MessageSquareQuote,
   Menu,
   MoreHorizontal,
-  Search,
   Settings2,
   X,
 } from 'lucide-react';
@@ -37,11 +35,6 @@ const NAV_ITEMS = [
   { href: '/organiser/remarks', label: 'Remarks', icon: MessageSquareQuote, key: 'remarks' },
   { href: '/organiser/replay', label: 'Replay', icon: History, key: 'replay' },
   { href: '/organiser/archive', label: 'Archive', icon: ArchiveIcon, key: 'archive' },
-];
-
-const ALL_LINKS = [
-  ...NAV_ITEMS.map((n) => ({ href: n.href, label: n.label })),
-  { href: '/rounds/new', label: 'Create round' },
 ];
 
 /**
@@ -66,7 +59,6 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
   const { startTour } = useTour();
   const { getToken } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
   const initials = initialsFrom(user?.name || user?.email || '?');
   const pathname = usePathname();
   const router = useRouter();
@@ -75,17 +67,9 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
   const wasOpen = useRef(false);
   const close = useCallback(() => setOpen(false), []);
 
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchRef = useRef(null);
-  const searchInputRef = useRef(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
   const [notifications, setNotifications] = useState([]);
-
-  const filteredLinks = ALL_LINKS.filter((l) =>
-    l.label.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   // Connect to the activity SSE stream for the notifications dropdown.
   useEffect(() => {
@@ -108,15 +92,14 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
     return () => { if (es) es.close(); };
   }, [notifOpen, getToken]);
 
-  // Close dropdowns on click outside or Escape.
+  // Close dropdown on click outside or Escape.
   useEffect(() => {
-    if (!searchOpen && !notifOpen) return undefined;
+    if (!notifOpen) return undefined;
     const onClick = (e) => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
     };
     const onKey = (e) => {
-      if (e.key === 'Escape') { setSearchOpen(false); setNotifOpen(false); }
+      if (e.key === 'Escape') setNotifOpen(false);
     };
     document.addEventListener('mousedown', onClick);
     document.addEventListener('keydown', onKey);
@@ -124,18 +107,13 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
       document.removeEventListener('mousedown', onClick);
       document.removeEventListener('keydown', onKey);
     };
-  }, [searchOpen, notifOpen]);
-
-  useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus();
-  }, [searchOpen]);
+  }, [notifOpen]);
 
   // Close the mobile drawer whenever the route changes. (state adjusted during render, not in an effect)
   const [lastPathname, setLastPathname] = useState(pathname);
   if (lastPathname !== pathname) {
     setLastPathname(pathname);
     setOpen(false);
-    setSearchOpen(false);
     setNotifOpen(false);
   }
 
@@ -224,17 +202,6 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
             type="button"
             className="organiser-logout organiser-settings"
             onClick={() => {
-              close();
-              setShowCalendar(true);
-            }}
-          >
-            <CalendarDays size={14} aria-hidden="true" /> Calendar
-          </button>
-          <button
-            type="button"
-            className="organiser-logout organiser-settings"
-            onClick={() => {
-              close();
               setShowSettings(true);
             }}
           >
@@ -288,51 +255,13 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
           </div>
           <div className="organiser-actions">
             <ThemeToggle />
-            <div className="organiser-dropdown-wrap" ref={searchRef}>
-              <button
-                className="icon-button"
-                aria-label="Search"
-                aria-expanded={searchOpen}
-                type="button"
-                onClick={() => { setSearchOpen((v) => !v); setNotifOpen(false); }}
-              >
-                <Search size={18} />
-              </button>
-              {searchOpen && (
-                <div className="organiser-dropdown organiser-search-dropdown" role="search">
-                  <input
-                    ref={searchInputRef}
-                    type="search"
-                    placeholder="Search pages..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="organiser-search-input"
-                  />
-                  <nav aria-label="Search results">
-                    {filteredLinks.length === 0 && (
-                      <p className="organiser-search-empty">No matching pages</p>
-                    )}
-                    {filteredLinks.map((l) => (
-                      <Link
-                        key={l.href}
-                        href={l.href}
-                        className="organiser-search-result"
-                        onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
-                      >
-                        {l.label}
-                      </Link>
-                    ))}
-                  </nav>
-                </div>
-              )}
-            </div>
             <div className="organiser-dropdown-wrap" ref={notifRef}>
               <button
                 className="icon-button"
                 aria-label="Notifications"
                 aria-expanded={notifOpen}
                 type="button"
-                onClick={() => { setNotifOpen((v) => !v); setSearchOpen(false); }}
+                onClick={() => setNotifOpen((v) => !v)}
               >
                 <Bell size={18} />
                 {notifications.length > 0 && <i />}
@@ -383,16 +312,6 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
                 Replay tour
               </button>
             </section>
-          </div>
-        </Modal>
-      )}
-
-      {showCalendar && (
-        <Modal title="Calendar" onClose={() => setShowCalendar(false)}>
-          <p className="modal-intro">Your upcoming deadlines and events will appear here.</p>
-          <div className="modal-empty">
-            <CalendarDays size={48} aria-hidden="true" />
-            <p>No upcoming events</p>
           </div>
         </Modal>
       )}
