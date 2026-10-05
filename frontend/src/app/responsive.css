@@ -117,6 +117,10 @@ textarea {
     width: min(280px, 86vw);
     z-index: 40;
   }
+  /* Override the desktop flex-basis so the sidebar doesn't reserve space */
+  .organiser-sidebar {
+    flex-basis: 0;
+  }
   /* Sidebar is position:fixed + flex:none on mobile, so content fills full width */
   .sidebar-open,
   .organiser-sidebar.is-open {
