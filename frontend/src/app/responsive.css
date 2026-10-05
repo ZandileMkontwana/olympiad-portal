@@ -116,6 +116,13 @@ textarea {
     width: min(280px, 86vw);
     z-index: 40;
   }
+  /* When sidebar is a drawer, content takes full width */
+  .organiser-shell {
+    display: block;
+  }
+  .organiser-content {
+    width: 100%;
+  }
   .sidebar-open,
   .organiser-sidebar.is-open {
     box-shadow: 12px 0 30px rgba(23, 37, 84, 0.18);
