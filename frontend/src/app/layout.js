@@ -4,6 +4,7 @@ import './globals.css';
 import './theme.css';
 import './responsive.css';
 import './accessibility.css';
+import './tour.css';
 import SiteHeader from '@/components/SiteHeader';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { themeInitScript } from '@/lib/theme';

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Modal from '@/components/Modal';
+import { useTour } from '@/components/OnboardingTour';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useClerk, useUser } from '@clerk/nextjs';
@@ -40,6 +41,7 @@ const WORKSPACE_LINKS = [
     href: '/educator/school',
     icon: Users,
     label: 'School Dashboard',
+    tour: 'educator-nav-school',
     match: (p) => p.startsWith('/educator/school'),
   },
   {
@@ -54,6 +56,7 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
   const pathname = usePathname() || '';
   const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
+  const { startTour } = useTour();
   const [showCalendar, setShowCalendar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -71,7 +74,14 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
             </div>
           </div>
         </div>
-        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--c-t-706391)', fontSize: '13px' }}>
+        <div
+          style={{
+            padding: '20px',
+            textAlign: 'center',
+            color: 'var(--c-t-706391)',
+            fontSize: '13px',
+          }}
+        >
           Loading account...
         </div>
       </aside>
@@ -134,7 +144,7 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           {!collapsed && <p className="nav-label">Workspace</p>}
-          {WORKSPACE_LINKS.map(({ href, icon: Icon, label, match }) => {
+          {WORKSPACE_LINKS.map(({ href, icon: Icon, label, match, tour }) => {
             const active = match(pathname);
             return (
               <Link
@@ -143,6 +153,7 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
                 className={`nav-item${active ? ' nav-selected' : ''}`}
                 aria-current={active ? 'page' : undefined}
                 title={collapsed ? label : undefined}
+                data-tour={tour}
                 onClick={onClose}
               >
                 <Icon /> {!collapsed && <span>{label}</span>}
@@ -233,6 +244,20 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
             <section className="modal-card" aria-labelledby="settings-prefs">
               <h3 id="settings-prefs">Preferences</h3>
               <p>Notification settings and preferences will be available here.</p>
+            </section>
+            <section className="modal-card" aria-labelledby="settings-tour">
+              <h3 id="settings-tour">Onboarding</h3>
+              <p>Take the short guided tour of the portal again.</p>
+              <button
+                type="button"
+                className="modal-action"
+                onClick={() => {
+                  setShowSettings(false);
+                  startTour();
+                }}
+              >
+                Replay tour
+              </button>
             </section>
           </div>
         </Modal>

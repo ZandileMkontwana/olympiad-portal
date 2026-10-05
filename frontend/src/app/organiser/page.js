@@ -331,7 +331,11 @@ export default function OrganiserDashboard() {
           </h1>
           <p className="organiser-subtitle">Here is what is happening across your Olympiads.</p>
         </div>
-        <button className="primary-action" onClick={() => setShowCreateForm(!showCreateForm)}>
+        <button
+          className="primary-action"
+          data-tour="organiser-create"
+          onClick={() => setShowCreateForm(!showCreateForm)}
+        >
           <Plus size={17} /> {showCreateForm ? 'Close form' : 'Create Olympiad'}
         </button>
       </div>
@@ -515,7 +519,7 @@ export default function OrganiserDashboard() {
       {/* Dashboard grid: Olympiads + Access requests */}
       <section className="organiser-dashboard-grid" aria-label="Organiser dashboard overview">
         {/* Olympiads panel */}
-        <article className="dashboard-panel olympiad-panel">
+        <article className="dashboard-panel olympiad-panel" data-tour="organiser-olympiads">
           <div className="dashboard-panel-heading">
             <div>
               <span className="command-eyebrow">
@@ -1138,7 +1142,11 @@ export default function OrganiserDashboard() {
       </section>
 
       {/* Activity panel */}
-      <section className="organiser-activity-panel" aria-label="Recent activity">
+      <section
+        className="organiser-activity-panel"
+        aria-label="Recent activity"
+        data-tour="organiser-activity"
+      >
         <div className="dashboard-panel-heading">
           <div>
             <span className="command-eyebrow">

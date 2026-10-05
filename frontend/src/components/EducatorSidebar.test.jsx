@@ -188,3 +188,28 @@ describe('EducatorSidebar accessibility', () => {
     await expectNoAxeViolations(container);
   });
 });
+
+describe('EducatorSidebar onboarding (#317)', () => {
+  beforeEach(() => {
+    clerkState.user = {
+      fullName: 'Ms Teacher',
+      primaryEmailAddress: { emailAddress: 'teacher@school.com' },
+    };
+    pathState.pathname = '/educator';
+  });
+
+  it('offers a Replay tour button in Settings', () => {
+    render(<EducatorSidebar />);
+    fireEvent.click(screen.getByText('Settings'));
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replay tour' })).toBeInTheDocument();
+  });
+
+  it('marks the School Dashboard link as a tour anchor', () => {
+    render(<EducatorSidebar />);
+    expect(screen.getByText('School Dashboard').closest('a')).toHaveAttribute(
+      'data-tour',
+      'educator-nav-school'
+    );
+  });
+});

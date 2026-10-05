@@ -145,6 +145,21 @@ label:has(> input[type='file'].sr-only:focus-visible) {
   font-size: 13px;
   margin: 0;
 }
+.modal-card .modal-action {
+  background: #6c4fd8;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 12px;
+  min-height: 40px;
+  padding: 0 16px;
+}
+.modal-card .modal-action:hover {
+  background: #4a34a8;
+}
 .modal-card p + p {
   margin-top: 4px;
 }

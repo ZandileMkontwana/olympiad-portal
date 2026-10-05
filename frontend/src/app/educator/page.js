@@ -615,7 +615,7 @@ export default function EducatorDashboard() {
       {/* Content grid */}
       <section className="content-grid">
         {/* Olympiad activity panel */}
-        <div className="panel">
+        <div className="panel" data-tour="educator-rounds">
           <div className="panel-heading">
             <div>
               <h2>Olympiad activity</h2>
@@ -683,7 +683,7 @@ export default function EducatorDashboard() {
         </div>
 
         {/* Quick actions panel */}
-        <div className="panel calendar-panel">
+        <div className="panel calendar-panel" data-tour="educator-quick-actions">
           <div className="panel-heading">
             <div>
               <h2>Quick actions</h2>
