@@ -29,7 +29,7 @@ export default function ClosedRoundPage() {
 
   if (status === 'loading') {
     return (
-      <main className="mx-auto max-w-xl px-8 py-24 text-center">
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl px-8 py-24 text-center">
         <p className="text-sm text-ink-soft">Loading round…</p>
       </main>
     );
@@ -37,7 +37,7 @@ export default function ClosedRoundPage() {
 
   if (status === 'error') {
     return (
-      <main className="mx-auto max-w-xl px-8 py-24 text-center">
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl px-8 py-24 text-center">
         <div
           role="alert"
           className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
@@ -55,7 +55,7 @@ export default function ClosedRoundPage() {
   }
 
   return (
-    <main className="mx-auto max-w-xl px-8 py-24">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl px-8 py-24">
       <div role="status" className="rounded-lg border border-gold/30 bg-gold/5 p-6 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-gold" aria-hidden="true" />

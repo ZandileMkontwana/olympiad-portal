@@ -2,12 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const PUBLIC_PATHS = ['/', '/login', '/register'];
 
 export default function SiteHeader() {
   const pathname = usePathname();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
+
+  // The landing and auth pages render their own headers — don't stack a second one.
+  // With Clerk's path-based routing, also hide on sub-routes like /login/factor-one.
+  if (pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/register'))
+    return null;
 
   const headerClass = 'bg-lavender-deep';
 
@@ -27,25 +33,19 @@ export default function SiteHeader() {
           Olympiad Portal
         </Link>
 
-        {isPublicPage ? (
-          <div className="flex items-center gap-6 text-sm">
-            <Link href="/register" className="nav-link-light text-white/70">
-              Register
-            </Link>
-            <Link href="/login" className="nav-link-light font-medium text-white">
-              Log in
-            </Link>
-          </div>
-        ) : (
-          <div className="flex gap-4 text-sm">
-            <Link href="/organiser" className="nav-link-light text-white/70">
-              Olympiads
-            </Link>
-            <Link href="/archive" className="nav-link-light text-white/70">
-              Archive
-            </Link>
-          </div>
-        )}
+        <div className="flex items-center gap-4 text-sm">
+          {isPublicPage ? (
+            <>
+              <Link href="/register" className="nav-link-light text-white/90">
+                Register
+              </Link>
+              <Link href="/login" className="nav-link-light font-medium text-white">
+                Log in
+              </Link>
+            </>
+          ) : null}
+          <ThemeToggle className="theme-toggle-on-dark" />
+        </div>
       </nav>
     </header>
   );

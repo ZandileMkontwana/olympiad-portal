@@ -1,3 +1,6 @@
+---
+sidebar_label: sprint1_minutes
+---
 # Sprint 1 Meeting Minutes
 
 ## Meeting 1

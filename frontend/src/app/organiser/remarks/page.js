@@ -3,15 +3,52 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { listRemarkQueue, reviewRemarkRequest, ApiError } from '@/lib/api';
+import OrganiserShell from '@/components/OrganiserShell';
+import {
+  listAllOrganisers,
+  listRemarkQueue,
+  assignRemarkRequest,
+  reviewRemarkRequest,
+  ApiError,
+} from '@/lib/api';
+
+function AppealSummary({ remarkRequest }) {
+  return (
+    <div>
+      <p style={{ margin: 0, fontWeight: 600 }}>
+        {remarkRequest.submission?.entrant?.name || 'Unknown entrant'}
+      </p>
+      <p className="description" style={{ margin: '2px 0 0 0', fontSize: '0.85em' }}>
+        {remarkRequest.submission?.round?.name || 'Unknown round'} · current score:{' '}
+        {remarkRequest.submission?.result?.score ?? 'unmarked'}
+      </p>
+      <p className="description" style={{ margin: '4px 0 0 0', fontSize: '0.85em' }}>
+        &ldquo;{remarkRequest.reason}&rdquo; — requested by{' '}
+        {remarkRequest.requestedBy?.name || 'unknown'}
+      </p>
+    </div>
+  );
+}
 
 export default function RemarksPage() {
   const { user, checking } = useRequireRole('organiser');
   const { getToken } = useAuth();
 
-  const [requests, setRequests] = useState([]);
-  const [status, setStatus] = useState('loading'); // loading | empty | ready | error
+  // Pending appeals waiting to be routed to a reviewer.
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [pendingStatus, setPendingStatus] = useState('loading'); // loading | empty | ready | error
+  // Appeals routed to the signed-in reviewer for a decision.
+  const [myRequests, setMyRequests] = useState([]);
+  const [myStatus, setMyStatus] = useState('loading'); // loading | empty | ready | error
   const [selected, setSelected] = useState(null);
+
+  // Reviewer routing state: dropdown options, the per-appeal choice, the
+  // in-flight assignment and its error.
+  const [organisers, setOrganisers] = useState([]);
+  const [reviewerChoices, setReviewerChoices] = useState({});
+  const [assigningId, setAssigningId] = useState(null);
+  const [assignError, setAssignError] = useState('');
+  const [assignErrorId, setAssignErrorId] = useState(null);
 
   // Review form state
   const [decision, setDecision] = useState('approved'); // approved | rejected
@@ -20,23 +57,44 @@ export default function RemarksPage() {
   const [formStatus, setFormStatus] = useState('idle'); // idle | submitting | error
   const [formError, setFormError] = useState('');
 
-  const loadQueue = useCallback(async () => {
-    setStatus('loading');
+  const loadQueues = useCallback(async () => {
+    setPendingStatus('loading');
+    setMyStatus('loading');
     try {
       const token = await getToken();
-      const data = await listRemarkQueue(token, { assignedTo: 'me' });
-      setRequests(data);
-      setStatus(data.length === 0 ? 'empty' : 'ready');
+      const pending = await listRemarkQueue(token, { status: 'pending' });
+      const mine = await listRemarkQueue(token, { assignedTo: 'me' });
+      setPendingRequests(pending);
+      setPendingStatus(pending.length === 0 ? 'empty' : 'ready');
+      setMyRequests(mine);
+      setMyStatus(mine.length === 0 ? 'empty' : 'ready');
     } catch {
-      setStatus('error');
+      setPendingStatus('error');
+      setMyStatus('error');
+    }
+  }, [getToken]);
+
+  // Options for routing an appeal to a different organiser reviewer.
+  const loadOrganisers = useCallback(async () => {
+    try {
+      const token = await getToken();
+      setOrganisers(await listAllOrganisers(token));
+    } catch {
+      // Non-critical — routing to another reviewer stays unavailable.
     }
   }, [getToken]);
 
   useEffect(() => {
     if (checking) return;
-    // Deferring via .then() so loadQueue's setState calls don't run
+    // Deferring via .then() so loadQueues' setState calls don't run
     // synchronously within the effect body itself (react-hooks/set-state-in-effect).
-    Promise.resolve().then(loadQueue);
+    Promise.resolve().then(loadQueues);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checking]);
+
+  useEffect(() => {
+    if (checking) return;
+    Promise.resolve().then(loadOrganisers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checking]);
 
@@ -79,55 +137,140 @@ export default function RemarksPage() {
       );
       setSelected(null);
       setFormStatus('idle');
-      await loadQueue();
+      await loadQueues();
     } catch (err) {
       setFormStatus('error');
       setFormError(err instanceof ApiError ? err.message : 'Could not submit this review.');
     }
   }
 
+  async function handleAssign(remarkRequest, assignedToId) {
+    setAssigningId(remarkRequest.id);
+    setAssignError('');
+    setAssignErrorId(null);
+    try {
+      const token = await getToken();
+      await assignRemarkRequest(remarkRequest.id, assignedToId ? { assignedToId } : {}, token);
+      setReviewerChoices((prev) => {
+        const next = { ...prev };
+        delete next[remarkRequest.id];
+        return next;
+      });
+      await loadQueues();
+    } catch (err) {
+      setAssignError(err instanceof ApiError ? err.message : 'Could not assign this appeal.');
+      setAssignErrorId(remarkRequest.id);
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
   if (checking) {
     return (
-      <main className="round-page">
-        <p>Loading...</p>
+      <main id="main-content" tabIndex={-1} className="organiser-shell">
+        <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
       </main>
     );
   }
 
   return (
-    <main className="round-page">
-      <h1>Assigned Appeals</h1>
-      <p className="description">
-        Review the appeals assigned to you, <strong>{user.email}</strong>.
-      </p>
+    <OrganiserShell activeNav="remarks" breadcrumb="Appeals" user={user}>
+      <div className="organiser-page-heading">
+        <h1>Appeals</h1>
+        <p>Route pending appeals to a reviewer, then decide the ones assigned to you.</p>
+      </div>
 
-      {status === 'loading' && <p className="description">Loading assigned appeals...</p>}
-      {status === 'error' && (
+      <h2 style={{ marginBottom: '8px' }}>Pending appeals</h2>
+      {pendingStatus === 'loading' && <p className="description">Loading pending appeals...</p>}
+      {pendingStatus === 'error' && (
+        <p className="message" role="alert">
+          Couldn&apos;t load pending appeals. Try refreshing.
+        </p>
+      )}
+      {pendingStatus === 'empty' && (
+        <p className="description">No pending appeals are waiting to be routed.</p>
+      )}
+
+      {pendingStatus === 'ready' && (
+        <ul style={{ marginTop: '0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {pendingRequests.map((r) => (
+            <li key={r.id} className="card" style={{ padding: '14px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <AppealSummary remarkRequest={r} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={() => handleAssign(r)}
+                    disabled={assigningId === r.id}
+                    className="button"
+                  >
+                    {assigningId === r.id ? 'Assigning...' : 'Assign to me'}
+                  </button>
+                  <select
+                    aria-label={`Reviewer for ${r.submission?.entrant?.name || 'Unknown entrant'}`}
+                    value={reviewerChoices[r.id] || ''}
+                    onChange={(e) =>
+                      setReviewerChoices((prev) => ({ ...prev, [r.id]: e.target.value }))
+                    }
+                    className="block rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Route to another reviewer…</option>
+                    {organisers
+                      .filter((o) => o.id !== user?.id)
+                      .map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name || o.email}
+                        </option>
+                      ))}
+                  </select>
+                  {reviewerChoices[r.id] && (
+                    <button
+                      onClick={() => handleAssign(r, reviewerChoices[r.id])}
+                      disabled={assigningId === r.id}
+                      className="button"
+                    >
+                      {assigningId === r.id ? 'Assigning...' : 'Assign'}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {assignErrorId === r.id && (
+                <p
+                  role="alert"
+                  style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', margin: '8px 0 0 0' }}
+                >
+                  {assignError}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h2 style={{ marginTop: '24px', marginBottom: '8px' }}>Assigned to me</h2>
+      {myStatus === 'loading' && <p className="description">Loading assigned appeals...</p>}
+      {myStatus === 'error' && (
         <p className="message" role="alert">
           Couldn&apos;t load assigned appeals. Try refreshing.
         </p>
       )}
-      {status === 'empty' && <p className="description">No appeals are assigned to you.</p>}
+      {myStatus === 'empty' && <p className="description">No appeals are assigned to you.</p>}
 
-      {status === 'ready' && !selected && (
-        <ul style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {requests.map((r) => (
+      {myStatus === 'ready' && !selected && (
+        <ul style={{ marginTop: '0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {myRequests.map((r) => (
             <li key={r.id} className="card" style={{ padding: '14px' }}>
               <div
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
-                <div>
-                  <p style={{ margin: 0, fontWeight: 600 }}>
-                    {r.submission?.entrant?.name || 'Unknown entrant'}
-                  </p>
-                  <p className="description" style={{ margin: '2px 0 0 0', fontSize: '0.85em' }}>
-                    {r.submission?.round?.name || 'Unknown round'} · current score:{' '}
-                    {r.submission?.result?.score ?? 'unmarked'}
-                  </p>
-                  <p className="description" style={{ margin: '4px 0 0 0', fontSize: '0.85em' }}>
-                    &ldquo;{r.reason}&rdquo; — requested by {r.requestedBy?.name || 'unknown'}
-                  </p>
-                </div>
+                <AppealSummary remarkRequest={r} />
                 <button onClick={() => openReviewForm(r)} className="button">
                   Review
                 </button>
@@ -173,7 +316,7 @@ export default function RemarksPage() {
                         justifyContent: 'space-between',
                         gap: '10px',
                         fontSize: '0.9em',
-                        borderBottom: '1px solid #eee',
+                        borderBottom: '1px solid var(--c-bd-eeeeee)',
                         paddingBottom: '4px',
                       }}
                     >
@@ -191,7 +334,10 @@ export default function RemarksPage() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '16px', margin: '12px 0' }}>
+          <fieldset
+            style={{ display: 'flex', gap: '16px', margin: '12px 0', border: 0, padding: 0 }}
+          >
+            <legend className="sr-only">Decision</legend>
             <label>
               <input
                 type="radio"
@@ -212,7 +358,7 @@ export default function RemarksPage() {
               />{' '}
               Reject
             </label>
-          </div>
+          </fieldset>
 
           {decision === 'approved' && (
             <div style={{ marginBottom: '12px' }}>
@@ -241,7 +387,10 @@ export default function RemarksPage() {
           </div>
 
           {formStatus === 'error' && (
-            <p role="alert" style={{ color: 'red', fontSize: '0.9em', marginBottom: '8px' }}>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', marginBottom: '8px' }}
+            >
               {formError}
             </p>
           )}
@@ -261,6 +410,6 @@ export default function RemarksPage() {
           </div>
         </form>
       )}
-    </main>
+    </OrganiserShell>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { fetchStandings, getSchoolStandings, ApiError } from '@/lib/api';
+import TableScroll from '@/components/TableScroll';
 
 export default function StandingsPage() {
   const { id: roundId } = useParams();
@@ -76,7 +77,7 @@ export default function StandingsPage() {
   }, [activeTab, roundId, getToken]);
 
   return (
-    <main className="mx-auto max-w-3xl px-8 py-12">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl px-8 py-12">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Standings</h1>
       <div className="mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-3 text-sm text-ink-soft">
@@ -136,7 +137,10 @@ export default function StandingsPage() {
           )}
 
           {status === 'ready' && (
-            <div className="mt-8 overflow-hidden rounded-lg border border-lavender/20">
+            <TableScroll
+              label="Entrant standings"
+              className="mt-8 rounded-lg border border-lavender/20"
+            >
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-lavender/20 bg-surface">
@@ -170,7 +174,7 @@ export default function StandingsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </>
       )}
@@ -197,7 +201,10 @@ export default function StandingsPage() {
           )}
 
           {schoolStatus === 'ready' && (
-            <div className="mt-8 overflow-hidden rounded-lg border border-lavender/20">
+            <TableScroll
+              label="School standings"
+              className="mt-8 rounded-lg border border-lavender/20"
+            >
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-lavender/20 bg-surface">
@@ -233,7 +240,7 @@ export default function StandingsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </>
       )}

@@ -126,6 +126,18 @@ export function fetchAccessRequests(token) {
 }
 
 /**
+ * Builds the SSE stream URL for the live activity feed. EventSource cannot
+ * set Authorization headers, so the Clerk token travels as a query parameter
+ * and the backend promotes it to a Bearer header before auth runs.
+ * Wired to GET /api/activity/stream (backend/src/routes/activity.js).
+ *
+ * @param {string} token - Clerk JWT
+ */
+export function buildActivityStreamUrl(token) {
+  return `${API_BASE_URL}/api/activity/stream?token=${encodeURIComponent(token)}`;
+}
+
+/**
  * Approves a pending school access request.
  * Wired to POST /api/olympiads/access-requests/:id/approve (backend/src/routes/rounds.js).
  *
@@ -155,9 +167,17 @@ export function declineAccessRequest(requestId, token) {
   });
 }
 
-export function createRound({ olympiadId, name, openTime, closeTime, qualifyingThreshold }) {
+/**
+ * Creates a new round for an olympiad. Organisers only.
+ *
+ * @param {{olympiadId: string, name: string, openTime: string, closeTime: string, qualifyingThreshold?: number}} payload
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function createRound({ olympiadId, name, openTime, closeTime, qualifyingThreshold }, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
   return requestJson('/api/rounds', {
     method: 'POST',
+    headers,
     body: JSON.stringify({
       olympiadId,
       name,
@@ -749,6 +769,23 @@ export function listRemarkQueue(token, { status, assignedTo } = {}) {
 
   return requestJson(`/api/remark/queue${query}`, {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Routes a pending appeal to an organiser reviewer. Omitting assignedToId
+ * assigns the signed-in organiser as the reviewer.
+ * Wired to PATCH /api/remark/:id/assign (backend/src/routes/remark.js).
+ *
+ * @param {string} remarkRequestId
+ * @param {{assignedToId?: string}} [data] - omit to self-assign on the backend
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function assignRemarkRequest(remarkRequestId, { assignedToId } = {}, token) {
+  return requestJson(`/api/remark/${remarkRequestId}/assign`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(assignedToId ? { assignedToId } : {}),
   });
 }
 

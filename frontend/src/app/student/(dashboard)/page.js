@@ -4,19 +4,41 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { fetchMySittings, fetchMyResults, fetchMyRounds } from '@/lib/api';
+import '@/app/auth.css';
+import {
+  Award,
+  BarChart3,
+  ChevronRight,
+  ArrowRight,
+  ClipboardList,
+  ClipboardCheck,
+  CheckCircle2,
+  Clock3,
+  LineChart,
+  Search,
+  Sparkles,
+  Trophy,
+  CalendarDays,
+} from 'lucide-react';
 
-// Student dashboard. The persistent sidebar lives in the (dashboard) layout;
-// this page shows everything in one scroll — a single unified "My tests" list
-// (started tests plus rounds not yet started) and one results list.
+// Student dashboard — uses the unified dashboard UI design with
+// welcome-row, hero-card, stats-grid, content-grid, and panel classes.
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
 
 function formatDate(isoString) {
-  return new Date(isoString).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
+  return new Date(isoString).toLocaleDateString('en-ZA', {
     day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   });
+}
+
+function greetingFor() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
 }
 
 function testStatus(test) {
@@ -25,16 +47,15 @@ function testStatus(test) {
   return 'in-progress';
 }
 
-function scoreStyle(score) {
-  if (score >= 70) return 'text-sage';
-  if (score >= 50) return 'text-gold';
-  return 'text-red-600';
+// CSS variables (see theme.css): readable (WCAG AA) in both themes.
+function scoreHex(score) {
+  if (score >= 70) return 'var(--score-good)';
+  if (score >= 50) return 'var(--score-mid)';
+  return 'var(--score-low)';
 }
 
-function scoreHex(score) {
-  if (score >= 70) return '#4caf7d';
-  if (score >= 50) return '#c99a2e';
-  return '#dc2626';
+function scoreColor(score) {
+  return scoreHex(score);
 }
 
 function timeLeft(expiresAt) {
@@ -46,33 +67,66 @@ function timeLeft(expiresAt) {
   return `${mins}m left`;
 }
 
+function olympiadTone(index) {
+  const tones = ['violet', 'amber', 'blue'];
+  return tones[index % tones.length];
+}
+
+function todayFormatted() {
+  return new Date().toLocaleDateString('en-ZA', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 const STATUS_STYLES = {
-  'in-progress': 'bg-sage/10 text-sage border border-sage/30',
-  'not-started': 'bg-gold/10 text-gold border border-gold/30',
-  completed: 'bg-lavender/10 text-lavender-deep border border-lavender/30',
-  expired: 'bg-slate/10 text-slate border border-slate/30',
-  locked: 'bg-gray-100 text-gray-500 border border-gray-300',
-};
-const STATUS_LABELS = {
-  'in-progress': 'In progress',
-  'not-started': 'Not started',
-  completed: 'Completed',
-  expired: 'Expired',
-  locked: 'Locked',
+  'in-progress': {
+    bg: 'rgba(76,175,125,0.1)',
+    color: 'var(--c-t-2b7854)',
+    label: 'In progress',
+    tone: 'green',
+  },
+  'not-started': {
+    bg: 'rgba(224,168,62,0.12)',
+    color: 'var(--c-t-85661e)',
+    label: 'Not started',
+    tone: 'amber',
+  },
+  completed: {
+    bg: 'rgba(139,92,246,0.08)',
+    color: 'var(--c-t-6d3fd1)',
+    label: 'Completed',
+    tone: 'purple',
+  },
+  expired: {
+    bg: 'rgba(139,127,168,0.1)',
+    color: 'var(--c-t-706391)',
+    label: 'Expired',
+    tone: 'blue',
+  },
+  locked: {
+    bg: 'rgba(139,127,168,0.06)',
+    color: 'var(--c-t-6a6a6a)',
+    label: 'Locked',
+    tone: 'blue',
+  },
 };
 
 /* ── Stat card ────────────────────────────────────────────────────────── */
 
-function StatCard({ icon, label, value, accent }) {
+function StatCard({ icon: Icon, label, value, detail, tone }) {
   return (
-    <div className="rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <span className="text-2xl" aria-hidden="true">
-          {icon}
-        </span>
+    <div className="stat-card">
+      <div className={`stat-icon ${tone || 'purple'}`}>
+        <Icon />
       </div>
-      <p className={`mt-3 font-display text-2xl font-bold ${accent || 'text-ink'}`}>{value}</p>
-      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-soft">{label}</p>
+      <div>
+        <p>{label}</p>
+        <strong>{value}</strong>
+        <span>{detail}</span>
+      </div>
     </div>
   );
 }
@@ -87,9 +141,9 @@ function TrendChart({ results }) {
 
   if (sorted.length < 2) {
     return (
-      <div className="flex h-full flex-col items-center justify-center rounded-xl border border-lavender/20 bg-surface p-6 text-center shadow-sm">
-        <span className="text-2xl">📈</span>
-        <p className="mt-2 text-sm text-ink-soft">
+      <div style={{ textAlign: 'center', padding: '24px 0' }}>
+        <BarChart3 size={24} style={{ color: 'var(--c-t-706391)', marginBottom: '8px' }} />
+        <p style={{ color: 'var(--c-t-706391)', fontSize: '12px', margin: 0 }}>
           Your performance trend will appear here once you have at least two released results.
         </p>
       </div>
@@ -109,12 +163,25 @@ function TrendChart({ results }) {
   const areaPath = `${path} L ${points[points.length - 1].x} ${h - pad} L ${points[0].x} ${h - pad} Z`;
 
   return (
-    <div className="rounded-xl border border-lavender/20 bg-surface p-6 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-base font-semibold text-ink">Performance trend</h3>
-        <span className="text-xs font-medium text-ink-soft">Last {sorted.length} results</span>
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px',
+        }}
+      >
+        <span style={{ fontSize: '11px', color: 'var(--c-t-706391)' }}>
+          Last {sorted.length} results
+        </span>
       </div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="mt-4 w-full">
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        style={{ width: '100%' }}
+        role="img"
+        aria-label={`Line chart of your last ${sorted.length} results, from ${Math.round(points[0].score)} percent to ${Math.round(points[points.length - 1].score)} percent`}
+      >
         <defs>
           <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.18" />
@@ -128,14 +195,14 @@ function TrendChart({ results }) {
             x2={w - pad}
             y1={h - pad - (v / 100) * (h - pad * 2)}
             y2={h - pad - (v / 100) * (h - pad * 2)}
-            stroke="rgba(139,92,246,0.08)"
+            className="chart-grid"
           />
         ))}
         <path d={areaPath} fill="url(#trendFill)" />
         <path
           d={path}
           fill="none"
-          stroke="#7c3aed"
+          className="chart-line"
           strokeWidth="2.5"
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -146,8 +213,8 @@ function TrendChart({ results }) {
               cx={p.x}
               cy={p.y}
               r="4"
-              fill="white"
-              stroke={scoreHex(p.score)}
+              className="chart-dot"
+              style={{ stroke: scoreHex(p.score) }}
               strokeWidth="2.5"
             />
             <title>{`${p.name}: ${Math.round(p.score)}%`}</title>
@@ -196,78 +263,39 @@ function AchievementBadges({ results, sittings }) {
   ];
 
   return (
-    <div className="rounded-xl border border-lavender/20 bg-surface p-6 shadow-sm">
-      <h3 className="font-display text-base font-semibold text-ink">Achievements</h3>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        {badges.map((b) => (
-          <div
-            key={b.id}
-            title={b.desc}
-            className={`flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-opacity ${
-              b.earned ? 'border-gold/40 bg-gold/5' : 'border-lavender/15 opacity-40 grayscale'
-            }`}
-          >
-            <span className="text-2xl">{b.icon}</span>
-            <p className="text-xs font-semibold text-ink">{b.label}</p>
-          </div>
-        ))}
-      </div>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))',
+        gap: '8px',
+        marginTop: '4px',
+      }}
+    >
+      {badges.map((b) => (
+        <div
+          key={b.id}
+          title={b.desc}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '12px 8px',
+            borderRadius: '10px',
+            border: b.earned ? '1px solid rgba(224,168,62,0.4)' : '1px solid rgba(139,92,246,0.1)',
+            background: b.earned ? 'rgba(224,168,62,0.05)' : 'transparent',
+            opacity: b.earned ? 1 : 0.4,
+            filter: b.earned ? 'none' : 'grayscale(1)',
+            textAlign: 'center',
+          }}
+        >
+          <span style={{ fontSize: '1.5em' }}>{b.icon}</span>
+          <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: 'var(--c-t-241f38)' }}>
+            {b.label}
+          </p>
+        </div>
+      ))}
     </div>
-  );
-}
-
-/* ── Hero ─────────────────────────────────────────────────────────────── */
-
-function HeroBanner({ name, school, inProgress, availableCount, resumeHref }) {
-  return (
-    <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-lavender-deep to-lavender px-8 py-10 text-white shadow-md sm:px-10">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/10"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-16 -left-6 h-40 w-40 rounded-full bg-white/5"
-      />
-      <p className="text-sm font-semibold uppercase tracking-widest text-white/75">Welcome back</p>
-      <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-        {name}
-      </h1>
-      {school && <p className="mt-2 text-lg font-medium text-white/85">{school.name ?? school}</p>}
-
-      <div className="mt-6 flex flex-wrap items-center gap-4">
-        {inProgress.length > 0 ? (
-          <>
-            <div className="rounded-lg bg-white/15 px-4 py-2">
-              <p className="text-sm font-medium">
-                {inProgress.length} test{inProgress.length > 1 ? 's' : ''} in progress -{' '}
-                <span className="font-bold">{timeLeft(inProgress[0].expiresAt)}</span>
-              </p>
-            </div>
-            {resumeHref && (
-              <Link
-                href={resumeHref}
-                onClick={(e) => {
-                  if (!window.confirm('Continue this test? Your answers are saved.'))
-                    e.preventDefault();
-                }}
-                className="rounded-lg bg-white px-5 py-2.5 text-base font-semibold text-lavender-deep transition-opacity hover:opacity-90"
-              >
-                Resume test →
-              </Link>
-            )}
-          </>
-        ) : availableCount > 0 ? (
-          <p className="text-lg font-medium text-white/90">
-            You have {availableCount} test{availableCount > 1 ? 's' : ''} ready to take.
-          </p>
-        ) : (
-          <p className="text-lg font-medium text-white/90">
-            All caught up — nothing due right now.
-          </p>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -292,106 +320,97 @@ function TestsSection({ tests, rounds }) {
         round: r.round,
         lockedReason: r.lockedReason,
       }));
-    // Urgent first: in-progress, then tests waiting to be started (both by
-    // their deadline), then finished/expired ones by most recent.
-    const order = { 'in-progress': 0, 'not-started': 1, completed: 2, expired: 3 };
+    // 'locked' items are rounds (no sitting), so the final fallback must not
+    // read .test off them — that crashed the dashboard when 2+ rounds were locked.
+    const order = { 'in-progress': 0, 'not-started': 1, locked: 2, completed: 3, expired: 4 };
     return [...started, ...notStarted].sort((a, b) => {
       if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
       if (a.status === 'in-progress')
         return new Date(a.test.expiresAt) - new Date(b.test.expiresAt);
       if (a.status === 'not-started')
         return new Date(a.round.closeTime) - new Date(b.round.closeTime);
-      return new Date(b.test.startedAt) - new Date(a.test.startedAt);
+      const aStarted = a.test ? new Date(a.test.startedAt) : 0;
+      const bStarted = b.test ? new Date(b.test.startedAt) : 0;
+      return bStarted - aStarted;
     });
   }, [tests, rounds]);
 
-  const inProgress = items.filter((i) => i.status === 'in-progress').length;
-
   return (
-    <section>
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-display text-2xl font-semibold text-ink">My tests</h2>
-        {inProgress > 0 && (
-          <span className="text-sm font-medium text-sage">{inProgress} to finish</span>
-        )}
-      </div>
+    <div>
       {items.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
-          <span className="text-3xl">📝</span>
-          <p className="mt-2 text-base text-ink-soft">
-            No tests yet. They&apos;ll appear here once a round opens.
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <ClipboardList size={24} style={{ color: 'var(--c-t-706391)', marginBottom: '8px' }} />
+          <p style={{ color: 'var(--c-t-706391)', fontSize: '12px', margin: 0 }}>
+            No tests yet. They will appear here once a round opens.
           </p>
         </div>
       ) : (
-        <ul className="mt-4 space-y-3">
+        <div className="test-list">
           {items.map((item) => {
             const isSitting = item.kind === 'sitting';
+            const style = STATUS_STYLES[item.status] || STATUS_STYLES.completed;
+            const dateLabel = isSitting
+              ? `Started ${formatDate(item.test.startedAt)}`
+              : `Closes ${formatDate(item.round.closeTime)}`;
+
             return (
-              <li
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm"
-              >
-                <div>
-                  <p className="text-lg font-semibold text-ink">{item.name}</p>
-                  {isSitting ? (
-                    <>
-                      <p className="mt-0.5 text-sm text-ink-soft">
-                        Started {formatDate(item.test.startedAt)}
-                      </p>
-                      {item.status === 'in-progress' && (
-                        <p className="mt-0.5 text-xs font-semibold text-sage">
-                          {timeLeft(item.test.expiresAt)}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="mt-0.5 text-sm text-ink-soft">
-                      Closes {formatDate(item.round.closeTime)}
-                    </p>
-                  )}
+              <div className="test-row" key={item.id}>
+                <div className={`test-symbol ${style.tone}`}>
+                  <ClipboardCheck />
                 </div>
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium ${STATUS_STYLES[item.status]}`}
-                  >
-                    {STATUS_LABELS[item.status]}
-                  </span>
+                <div className="test-main">
+                  <strong>{item.name}</strong>
+                  <span>{dateLabel}</span>
                   {item.status === 'in-progress' && (
-                    <Link
-                      href={`/student/sit?id=${item.test.roundId}`}
-                      onClick={(e) => {
-                        if (!window.confirm('Continue this test? Your answers are saved.'))
-                          e.preventDefault();
-                      }}
-                      className="rounded-lg bg-lavender-deep px-5 py-2.5 text-base font-medium text-white transition-opacity hover:opacity-90"
-                    >
-                      Resume
-                    </Link>
-                  )}
-                  {item.status === 'not-started' && (
-                    <Link
-                      href={`/student/sit?id=${item.round.id}`}
-                      onClick={(e) => {
-                        if (
-                          !window.confirm(`Start "${item.name}"? Once started, your time begins.`)
-                        )
-                          e.preventDefault();
-                      }}
-                      className="rounded-lg bg-lavender-deep px-5 py-2.5 text-base font-medium text-white transition-opacity hover:opacity-90"
-                    >
-                      Start test
-                    </Link>
-                  )}
-                  {item.status === 'locked' && item.lockedReason && (
-                    <span className="text-xs text-gray-500 italic">{item.lockedReason}</span>
+                    <div className="progress-line">
+                      <i style={{ width: '68%' }} />
+                    </div>
                   )}
                 </div>
-              </li>
+                <div className="test-side">
+                  <span className={`status-badge ${style.tone}`}>{style.label}</span>
+                  <small>
+                    {item.status === 'in-progress' ? timeLeft(item.test.expiresAt) : ''}
+                  </small>
+                </div>
+                {item.status === 'in-progress' && (
+                  <Link
+                    href={`/student/sit?id=${item.test.roundId}`}
+                    onClick={(e) => {
+                      if (!window.confirm('Continue this test? Your answers are saved.'))
+                        e.preventDefault();
+                    }}
+                  >
+                    <ArrowRight className="row-arrow" />
+                  </Link>
+                )}
+                {item.status === 'not-started' && (
+                  <Link
+                    href={`/student/sit?id=${item.round.id}`}
+                    onClick={(e) => {
+                      if (!window.confirm(`Start "${item.name}"? Once started, your time begins.`))
+                        e.preventDefault();
+                    }}
+                  >
+                    <ArrowRight className="row-arrow" />
+                  </Link>
+                )}
+                {item.status === 'locked' && item.lockedReason && (
+                  <span
+                    style={{ fontSize: '10px', color: 'var(--c-t-6a6a6a)', fontStyle: 'italic' }}
+                  >
+                    {item.lockedReason}
+                  </span>
+                )}
+                {item.status !== 'in-progress' &&
+                  item.status !== 'not-started' &&
+                  item.status !== 'locked' && <ArrowRight className="row-arrow" />}
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -399,64 +418,151 @@ function TestsSection({ tests, rounds }) {
 
 function ResultsSection({ results }) {
   const [search, setSearch] = useState('');
-  const best = results.reduce((max, r) => Math.max(max, r.score), 0);
   const filtered = results.filter((r) => r.round.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <section>
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="font-display text-2xl font-semibold text-ink">My results</h2>
-        {results.length > 0 && (
-          <span className="text-sm font-medium text-ink-soft">
-            Best: <span className={scoreStyle(best)}>{Math.round(best)}%</span>
-          </span>
-        )}
-      </div>
-
+    <div>
       {results.length > 3 && (
-        <input
-          type="text"
-          placeholder="Search by round name..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="mt-3 w-full rounded-lg border border-lavender/30 bg-surface px-3.5 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-lavender/50"
-        />
+        <div style={{ marginBottom: '12px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: '1px solid rgba(139,92,246,0.15)',
+              borderRadius: '9px',
+              padding: '8px 12px',
+              background: 'var(--c-bg-ffffff)',
+            }}
+          >
+            <Search size={14} style={{ color: 'var(--c-t-706391)' }} />
+            <input
+              aria-label="Search tests by round name"
+              type="text"
+              placeholder="Search by round name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                border: 'none',
+                outline: 'none',
+                flex: 1,
+                fontSize: '12px',
+                color: 'var(--c-t-241f38)',
+                background: 'transparent',
+              }}
+            />
+          </div>
+        </div>
       )}
 
       {results.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-lavender/20 bg-surface p-8 text-center shadow-sm">
-          <span className="text-3xl">🏆</span>
-          <p className="mt-2 text-base text-ink-soft">No results released yet.</p>
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <Trophy size={24} style={{ color: 'var(--c-t-706391)', marginBottom: '8px' }} />
+          <p style={{ color: 'var(--c-t-706391)', fontSize: '12px', margin: 0 }}>
+            No results released yet.
+          </p>
         </div>
       ) : (
-        <ul className="mt-4 space-y-3">
-          {filtered.map((result) => (
-            <li
-              key={result.id}
-              className="rounded-xl border border-lavender/20 bg-surface p-5 shadow-sm"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-lg font-semibold text-ink">{result.round.name}</p>
-                  <p className="mt-0.5 text-sm text-ink-soft">
-                    Submitted {formatDate(result.submittedAt)}
-                  </p>
-                </div>
-                <p className={`font-display text-3xl font-semibold ${scoreStyle(result.score)}`}>
-                  {Math.round(result.score)}%
-                </p>
-              </div>
+        <div className="test-list">
+          {filtered.map((result, idx) => {
+            const tone = olympiadTone(idx);
+            const toneColorMap = { violet: 'purple', amber: 'amber', blue: 'blue' };
+            return (
               <Link
                 href={`/student/result?id=${result.id}`}
-                className="mt-4 inline-block rounded-lg border border-lavender/40 px-5 py-2.5 text-base font-medium text-lavender-deep transition-colors hover:bg-lavender/10"
+                key={result.id}
+                className="test-row"
+                style={{ textDecoration: 'none', cursor: 'pointer' }}
               >
-                View test →
+                <div className={`test-symbol ${toneColorMap[tone] || 'purple'}`}>
+                  <ClipboardCheck />
+                </div>
+                <div className="test-main">
+                  <strong>{result.round.name}</strong>
+                  <span>Submitted {formatDate(result.submittedAt)}</span>
+                </div>
+                <div className="test-side">
+                  <span
+                    style={{ fontSize: '16px', fontWeight: 700, color: scoreColor(result.score) }}
+                  >
+                    {Math.round(result.score)}%
+                  </span>
+                </div>
+                <ArrowRight className="row-arrow" />
               </Link>
-            </li>
-          ))}
-        </ul>
+            );
+          })}
+        </div>
       )}
-    </section>
+    </div>
+  );
+}
+
+/* ── Up-next cards ────────────────────────────────────────────────────── */
+
+function UpNextSection({ rounds, sittings }) {
+  const notStarted = rounds
+    .filter((r) => !r.sitting && !r.locked)
+    .sort((a, b) => new Date(a.round.closeTime) - new Date(b.round.closeTime))
+    .slice(0, 2);
+
+  const inProgress = sittings
+    .filter((s) => testStatus(s) === 'in-progress')
+    .sort((a, b) => new Date(a.expiresAt) - new Date(b.expiresAt))
+    .slice(0, 1);
+
+  const upcoming = [
+    ...inProgress.map((s) => ({
+      name: s.round.name,
+      subtitle: `Test in progress`,
+      date: new Date(s.expiresAt),
+      timeLabel: timeLeft(s.expiresAt),
+      day: new Date(s.expiresAt).getDate(),
+      month: new Date(s.expiresAt).toLocaleDateString('en-ZA', { month: 'short' }).toUpperCase(),
+    })),
+    ...notStarted.map((r) => ({
+      name: r.round.name,
+      subtitle: `Round opens soon`,
+      date: new Date(r.round.openTime),
+      timeLabel: '',
+      day: new Date(r.round.openTime).getDate(),
+      month: new Date(r.round.openTime)
+        .toLocaleDateString('en-ZA', { month: 'short' })
+        .toUpperCase(),
+    })),
+  ].slice(0, 2);
+
+  if (upcoming.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '20px 0' }}>
+        <CalendarDays size={20} style={{ color: 'var(--c-t-706391)', marginBottom: '6px' }} />
+        <p style={{ color: 'var(--c-t-706391)', fontSize: '12px', margin: 0 }}>
+          No upcoming deadlines.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {upcoming.map((item, idx) => (
+        <div className={`calendar-card${idx > 0 ? ' muted-card' : ''}`} key={idx}>
+          <div className="calendar-date">
+            <strong>{item.day}</strong>
+            <span>{item.month}</span>
+          </div>
+          <div>
+            <strong>{item.name}</strong>
+            <span>{item.subtitle}</span>
+            {item.timeLabel && (
+              <small>
+                <Clock3 /> {item.timeLabel}
+              </small>
+            )}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -491,12 +597,10 @@ export default function StudentDashboard() {
     load();
   }, [checking, user, getToken]);
 
-  // `!user` covers the window after sign-out clears the session but before
-  // the redirect away finishes — otherwise user.name below would crash.
   if (checking || !user || status === 'loading') {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-lg text-ink-soft">Loading...</p>
+      <div style={{ padding: '48px 0', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>
+        Loading...
       </div>
     );
   }
@@ -505,68 +609,244 @@ export default function StudentDashboard() {
   const inProgress = sittings.filter((s) => testStatus(s) === 'in-progress');
   const resumeHref = inProgress.length > 0 ? `/student/sit?id=${inProgress[0].roundId}` : null;
   const bestScore =
-    results.length > 0 ? `${Math.round(Math.max(...results.map((r) => r.score)))}%` : '—';
+    results.length > 0 ? `${Math.round(Math.max(...results.map((r) => r.score)))}%` : '\u2014';
   const avgScore =
     results.length > 0
       ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length)
       : null;
 
+  const firstName = (user?.name || user?.email || 'Student').split(/[\s@]/)[0];
+  const availableCount = rounds.filter((r) => !r.sitting && !r.locked).length;
+  const heroTest = inProgress[0] || null;
+
   return (
     <>
-      <HeroBanner
-        name={user.name}
-        school={user.school}
-        inProgress={inProgress}
-        availableCount={rounds.filter((r) => !r.sitting && !r.locked).length}
-        resumeHref={resumeHref}
-      />
+      {/* Welcome row */}
+      <section className="welcome-row">
+        <div>
+          <p className="eyebrow">{todayFormatted()}</p>
+          <h1>
+            {greetingFor()}, {firstName} <span>&#10022;</span>
+          </h1>
+          <p className="subheading">
+            {inProgress.length > 0
+              ? `You have ${inProgress.length} test${inProgress.length > 1 ? 's' : ''} in progress — keep going!`
+              : availableCount > 0
+                ? `You have ${availableCount} test${availableCount > 1 ? 's' : ''} ready to take.`
+                : 'All caught up — nothing due right now.'}
+          </p>
+        </div>
+        {resumeHref && (
+          <Link
+            href={resumeHref}
+            onClick={(e) => {
+              if (!window.confirm('Continue this test? Your answers are saved.'))
+                e.preventDefault();
+            }}
+            className="button primary"
+          >
+            Resume test <ArrowRight />
+          </Link>
+        )}
+      </section>
+
+      {/* Hero card — in-progress test */}
+      {heroTest && (
+        <section className="hero-card">
+          <div className="hero-copy">
+            <div className="hero-kicker">
+              <Sparkles /> Your next milestone
+            </div>
+            <h2>Finish strong</h2>
+            <p>{heroTest.round.name}</p>
+            <div className="hero-meta">
+              <span>
+                <Clock3 /> {timeLeft(heroTest.expiresAt)}
+              </span>
+              <span>
+                <ClipboardCheck /> In progress
+              </span>
+            </div>
+            <Link
+              href={resumeHref}
+              onClick={(e) => {
+                if (!window.confirm('Continue this test? Your answers are saved.'))
+                  e.preventDefault();
+              }}
+              className="button light"
+            >
+              Continue test <ArrowRight />
+            </Link>
+          </div>
+          <div className="hero-ring">
+            <div>
+              <strong>68%</strong>
+              <span>complete</span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {status === 'error' && (
         <div
           role="alert"
-          className="relative mt-8 rounded-lg border border-red-200 bg-red-50 p-5 text-base text-red-800"
+          className="panel"
+          style={{
+            marginTop: '20px',
+            padding: '16px',
+            borderColor: 'var(--c-bd-f3c2c2)',
+            background: 'var(--c-bg-fdf0f0)',
+          }}
         >
-          Couldn&apos;t load your tests or results. Try refreshing the page.
+          <p style={{ color: 'var(--c-t-8f2f2f)', fontSize: '13px', margin: 0 }}>
+            Couldn&apos;t load your tests or results. Try refreshing the page.
+          </p>
         </div>
       )}
 
       {status === 'ready' && (
         <>
-          <div className="relative mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <StatCard icon="📝" label="Tests" value={sittings.length} />
-            <StatCard icon="✅" label="Completed" value={completed} />
+          {/* Section heading */}
+          <div className="section-heading">
+            <div>
+              <h2>Your overview</h2>
+              <p>A quick look at your Olympiad journey.</p>
+            </div>
+          </div>
+
+          {/* Stats grid */}
+          <section className="stats-grid">
             <StatCard
-              icon="📊"
-              label="Average"
-              value={avgScore !== null ? `${avgScore}%` : '—'}
-              accent={avgScore !== null ? scoreStyle(avgScore) : undefined}
+              icon={ClipboardCheck}
+              label="Tests completed"
+              value={completed}
+              detail={sittings.length > 0 ? `${sittings.length} total started` : 'No tests yet'}
+              tone="purple"
             />
             <StatCard
-              icon="🏆"
+              icon={Trophy}
+              label="Average score"
+              value={avgScore !== null ? `${avgScore}%` : '\u2014'}
+              detail={avgScore !== null ? `Best: ${bestScore}` : 'Take a test to see stats'}
+              tone="amber"
+            />
+            <StatCard
+              icon={Clock3}
+              label="Tests available"
+              value={availableCount}
+              detail={availableCount > 0 ? 'Ready to start' : 'None right now'}
+              tone="blue"
+            />
+            <StatCard
+              icon={Sparkles}
               label="Best score"
               value={bestScore}
-              accent={
+              detail={
                 results.length > 0
-                  ? scoreStyle(Math.max(...results.map((r) => r.score)))
-                  : undefined
+                  ? `${results.length} result${results.length !== 1 ? 's' : ''} released`
+                  : 'No results yet'
               }
+              tone="green"
             />
-          </div>
+          </section>
 
-          <div className="relative mt-10 grid gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <TrendChart results={results} />
+          {/* Content grid */}
+          <section className="content-grid">
+            {/* My tests panel */}
+            <div className="panel" id="tests">
+              <div className="panel-heading">
+                <div>
+                  <h2>My tests</h2>
+                  <p>Stay on top of your active and upcoming challenges.</p>
+                </div>
+                {inProgress.length > 0 && (
+                  <span
+                    style={{
+                      background: 'rgba(76,175,125,0.1)',
+                      color: 'var(--c-t-2b7854)',
+                      padding: '3px 10px',
+                      borderRadius: '20px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {inProgress.length} active
+                  </span>
+                )}
+              </div>
+              <TestsSection tests={sittings} rounds={rounds} />
+              <Link href="/student" className="full-link">
+                View all tests <ArrowRight />
+              </Link>
             </div>
-            <AchievementBadges results={results} sittings={sittings} />
-          </div>
 
-          <div className="relative mt-12">
-            <TestsSection tests={sittings} rounds={rounds} />
-          </div>
+            {/* Up next panel */}
+            <div className="panel calendar-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Up next</h2>
+                  <p>Your upcoming deadlines.</p>
+                </div>
+                <CalendarDays className="heading-icon" />
+              </div>
+              <UpNextSection rounds={rounds} sittings={sittings} />
+            </div>
+          </section>
 
-          <div className="relative mt-12">
-            <ResultsSection results={results} />
-          </div>
+          {/* Trend & achievements + Results (second row) */}
+          <section className="content-grid">
+            <div className="panel" id="results">
+              <div className="panel-heading">
+                <div>
+                  <h2>My results</h2>
+                  <p>
+                    {results.length > 0
+                      ? `Best score: ${bestScore}`
+                      : 'Your released results will appear here.'}
+                  </p>
+                </div>
+                {results.length > 0 && (
+                  <Link href={`/student/result?id=${results[0]?.id}`} className="text-button">
+                    View latest <ArrowRight />
+                  </Link>
+                )}
+              </div>
+              <ResultsSection results={results} />
+            </div>
+
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Performance</h2>
+                  <p>Track your progress over time.</p>
+                </div>
+                <Award className="heading-icon" />
+              </div>
+              <TrendChart results={results} />
+              <div
+                style={{
+                  marginTop: '16px',
+                  borderTop: '1px solid var(--c-bd-f0edf6)',
+                  paddingTop: '14px',
+                }}
+              >
+                <span
+                  style={{
+                    color: 'var(--c-t-626b7e)',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '.12em',
+                    textTransform: 'uppercase',
+                    display: 'block',
+                    marginBottom: '10px',
+                  }}
+                >
+                  Badges
+                </span>
+                <AchievementBadges results={results} sittings={sittings} />
+              </div>
+            </div>
+          </section>
         </>
       )}
     </>

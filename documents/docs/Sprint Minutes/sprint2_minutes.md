@@ -1,3 +1,6 @@
+---
+sidebar_label: sprint2_minutes
+---
 # Sprint 2 Minutes
 
 ## Meeting 1 — 26 August 2026

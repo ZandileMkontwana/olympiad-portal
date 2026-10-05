@@ -1,3 +1,6 @@
+---
+sidebar_label: sprint3_minutes
+---
 # Sprint 3 Daily Standup Minutes
 
 **Period:** 15 September 2026 – 28 September 2026  

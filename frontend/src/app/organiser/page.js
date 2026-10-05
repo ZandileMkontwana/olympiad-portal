@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useAuth, useClerk } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
+import OrganiserShell from '@/components/OrganiserShell';
+import ActivityFeed from '@/components/ActivityFeed';
 import {
   listOlympiads,
   createOlympiad,
@@ -17,6 +19,15 @@ import {
   listAllOrganisers,
   ApiError,
 } from '@/lib/api';
+import {
+  CalendarDays,
+  ChevronRight,
+  ClipboardList,
+  History,
+  Plus,
+  Sparkles,
+  UserPlus,
+} from 'lucide-react';
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-ZA', {
@@ -26,9 +37,27 @@ function formatDate(iso) {
   });
 }
 
+function greetingFor() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function olympiadTone(index) {
+  const tones = ['violet', 'amber', 'blue'];
+  return tones[index % tones.length];
+}
+
+function initialsFor(name) {
+  if (!name) return '??';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
 export default function OrganiserDashboard() {
   const { user, checking } = useRequireRole('organiser');
-  const { signOut } = useClerk();
   const { getToken } = useAuth();
 
   const [olympiads, setOlympiads] = useState([]);
@@ -281,104 +310,97 @@ export default function OrganiserDashboard() {
 
   if (checking) {
     return (
-      <main className="round-page">
-        <p>Loading...</p>
+      <main id="main-content" tabIndex={-1} className="organiser-shell">
+        <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
       </main>
     );
   }
 
-  async function handleLogout() {
-    await signOut({ redirectUrl: '/login' });
-  }
+  const firstName = (user?.name || user?.email || 'Organiser').split(/[\s@]/)[0];
 
   return (
-    <main className="round-page">
-      <h1>Organiser Console</h1>
-      <p className="description">
-        Logged in as <strong>{user.email}</strong> ({user.role})
-      </p>
-      <div className="card" style={{ display: 'flex', gap: '12px' }}>
-        <Link href="/organiser/marking" className="button">
-          Marking
-        </Link>
-
-        <Link href="/organiser/remarks" className="button">
-          Remarks
-        </Link>
-
-        <Link href="/organiser/replay" className="button">
-          Replay
-        </Link>
-
-        <button onClick={handleLogout} className="button">
-          Log out
+    <OrganiserShell activeNav="dashboard" breadcrumb="Overview" user={user}>
+      {/* Welcome row */}
+      <div className="organiser-welcome-row">
+        <div>
+          <p className="organiser-eyebrow">
+            <Sparkles size={14} /> Your organiser space
+          </p>
+          <h1>
+            {greetingFor()}, {firstName}.
+          </h1>
+          <p className="organiser-subtitle">Here is what is happening across your Olympiads.</p>
+        </div>
+        <button
+          className="primary-action"
+          data-tour="organiser-create"
+          onClick={() => setShowCreateForm(!showCreateForm)}
+        >
+          <Plus size={17} /> {showCreateForm ? 'Close form' : 'Create Olympiad'}
         </button>
       </div>
 
-      {/* Olympiads section */}
-      <h2
-        style={{
-          marginTop: '24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        Olympiads
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className="button"
-          style={{ fontSize: '0.85em', padding: '6px 14px' }}
-        >
-          {showCreateForm ? 'Cancel' : '+ New Olympiad'}
-        </button>
-      </h2>
-
-      {/* Create olympiad form */}
+      {/* Create olympiad form (inline) */}
       {showCreateForm && (
         <form
           onSubmit={handleCreateOlympiad}
-          className="card"
-          style={{ marginTop: '12px', padding: '16px' }}
+          className="dashboard-panel"
+          style={{ marginTop: '20px', padding: '21px' }}
         >
-          <div style={{ marginBottom: '12px' }}>
-            <label
-              htmlFor="olympiad-name"
-              style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
-            >
-              Olympiad name
-            </label>
-            <input
-              id="olympiad-name"
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Wits Computing Olympiad 2026"
-              className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-              required
-            />
+          <span className="command-eyebrow">
+            <Plus size={13} /> New Olympiad
+          </span>
+          <h2 style={{ fontSize: '18px', letterSpacing: '-0.04em', margin: '8px 0 16px' }}>
+            Set up a new Olympiad
+          </h2>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+              gap: '12px',
+            }}
+          >
+            <div>
+              <label
+                htmlFor="olympiad-name"
+                style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}
+              >
+                Olympiad name
+              </label>
+              <input
+                id="olympiad-name"
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="e.g. Wits Computing Olympiad 2026"
+                className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                required
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="timezone"
+                style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}
+              >
+                Timezone
+              </label>
+              <input
+                id="timezone"
+                type="text"
+                value={newTimezone}
+                onChange={(e) => setNewTimezone(e.target.value)}
+                placeholder="Africa/Johannesburg"
+                className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                required
+              />
+            </div>
           </div>
-          <div style={{ marginBottom: '12px' }}>
-            <label
-              htmlFor="timezone"
-              style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
-            >
-              Timezone
-            </label>
-            <input
-              id="timezone"
-              type="text"
-              value={newTimezone}
-              onChange={(e) => setNewTimezone(e.target.value)}
-              placeholder="Africa/Johannesburg"
-              className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-              required
-            />
-          </div>
-          <div style={{ marginBottom: '12px' }}>
+
+          <div style={{ marginTop: '12px' }}>
             <label
               htmlFor="olympiad-description"
-              style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
+              style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}
             >
               Description (optional)
             </label>
@@ -391,527 +413,770 @@ export default function OrganiserDashboard() {
               className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
             />
           </div>
-          <div style={{ marginBottom: '12px' }}>
-            <label
-              htmlFor="olympiad-grades"
-              style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
-            >
-              Grades (optional)
-            </label>
-            <input
-              id="olympiad-grades"
-              type="text"
-              value={newGrades}
-              onChange={(e) => setNewGrades(e.target.value)}
-              placeholder="e.g. Grade 8–12"
-              className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-            />
-          </div>
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-            <div style={{ flex: 1 }}>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+              gap: '12px',
+              marginTop: '12px',
+            }}
+          >
+            <div>
               <label
-                htmlFor="olympiad-start-date"
-                style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
+                htmlFor="olympiad-grades"
+                style={{ display: 'block', marginBottom: '4px', fontSize: '12px', fontWeight: 600 }}
               >
-                Start date (optional)
+                Grades (optional)
               </label>
               <input
-                id="olympiad-start-date"
-                type="date"
-                value={newStartDate}
-                onChange={(e) => setNewStartDate(e.target.value)}
+                id="olympiad-grades"
+                type="text"
+                value={newGrades}
+                onChange={(e) => setNewGrades(e.target.value)}
+                placeholder="e.g. Grade 8–12"
                 className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <label
-                htmlFor="olympiad-end-date"
-                style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
-              >
-                End date (optional)
-              </label>
-              <input
-                id="olympiad-end-date"
-                type="date"
-                value={newEndDate}
-                onChange={(e) => setNewEndDate(e.target.value)}
-                className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-              />
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <label
+                  htmlFor="olympiad-start-date"
+                  style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}
+                >
+                  Start date
+                </label>
+                <input
+                  id="olympiad-start-date"
+                  type="date"
+                  value={newStartDate}
+                  onChange={(e) => setNewStartDate(e.target.value)}
+                  className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label
+                  htmlFor="olympiad-end-date"
+                  style={{
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}
+                >
+                  End date
+                </label>
+                <input
+                  id="olympiad-end-date"
+                  type="date"
+                  value={newEndDate}
+                  onChange={(e) => setNewEndDate(e.target.value)}
+                  className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                />
+              </div>
             </div>
           </div>
+
           {createStatus === 'error' && (
-            <p style={{ color: 'red', fontSize: '0.9em', marginBottom: '8px' }}>{createError}</p>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '12px', marginTop: '10px' }}
+            >
+              {createError}
+            </p>
           )}
-          <button type="submit" disabled={createStatus === 'submitting'} className="button">
-            {createStatus === 'submitting' ? 'Creating...' : 'Create Olympiad'}
-          </button>
+
+          <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+            <button
+              type="submit"
+              disabled={createStatus === 'submitting'}
+              className="primary-action"
+            >
+              {createStatus === 'submitting' ? 'Creating...' : 'Create Olympiad'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCreateForm(false)}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--c-bd-ebe7f4)',
+                borderRadius: '9px',
+                padding: '12px 16px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                color: 'var(--c-t-6d667f)',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       )}
 
-      {status === 'loading' && <p className="description">Loading olympiads...</p>}
+      {/* Dashboard grid: Olympiads + Access requests */}
+      <section className="organiser-dashboard-grid" aria-label="Organiser dashboard overview">
+        {/* Olympiads panel */}
+        <article className="dashboard-panel olympiad-panel" data-tour="organiser-olympiads">
+          <div className="dashboard-panel-heading">
+            <div>
+              <span className="command-eyebrow">
+                <ClipboardList size={13} /> Your workspace
+              </span>
+              <h2>Olympiads you&apos;ve posted</h2>
+              <p>Manage events, rounds, and registration windows.</p>
+            </div>
+            {status === 'ready' && (
+              <span className="nav-count" style={{ flex: '0 0 auto' }}>
+                {olympiads.length}
+              </span>
+            )}
+          </div>
 
-      {status === 'empty' && !showCreateForm && (
-        <p className="description">
-          No olympiads yet.{' '}
-          <button
-            onClick={() => setShowCreateForm(true)}
-            style={{
-              textDecoration: 'underline',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'inherit',
-            }}
-          >
-            Create one
-          </button>{' '}
-          to get started.
-        </p>
-      )}
+          {status === 'loading' && (
+            <p style={{ color: 'var(--c-t-6d667c)', fontSize: '13px', marginTop: '18px' }}>
+              Loading olympiads...
+            </p>
+          )}
 
-      {status === 'error' && (
-        <p className="message">Couldn&apos;t load olympiads. Try refreshing the page.</p>
-      )}
+          {status === 'error' && (
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '18px' }}
+            >
+              Couldn&apos;t load olympiads. Try refreshing.
+            </p>
+          )}
 
-      {status === 'ready' && (
-        <ul style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {olympiads.map((olympiad) => (
-            <li key={olympiad.id} className="card" style={{ padding: '16px' }}>
-              <div
+          {status === 'empty' && !showCreateForm && (
+            <div style={{ marginTop: '18px' }}>
+              <p style={{ color: 'var(--c-t-6d667c)', fontSize: '13px' }}>
+                No olympiads yet. Create one to get started.
+              </p>
+              <button
+                onClick={() => setShowCreateForm(true)}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '8px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--violet)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  padding: 0,
+                  marginTop: '6px',
                 }}
               >
-                <h3 style={{ margin: 0, fontSize: '1.1em' }}>{olympiad.name}</h3>
-                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                  <button
-                    type="button"
+                + Create your first Olympiad
+              </button>
+            </div>
+          )}
+
+          {status === 'ready' && (
+            <div className="mini-event-list">
+              {olympiads.map((olympiad, idx) => (
+                <div key={olympiad.id}>
+                  <div
+                    className="mini-event"
+                    style={{ cursor: 'pointer', position: 'relative' }}
                     onClick={() => toggleEdit(olympiad)}
-                    className="button"
-                    style={{ fontSize: '0.8em', padding: '4px 10px' }}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={editingId === olympiad.id}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleEdit(olympiad);
+                      }
+                    }}
                   >
-                    {editingId === olympiad.id ? 'Close' : 'Edit details'}
-                  </button>
-                  <Link
-                    href={`/rounds/new?olympiadId=${olympiad.id}&olympiadName=${encodeURIComponent(olympiad.name)}`}
-                    className="button"
-                    style={{ fontSize: '0.8em', padding: '4px 10px' }}
-                  >
-                    + Add Round
-                  </Link>
-                </div>
-              </div>
-              <p className="description" style={{ margin: '0 0 12px 0', fontSize: '0.85em' }}>
-                {olympiad.timezone} · {olympiad.rounds.length} round
-                {olympiad.rounds.length !== 1 ? 's' : ''}
-              </p>
+                    <span className={`event-dot ${olympiadTone(idx)}`} />
+                    <span>
+                      <strong>{olympiad.name}</strong>
+                      <small>
+                        {olympiad.timezone} &middot; {olympiad.rounds.length} round
+                        {olympiad.rounds.length !== 1 ? 's' : ''}
+                        {olympiad.startDate ? ` · from ${formatDate(olympiad.startDate)}` : ''}
+                      </small>
+                    </span>
+                    <ChevronRight size={15} />
+                  </div>
 
-              {(olympiad.description ||
-                olympiad.grades ||
-                olympiad.startDate ||
-                olympiad.endDate) && (
-                <div style={{ marginBottom: '12px' }}>
-                  {olympiad.description && (
-                    <p className="description" style={{ margin: '0 0 4px', fontSize: '0.85em' }}>
-                      {olympiad.description}
-                    </p>
-                  )}
-                  {olympiad.grades && (
-                    <p className="description" style={{ margin: 0, fontSize: '0.85em' }}>
-                      🎓 Grades: {olympiad.grades}
-                    </p>
-                  )}
-                  {(olympiad.startDate || olympiad.endDate) && (
-                    <p className="description" style={{ margin: 0, fontSize: '0.85em' }}>
-                      📅 {olympiad.startDate ? formatDate(olympiad.startDate) : 'TBC'} →{' '}
-                      {olympiad.endDate ? formatDate(olympiad.endDate) : 'TBC'}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {editingId === olympiad.id && (
-                <form
-                  onSubmit={(e) => handleUpdateOlympiad(e, olympiad)}
-                  style={{
-                    marginBottom: '12px',
-                    padding: '12px',
-                    border: '1px solid rgba(139, 92, 246, 0.2)',
-                    borderRadius: '8px',
-                  }}
-                >
-                  <div style={{ marginBottom: '12px' }}>
-                    <label
-                      htmlFor={`edit-name-${olympiad.id}`}
-                      style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
+                  {/* Expanded edit form */}
+                  {editingId === olympiad.id && (
+                    <form
+                      onSubmit={(e) => handleUpdateOlympiad(e, olympiad)}
+                      style={{
+                        margin: '8px 0 12px',
+                        padding: '14px',
+                        border: '1px solid rgba(139, 92, 246, 0.15)',
+                        borderRadius: '10px',
+                        background: 'var(--c-bg-faf8ff)',
+                      }}
                     >
-                      Olympiad name
-                    </label>
-                    <input
-                      id={`edit-name-${olympiad.id}`}
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-                      required
-                    />
-                  </div>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label
-                      htmlFor={`edit-timezone-${olympiad.id}`}
-                      style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
-                    >
-                      Timezone
-                    </label>
-                    <input
-                      id={`edit-timezone-${olympiad.id}`}
-                      type="text"
-                      value={editTimezone}
-                      onChange={(e) => setEditTimezone(e.target.value)}
-                      className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-                      required
-                    />
-                  </div>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label
-                      htmlFor={`edit-description-${olympiad.id}`}
-                      style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
-                    >
-                      Description
-                    </label>
-                    <textarea
-                      id={`edit-description-${olympiad.id}`}
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      rows={3}
-                      className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label
-                      htmlFor={`edit-grades-${olympiad.id}`}
-                      style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
-                    >
-                      Grades
-                    </label>
-                    <input
-                      id={`edit-grades-${olympiad.id}`}
-                      type="text"
-                      value={editGrades}
-                      onChange={(e) => setEditGrades(e.target.value)}
-                      placeholder="e.g. Grade 8–12"
-                      className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                    <div style={{ flex: 1 }}>
-                      <label
-                        htmlFor={`edit-start-date-${olympiad.id}`}
-                        style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+                          gap: '10px',
+                        }}
                       >
-                        Start date
-                      </label>
-                      <input
-                        id={`edit-start-date-${olympiad.id}`}
-                        type="date"
-                        value={editStartDate}
-                        onChange={(e) => setEditStartDate(e.target.value)}
-                        className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label
-                        htmlFor={`edit-end-date-${olympiad.id}`}
-                        style={{ display: 'block', marginBottom: '4px', fontSize: '0.9em' }}
-                      >
-                        End date
-                      </label>
-                      <input
-                        id={`edit-end-date-${olympiad.id}`}
-                        type="date"
-                        value={editEndDate}
-                        onChange={(e) => setEditEndDate(e.target.value)}
-                        className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
-                      />
-                    </div>
-                  </div>
-                  {editStatus === 'error' && (
-                    <p style={{ color: 'red', fontSize: '0.9em', marginBottom: '8px' }}>
-                      {editError}
-                    </p>
-                  )}
-                  <button type="submit" disabled={editStatus === 'submitting'} className="button">
-                    {editStatus === 'submitting' ? 'Saving...' : 'Save details'}
-                  </button>
-                </form>
-              )}
+                        <div>
+                          <label
+                            htmlFor={`edit-name-${olympiad.id}`}
+                            style={{
+                              display: 'block',
+                              marginBottom: '4px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Name
+                          </label>
+                          <input
+                            id={`edit-name-${olympiad.id}`}
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor={`edit-timezone-${olympiad.id}`}
+                            style={{
+                              display: 'block',
+                              marginBottom: '4px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Timezone
+                          </label>
+                          <input
+                            id={`edit-timezone-${olympiad.id}`}
+                            type="text"
+                            value={editTimezone}
+                            onChange={(e) => setEditTimezone(e.target.value)}
+                            className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                            required
+                          />
+                        </div>
+                      </div>
 
-              {olympiad.rounds.length === 0 ? (
-                <p className="description" style={{ fontSize: '0.85em', fontStyle: 'italic' }}>
-                  No rounds yet. Click &quot;+ Add Round&quot; to create one.
-                </p>
-              ) : (
-                <ul style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {olympiad.rounds.map((round) => {
-                    let href = `/educator/round_view?id=${round.id}`;
-                    if (round.state === 'open' || round.state === 'scheduled') {
-                      href = `/rounds/${round.id}/papers`;
-                    } else if (round.state === 'closed' || round.state === 'released') {
-                      // The educator round view gates certificates on the
-                      // educator role and would fail for organisers — the
-                      // closed-round info page is the safe target for both
-                      // terminal states.
-                      href = `/rounds/${round.id}/closed_round`;
-                    }
+                      <div style={{ marginTop: '10px' }}>
+                        <label
+                          htmlFor={`edit-description-${olympiad.id}`}
+                          style={{
+                            display: 'block',
+                            marginBottom: '4px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Description
+                        </label>
+                        <textarea
+                          id={`edit-description-${olympiad.id}`}
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          rows={2}
+                          className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                        />
+                      </div>
 
-                    return (
-                      <li
-                        key={round.id}
-                        style={{ display: 'flex', alignItems: 'stretch', gap: '6px' }}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
+                          gap: '10px',
+                          marginTop: '10px',
+                        }}
                       >
-                        <Link
-                          href={href}
+                        <div>
+                          <label
+                            htmlFor={`edit-grades-${olympiad.id}`}
+                            style={{
+                              display: 'block',
+                              marginBottom: '4px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Grades
+                          </label>
+                          <input
+                            id={`edit-grades-${olympiad.id}`}
+                            type="text"
+                            value={editGrades}
+                            onChange={(e) => setEditGrades(e.target.value)}
+                            placeholder="e.g. Grade 8–12"
+                            className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <div style={{ flex: 1 }}>
+                            <label
+                              htmlFor={`edit-start-date-${olympiad.id}`}
+                              style={{
+                                display: 'block',
+                                marginBottom: '4px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Start
+                            </label>
+                            <input
+                              id={`edit-start-date-${olympiad.id}`}
+                              type="date"
+                              value={editStartDate}
+                              onChange={(e) => setEditStartDate(e.target.value)}
+                              className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                            />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label
+                              htmlFor={`edit-end-date-${olympiad.id}`}
+                              style={{
+                                display: 'block',
+                                marginBottom: '4px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                              }}
+                            >
+                              End
+                            </label>
+                            <input
+                              id={`edit-end-date-${olympiad.id}`}
+                              type="date"
+                              value={editEndDate}
+                              onChange={(e) => setEditEndDate(e.target.value)}
+                              className="block w-full rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {editStatus === 'error' && (
+                        <p
+                          role="alert"
+                          style={{ color: 'var(--c-t-b42318)', fontSize: '11px', marginTop: '8px' }}
+                        >
+                          {editError}
+                        </p>
+                      )}
+
+                      <div
+                        style={{
+                          marginTop: '12px',
+                          display: 'flex',
+                          gap: '8px',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <button
+                          type="submit"
+                          disabled={editStatus === 'submitting'}
+                          className="button"
+                          style={{ fontSize: '11px', padding: '6px 14px' }}
+                        >
+                          {editStatus === 'submitting' ? 'Saving...' : 'Save details'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(null)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--c-t-6d667f)',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+
+                      {/* Rounds list */}
+                      {olympiad.rounds.length > 0 && (
+                        <div style={{ marginTop: '14px' }}>
+                          <p
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              marginBottom: '6px',
+                              color: 'var(--c-t-6d667f)',
+                            }}
+                          >
+                            Rounds
+                          </p>
+                          <ul style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {olympiad.rounds.map((round) => {
+                              let href = `/educator/round_view?id=${round.id}`;
+                              if (round.state === 'open' || round.state === 'scheduled') {
+                                href = `/rounds/${round.id}/papers`;
+                              } else if (round.state === 'closed' || round.state === 'released') {
+                                href = `/rounds/${round.id}/closed_round`;
+                              }
+                              return (
+                                <li
+                                  key={round.id}
+                                  style={{ display: 'flex', gap: '4px', alignItems: 'stretch' }}
+                                >
+                                  <Link
+                                    href={href}
+                                    style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      padding: '6px 10px',
+                                      borderRadius: '6px',
+                                      border: '1px solid rgba(139, 92, 246, 0.15)',
+                                      textDecoration: 'none',
+                                      fontSize: '12px',
+                                      flex: 1,
+                                      background: 'var(--c-bg-ffffff)',
+                                    }}
+                                  >
+                                    <span>{round.name}</span>
+                                    <span
+                                      style={{
+                                        textTransform: 'capitalize',
+                                        opacity: 0.6,
+                                        fontSize: '11px',
+                                      }}
+                                    >
+                                      {round.state}
+                                    </span>
+                                  </Link>
+                                  <Link
+                                    href={`/rounds/${round.id}/notifications`}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      padding: '6px 10px',
+                                      borderRadius: '6px',
+                                      border: '1px solid rgba(139, 92, 246, 0.15)',
+                                      textDecoration: 'none',
+                                      fontSize: '11px',
+                                      color: 'rgba(139, 92, 246, 0.9)',
+                                      background: 'var(--c-bg-ffffff)',
+                                    }}
+                                  >
+                                    Notifications
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+
+                      {olympiad.rounds.length === 0 && (
+                        <div style={{ marginTop: '12px' }}>
+                          <Link
+                            href={`/rounds/new?olympiadId=${olympiad.id}&olympiadName=${encodeURIComponent(olympiad.name)}`}
+                            className="panel-create"
+                            style={{ fontSize: '11px' }}
+                          >
+                            <Plus size={13} /> Add a round
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* Co-organisers section */}
+                      <div
+                        style={{
+                          marginTop: '14px',
+                          borderTop: '1px solid var(--c-bd-f0edf6)',
+                          paddingTop: '12px',
+                        }}
+                      >
+                        <div
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid rgba(139, 92, 246, 0.2)',
-                            textDecoration: 'none',
-                            fontSize: '0.9em',
-                            flex: 1,
-                          }}
-                        >
-                          <span>{round.name}</span>
-                          <span style={{ textTransform: 'capitalize', opacity: 0.7 }}>
-                            {round.state}
-                          </span>
-                        </Link>
-                        <Link
-                          href={`/rounds/${round.id}/notifications`}
-                          style={{
-                            display: 'flex',
                             alignItems: 'center',
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid rgba(139, 92, 246, 0.2)',
-                            textDecoration: 'none',
-                            fontSize: '0.85em',
-                            color: 'rgba(139, 92, 246, 0.9)',
+                            marginBottom: '6px',
                           }}
                         >
-                          Notifications
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-
-              {/* Co-organisers section */}
-              <div style={{ marginTop: '12px' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '6px',
-                  }}
-                >
-                  <strong style={{ fontSize: '0.9em' }}>Co-organisers</strong>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowAddOrganiser(showAddOrganiser === olympiad.id ? null : olympiad.id)
-                    }
-                    className="button"
-                    style={{ fontSize: '0.75em', padding: '3px 8px' }}
-                  >
-                    {showAddOrganiser === olympiad.id ? 'Cancel' : '+ Add organiser'}
-                  </button>
-                </div>
-
-                {(organisersByOlympiad[olympiad.id] || []).length === 0 ? (
-                  <p
-                    className="description"
-                    style={{ fontSize: '0.8em', fontStyle: 'italic', margin: '4px 0' }}
-                  >
-                    No organisers yet.
-                  </p>
-                ) : (
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 4px 0' }}>
-                    {(organisersByOlympiad[olympiad.id] || []).map((org) => (
-                      <li
-                        key={org.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '4px 0',
-                          fontSize: '0.85em',
-                          borderBottom: '1px solid rgba(139, 92, 246, 0.1)',
-                        }}
-                      >
-                        <span>
-                          {org.name} ({org.email})
-                          {org.isCreator && (
-                            <span
-                              style={{
-                                marginLeft: '6px',
-                                fontSize: '0.8em',
-                                color: 'rgba(139, 92, 246, 0.7)',
-                              }}
-                            >
-                              creator
-                            </span>
-                          )}
-                        </span>
-                        {!org.isCreator && (
+                          <strong style={{ fontSize: '11px', color: 'var(--c-t-6d667f)' }}>
+                            Co-organisers
+                          </strong>
                           <button
                             type="button"
-                            onClick={() => handleRemoveOrganiser(olympiad.id, org.organiserId)}
+                            onClick={() =>
+                              setShowAddOrganiser(
+                                showAddOrganiser === olympiad.id ? null : olympiad.id
+                              )
+                            }
                             style={{
                               background: 'none',
                               border: 'none',
-                              color: 'red',
+                              color: 'var(--violet)',
+                              fontSize: '10px',
+                              fontWeight: 700,
                               cursor: 'pointer',
-                              fontSize: '0.85em',
                             }}
                           >
-                            Remove
+                            {showAddOrganiser === olympiad.id ? 'Cancel' : '+ Add'}
                           </button>
+                        </div>
+
+                        {(organisersByOlympiad[olympiad.id] || []).length === 0 ? (
+                          <p
+                            style={{
+                              fontSize: '11px',
+                              fontStyle: 'italic',
+                              color: 'var(--c-t-6f667d)',
+                              margin: '2px 0',
+                            }}
+                          >
+                            No organisers yet.
+                          </p>
+                        ) : (
+                          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 4px 0' }}>
+                            {(organisersByOlympiad[olympiad.id] || []).map((org) => (
+                              <li
+                                key={org.id}
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '3px 0',
+                                  fontSize: '11px',
+                                  borderBottom: '1px solid rgba(139, 92, 246, 0.08)',
+                                }}
+                              >
+                                <span>
+                                  {org.name} ({org.email})
+                                  {org.isCreator && (
+                                    <span
+                                      style={{
+                                        marginLeft: '4px',
+                                        fontSize: '9px',
+                                        color: 'rgba(139, 92, 246, 0.6)',
+                                      }}
+                                    >
+                                      creator
+                                    </span>
+                                  )}
+                                </span>
+                                {!org.isCreator && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveOrganiser(olympiad.id, org.organiserId)
+                                    }
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--c-t-b42318)',
+                                      cursor: 'pointer',
+                                      fontSize: '10px',
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         )}
-                      </li>
-                    ))}
-                  </ul>
+
+                        {showAddOrganiser === olympiad.id && (
+                          <form
+                            onSubmit={(e) => handleAddOrganiser(e, olympiad.id)}
+                            style={{
+                              display: 'flex',
+                              gap: '6px',
+                              alignItems: 'center',
+                              marginTop: '6px',
+                            }}
+                          >
+                            <select
+                              aria-label="Organiser to add as co-organiser"
+                              value={selectedOrganiserId}
+                              onChange={(e) => setSelectedOrganiserId(e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: '4px 6px',
+                                borderRadius: '6px',
+                                border: '1px solid rgba(139, 92, 246, 0.25)',
+                                fontSize: '11px',
+                              }}
+                              required
+                            >
+                              <option value="">Select an organiser...</option>
+                              {allOrganisers
+                                .filter(
+                                  (o) =>
+                                    !(organisersByOlympiad[olympiad.id] || []).some(
+                                      (existing) => existing.organiserId === o.id
+                                    )
+                                )
+                                .map((o) => (
+                                  <option key={o.id} value={o.id}>
+                                    {o.name} ({o.email})
+                                  </option>
+                                ))}
+                            </select>
+                            <button
+                              type="submit"
+                              disabled={organiserStatus === 'submitting'}
+                              className="button"
+                              style={{ fontSize: '10px', padding: '4px 10px' }}
+                            >
+                              {organiserStatus === 'submitting' ? 'Adding...' : 'Add'}
+                            </button>
+                          </form>
+                        )}
+
+                        {organiserError && (
+                          <p
+                            role="alert"
+                            style={{
+                              color: 'var(--c-t-b42318)',
+                              fontSize: '10px',
+                              margin: '4px 0 0',
+                            }}
+                          >
+                            {organiserError}
+                          </p>
+                        )}
+                      </div>
+                    </form>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {status === 'ready' && olympiads.length > 0 && (
+            <Link
+              href="/organiser"
+              className="panel-create"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowCreateForm(true);
+              }}
+            >
+              <Plus size={15} /> Post a new Olympiad
+            </Link>
+          )}
+        </article>
+
+        {/* Access requests panel */}
+        <article className="dashboard-panel requests-panel">
+          <div className="dashboard-panel-heading">
+            <div>
+              <span className="command-eyebrow">
+                <UserPlus size={13} /> Access requests{' '}
+                {accessStatus === 'ready' && accessRequests.length > 0 && (
+                  <b className="request-count">{accessRequests.length}</b>
                 )}
+              </span>
+              <h2>Educators waiting to join</h2>
+              <p>Review school requests for your Olympiads.</p>
+            </div>
+          </div>
 
-                {showAddOrganiser === olympiad.id && (
-                  <form
-                    onSubmit={(e) => handleAddOrganiser(e, olympiad.id)}
-                    style={{
-                      display: 'flex',
-                      gap: '8px',
-                      alignItems: 'center',
-                      marginTop: '6px',
-                    }}
-                  >
-                    <select
-                      value={selectedOrganiserId}
-                      onChange={(e) => setSelectedOrganiserId(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        border: '1px solid rgba(139, 92, 246, 0.3)',
-                        fontSize: '0.85em',
-                      }}
-                      required
-                    >
-                      <option value="">Select an organiser...</option>
-                      {allOrganisers
-                        .filter(
-                          (o) =>
-                            !(organisersByOlympiad[olympiad.id] || []).some(
-                              (existing) => existing.organiserId === o.id
-                            )
-                        )
-                        .map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.name} ({o.email})
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      type="submit"
-                      disabled={organiserStatus === 'submitting'}
-                      className="button"
-                      style={{ fontSize: '0.8em', padding: '4px 10px' }}
-                    >
-                      {organiserStatus === 'submitting' ? 'Adding...' : 'Add'}
-                    </button>
-                  </form>
-                )}
+          {accessStatus === 'loading' && (
+            <p style={{ color: 'var(--c-t-6d667c)', fontSize: '13px', marginTop: '18px' }}>
+              Loading access requests...
+            </p>
+          )}
 
-                {organiserError && (
-                  <p style={{ color: 'red', fontSize: '0.8em', margin: '4px 0' }}>
-                    {organiserError}
-                  </p>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+          {accessStatus === 'error' && (
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '18px' }}
+            >
+              Couldn&apos;t load requests.
+            </p>
+          )}
 
-      {/* Access requests section */}
-      <h2 style={{ marginTop: '32px' }}>Access requests</h2>
+          {accessStatus === 'ready' && accessRequests.length === 0 && (
+            <p style={{ color: 'var(--c-t-6f667d)', fontSize: '12px', marginTop: '18px' }}>
+              No pending access requests.
+            </p>
+          )}
 
-      {accessStatus === 'loading' && <p className="description">Loading access requests...</p>}
-
-      {accessStatus === 'error' && (
-        <p className="message">Couldn&apos;t load access requests. Try refreshing the page.</p>
-      )}
-
-      {accessStatus === 'ready' &&
-        (accessRequests.length === 0 ? (
-          <p className="description">No pending access requests.</p>
-        ) : (
-          <ul style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {accessRequests.map((request) => (
-              <li key={request.id} className="card" style={{ padding: '16px' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '12px',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 700 }}>
-                      {request.school.name} — {request.olympiad.name}
-                    </p>
-                    <p className="description" style={{ margin: '4px 0 0', fontSize: '0.85em' }}>
-                      Requested by{' '}
-                      {request.requestedBy
-                        ? `${request.requestedBy.name} (${request.requestedBy.email})`
-                        : 'an educator'}{' '}
-                      on {formatDate(request.requestedAt)}
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          {accessStatus === 'ready' && accessRequests.length > 0 && (
+            <div className="request-list">
+              {accessRequests.map((request) => (
+                <div className="request-row" key={request.id}>
+                  <span className="request-avatar">
+                    {initialsFor(request.school?.name || request.requestedBy?.name || '??')}
+                  </span>
+                  <span>
+                    <strong>{request.school?.name}</strong>
+                    <small>
+                      {request.olympiad?.name}
+                      {request.requestedBy ? ` · ${request.requestedBy.name}` : ''}
+                      {` · ${formatDate(request.requestedAt)}`}
+                    </small>
+                  </span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
                     <button
                       type="button"
                       onClick={() => handleAccessDecision(request.id, 'approve')}
                       disabled={decidingId === request.id}
-                      className="button"
-                      style={{ fontSize: '0.85em', padding: '6px 14px' }}
+                      className="request-review"
+                      style={{ background: 'var(--c-bg-e6f7ed)', color: 'var(--c-t-1a7a3a)' }}
                     >
-                      Approve
+                      {decidingId === request.id ? '...' : 'Approve'}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleAccessDecision(request.id, 'decline')}
                       disabled={decidingId === request.id}
-                      className="button"
-                      style={{ fontSize: '0.85em', padding: '6px 14px' }}
+                      className="request-review"
                     >
-                      Decline
+                      {decidingId === request.id ? '...' : 'Decline'}
                     </button>
                   </div>
                 </div>
-              </li>
-            ))}
-          </ul>
-        ))}
+              ))}
+            </div>
+          )}
 
-      {decisionError && <p className="message">{decisionError}</p>}
-    </main>
+          {decisionError && (
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '11px', marginTop: '8px' }}
+            >
+              {decisionError}
+            </p>
+          )}
+        </article>
+      </section>
+
+      {/* Activity panel */}
+      <section
+        className="organiser-activity-panel"
+        aria-label="Recent activity"
+        data-tour="organiser-activity"
+      >
+        <div className="dashboard-panel-heading">
+          <div>
+            <span className="command-eyebrow">
+              <History size={13} /> Recent activity
+            </span>
+            <h2>What&apos;s moving across your workspace</h2>
+          </div>
+          <Link href="/organiser/replay" className="panel-link">
+            Open Replay <ChevronRight size={14} />
+          </Link>
+        </div>
+
+        <ActivityFeed />
+      </section>
+    </OrganiserShell>
   );
 }

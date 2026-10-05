@@ -12,7 +12,7 @@ datasource db {
 model Olympiad {
   id           String              @id @default(uuid())
   name         String
-  timezone     String
+  timezone     String              @default("UTC")
   description  String? // organiser-written blurb shown to educators requesting access
   grades       String? // target learner grades, e.g. "Grade 8-12"
   startDate    DateTime? // olympiad run dates, organiser-set
@@ -44,16 +44,17 @@ model Round {
   openTime               DateTime
   closeTime              DateTime
   state                  String             @default("scheduled")
-  qualifyingThreshold    Float? // minimum score % (0-100) required to pass; null = no gate
-  prerequisiteRoundId    String? // the round that must be passed first; null = no prerequisite
+  qualifyingThreshold    Float?             // minimum score % (0-100) required to pass; null = no gate
+  prerequisiteRoundId    String?            // the round that must be passed first; null = no prerequisite
   autoAdvanceProcessedAt DateTime?
+
   notificationLogs       NotificationLog[]
   notificationRules      NotificationRule[]
   auditLogs              AuditLog[]
   paper                  Paper?
   olympiad               Olympiad           @relation(fields: [olympiadId], references: [id])
   prerequisiteRound      Round?             @relation("RoundPrerequisites", fields: [prerequisiteRoundId], references: [id])
-  dependentRounds        Round[]            @relation("RoundPrerequisites")
+  dependentRounds        Round[]             @relation("RoundPrerequisites")
   roundEntrants          RoundEntrant[]
   sittings               Sitting[]
   submissions            Submission[]
@@ -253,9 +254,21 @@ model NotificationRule {
 // audit what happened and when.
 model AuditLog {
   id        String   @id @default(uuid())
-  action    String   // 'round_opened' | 'round_closed' | 'auto_advanced' | 'notification_sent'
+  action    String   // 'round_opened' | 'round_closed' | 'auto_advanced' | 'notification_sent' | 'entrants_registered'
   timestamp DateTime @default(now())
   roundId   String?
   payload   Json?    // detail data, e.g. { entrantId, nextRoundId } for auto-advance
   round     Round?   @relation(fields: [roundId], references: [id])
 }
+
+// API keys for external consumers to access read-only endpoints.
+// Keys are issued by organisers and can be revoked at any time.
+model ApiKey {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  name      String    // e.g. "Partner School API"
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+  createdBy String    // organiser user id who created this key
+}
+

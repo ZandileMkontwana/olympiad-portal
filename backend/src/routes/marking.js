@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const activityBus = require('../lib/activityBus');
 const { requireRole } = require('../middleware/auth');
 const { isOlympiadOrganiser } = require('../lib/authorization');
 
@@ -106,7 +107,14 @@ router.patch('/marking/:id', ...requireRole('organiser'), async (req, res) => {
 
     const task = await prisma.markingTask.findUnique({
       where: { id: req.params.id },
-      include: { submission: { select: { round: { select: { olympiadId: true } } } } },
+      include: {
+        submission: {
+          select: {
+            round: { select: { olympiadId: true } },
+            entrant: { select: { name: true } },
+          },
+        },
+      },
     });
     if (!task) {
       return res.status(404).json({ error: 'Marking task not found' });
@@ -126,6 +134,13 @@ router.patch('/marking/:id', ...requireRole('organiser'), async (req, res) => {
         status: 'marked',
         markedAt: new Date(),
       },
+    });
+
+    // Live activity feed (US-4.1): manual marking was recorded.
+    activityBus.broadcast({
+      type: 'marking_completed',
+      message: `Marking completed for ${task.submission.entrant.name}`,
+      olympiadId,
     });
 
     res.json(updated);

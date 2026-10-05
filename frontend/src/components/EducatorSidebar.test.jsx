@@ -28,6 +28,7 @@ vi.mock('next/link', () => ({
 }));
 
 import EducatorSidebar from './EducatorSidebar';
+import { expectNoAxeViolations } from '@/test/axe';
 
 describe('EducatorSidebar', () => {
   beforeEach(() => {
@@ -146,5 +147,69 @@ describe('EducatorSidebar', () => {
 
     expect(screen.getByText(/loading account/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /log out/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('EducatorSidebar mobile drawer', () => {
+  beforeEach(() => {
+    clerkState.user = {
+      fullName: 'Ms Teacher',
+      primaryEmailAddress: { emailAddress: 'teacher@school.com' },
+    };
+    pathState.pathname = '/educator';
+  });
+
+  it('has a stable id and is closed by default', () => {
+    const { container } = render(<EducatorSidebar />);
+    const aside = container.querySelector('aside');
+    expect(aside).toHaveAttribute('id', 'app-sidebar');
+    expect(aside).not.toHaveClass('sidebar-open');
+    expect(screen.queryByRole('button', { name: 'Close menu' })).not.toBeInTheDocument();
+  });
+
+  it('shows the open state and calls onClose from the close button and nav links', () => {
+    const onClose = vi.fn();
+    const { container } = render(<EducatorSidebar open onClose={onClose} />);
+    expect(container.querySelector('aside')).toHaveClass('sidebar-open');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close menu' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByText('Archive').closest('a'));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('EducatorSidebar accessibility', () => {
+  it('has no axe accessibility violations (closed and open drawer)', async () => {
+    const { container, rerender } = render(<EducatorSidebar />);
+    await expectNoAxeViolations(container);
+    rerender(<EducatorSidebar open onClose={() => {}} />);
+    await expectNoAxeViolations(container);
+  });
+});
+
+describe('EducatorSidebar onboarding (#317)', () => {
+  beforeEach(() => {
+    clerkState.user = {
+      fullName: 'Ms Teacher',
+      primaryEmailAddress: { emailAddress: 'teacher@school.com' },
+    };
+    pathState.pathname = '/educator';
+  });
+
+  it('offers a Replay tour button in Settings', () => {
+    render(<EducatorSidebar />);
+    fireEvent.click(screen.getByText('Settings'));
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replay tour' })).toBeInTheDocument();
+  });
+
+  it('marks the School Dashboard link as a tour anchor', () => {
+    render(<EducatorSidebar />);
+    expect(screen.getByText('School Dashboard').closest('a')).toHaveAttribute(
+      'data-tour',
+      'educator-nav-school'
+    );
   });
 });
