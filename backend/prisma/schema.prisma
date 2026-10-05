@@ -135,6 +135,41 @@ model Paper {
   uploadedAt  DateTime @default(now())
   memoAnswers Json?
   round       Round    @relation(fields: [roundId], references: [id])
+  questions   Question[]
+}
+
+model Question {
+  id           String            @id @default(uuid())
+  paperId      String
+  number       Int               // question number within the paper
+  text         String            // question text/content
+  type         String            // 'multiple_choice' | 'short_answer' | 'essay' | 'numeric'
+  marks        Float             // maximum score for this question
+  memoAnswer   String?           // correct answer for auto-marking (if applicable)
+  options      Json?             // MCQ options, e.g. [{"label": "A", "text": "..."}, ...]
+  rubric       Json?             // marking rubric for essay/short answer questions
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  paper        Paper             @relation(fields: [paperId], references: [id])
+  variants     QuestionVariant[]
+
+  @@unique([paperId, number])
+  @@index([paperId])
+}
+
+model QuestionVariant {
+  id         String   @id @default(uuid())
+  questionId String
+  label      String   // e.g. "Variant A", "Variant B", "Version 1"
+  text       String?  // variant-specific question text (null = use parent question text)
+  memoAnswer String?  // variant-specific correct answer
+  options    Json?    // variant-specific MCQ options
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  question   Question @relation(fields: [questionId], references: [id])
+
+  @@unique([questionId, label])
+  @@index([questionId])
 }
 
 model Submission {
