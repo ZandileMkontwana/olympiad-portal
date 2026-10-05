@@ -19,7 +19,7 @@ export const SIDEBAR_ID = 'app-sidebar';
  *  - section: label shown in the topbar breadcrumb
  *  - initials: avatar initials shown in the topbar
  */
-export default function AppShell({ renderSidebar, section, initials = 'AM', children }) {
+export default function AppShell({ renderSidebar, section, initials = '', children }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const menuButtonRef = useRef(null);

@@ -475,7 +475,10 @@ body {
   display: flex;
   flex-direction: column;
   padding: 25px 16px 18px;
-  min-height: 100vh;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
   z-index: 20;
 }
 .sidebar-top {

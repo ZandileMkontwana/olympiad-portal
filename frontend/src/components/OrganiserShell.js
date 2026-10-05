@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import '@/app/auth.css';
 import {
@@ -24,6 +24,8 @@ import ThemeToggle from '@/components/ThemeToggle';
 import Modal from '@/components/Modal';
 import { TourHost, useTour } from '@/components/OnboardingTour';
 import { ORGANISER_TOUR } from '@/lib/tour';
+import { buildActivityStreamUrl } from '@/lib/api';
+import { useAuth } from '@clerk/nextjs';
 
 const ClerkSignOutButton = dynamic(() => import('@clerk/nextjs').then((mod) => mod.SignOutButton), {
   ssr: false,
@@ -35,6 +37,11 @@ const NAV_ITEMS = [
   { href: '/organiser/remarks', label: 'Remarks', icon: MessageSquareQuote, key: 'remarks' },
   { href: '/organiser/replay', label: 'Replay', icon: History, key: 'replay' },
   { href: '/organiser/archive', label: 'Archive', icon: ArchiveIcon, key: 'archive' },
+];
+
+const ALL_LINKS = [
+  ...NAV_ITEMS.map((n) => ({ href: n.href, label: n.label })),
+  { href: '/rounds/new', label: 'Create round' },
 ];
 
 /**
@@ -57,19 +64,78 @@ export default function OrganiserShell(props) {
 
 function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
   const { startTour } = useTour();
+  const { getToken } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const initials = initialsFrom(user?.name || user?.email || '?');
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const menuButtonRef = useRef(null);
   const wasOpen = useRef(false);
   const close = useCallback(() => setOpen(false), []);
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+
+  const filteredLinks = ALL_LINKS.filter((l) =>
+    l.label.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Connect to the activity SSE stream for the notifications dropdown.
+  useEffect(() => {
+    if (!notifOpen) return undefined;
+    let es;
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      es = new EventSource(buildActivityStreamUrl(token));
+      es.addEventListener('history', (e) => {
+        try { setNotifications(JSON.parse(e.data).slice(0, 8)); } catch {}
+      });
+      es.addEventListener('message', (e) => {
+        try {
+          const item = JSON.parse(e.data);
+          setNotifications((prev) => [item, ...prev].slice(0, 8));
+        } catch {}
+      });
+    })();
+    return () => { if (es) es.close(); };
+  }, [notifOpen, getToken]);
+
+  // Close dropdowns on click outside or Escape.
+  useEffect(() => {
+    if (!searchOpen && !notifOpen) return undefined;
+    const onClick = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { setSearchOpen(false); setNotifOpen(false); }
+    };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [searchOpen, notifOpen]);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   // Close the mobile drawer whenever the route changes. (state adjusted during render, not in an effect)
   const [lastPathname, setLastPathname] = useState(pathname);
   if (lastPathname !== pathname) {
     setLastPathname(pathname);
     setOpen(false);
+    setSearchOpen(false);
+    setNotifOpen(false);
   }
 
   useEffect(() => {
@@ -108,7 +174,7 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
         >
           <X size={20} aria-hidden="true" />
         </button>
-        <Link href="/" className="organiser-brand">
+        <Link href="/organiser" className="organiser-brand">
           <span className="organiser-brand-mark">
             <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-hidden="true">
               <circle cx="20" cy="20" r="18" stroke="#6c4fd8" strokeWidth="2.5" fill="none" />
@@ -211,13 +277,70 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
           </div>
           <div className="organiser-actions">
             <ThemeToggle />
-            <button className="icon-button" aria-label="Search" type="button">
-              <Search size={18} />
-            </button>
-            <button className="icon-button" aria-label="Notifications" type="button">
-              <Bell size={18} />
-              <i />
-            </button>
+            <div className="organiser-dropdown-wrap" ref={searchRef}>
+              <button
+                className="icon-button"
+                aria-label="Search"
+                aria-expanded={searchOpen}
+                type="button"
+                onClick={() => { setSearchOpen((v) => !v); setNotifOpen(false); }}
+              >
+                <Search size={18} />
+              </button>
+              {searchOpen && (
+                <div className="organiser-dropdown organiser-search-dropdown" role="search">
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    placeholder="Search pages..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="organiser-search-input"
+                  />
+                  <nav aria-label="Search results">
+                    {filteredLinks.length === 0 && (
+                      <p className="organiser-search-empty">No matching pages</p>
+                    )}
+                    {filteredLinks.map((l) => (
+                      <Link
+                        key={l.href}
+                        href={l.href}
+                        className="organiser-search-result"
+                        onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+                      >
+                        {l.label}
+                      </Link>
+                    ))}
+                  </nav>
+                </div>
+              )}
+            </div>
+            <div className="organiser-dropdown-wrap" ref={notifRef}>
+              <button
+                className="icon-button"
+                aria-label="Notifications"
+                aria-expanded={notifOpen}
+                type="button"
+                onClick={() => { setNotifOpen((v) => !v); setSearchOpen(false); }}
+              >
+                <Bell size={18} />
+                {notifications.length > 0 && <i />}
+              </button>
+              {notifOpen && (
+                <div className="organiser-dropdown organiser-notif-dropdown" role="region" aria-label="Notifications">
+                  <h4 className="organiser-dropdown-heading">Recent activity</h4>
+                  {notifications.length === 0 && (
+                    <p className="organiser-search-empty">No recent activity</p>
+                  )}
+                  {notifications.map((n, i) => (
+                    <div key={`${n.type}-${n.ts}-${i}`} className="organiser-notif-item">
+                      <span className="organiser-notif-type">{formatNotifType(n.type)}</span>
+                      <span className="organiser-notif-detail">{n.detail || n.type}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <span className="top-avatar">{initials}</span>
           </div>
         </header>
@@ -260,4 +383,11 @@ function initialsFrom(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
+}
+
+function formatNotifType(type) {
+  if (!type) return 'Activity';
+  return type
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
