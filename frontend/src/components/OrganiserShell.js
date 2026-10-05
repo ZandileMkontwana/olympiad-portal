@@ -17,9 +17,13 @@ import {
   Menu,
   MoreHorizontal,
   Search,
+  Settings2,
   X,
 } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
+import Modal from '@/components/Modal';
+import { TourHost, useTour } from '@/components/OnboardingTour';
+import { ORGANISER_TOUR } from '@/lib/tour';
 
 const ClerkSignOutButton = dynamic(() => import('@clerk/nextjs').then((mod) => mod.SignOutButton), {
   ssr: false,
@@ -42,7 +46,18 @@ const NAV_ITEMS = [
  *  - user: { name, email, role } — used for the profile block and avatar initials
  *  - children: page content rendered inside <div className="organiser-main">
  */
-export default function OrganiserShell({ activeNav, breadcrumb, user, children }) {
+export default function OrganiserShell(props) {
+  // New organisers get a short guided tour on their first visit (#317).
+  return (
+    <TourHost tour={ORGANISER_TOUR} userId={props.user?.id ?? props.user?.email}>
+      <OrganiserShellLayout {...props} />
+    </TourHost>
+  );
+}
+
+function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
+  const { startTour } = useTour();
+  const [showSettings, setShowSettings] = useState(false);
   const initials = initialsFrom(user?.name || user?.email || '?');
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -119,7 +134,7 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
         </Link>
 
         <p className="organiser-nav-label">Workspace</p>
-        <nav className="organiser-nav" aria-label="Organiser navigation">
+        <nav className="organiser-nav" aria-label="Organiser navigation" data-tour="organiser-nav">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeNav === item.key;
@@ -138,6 +153,16 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
         </nav>
 
         <div className="organiser-sidebar-bottom">
+          <button
+            type="button"
+            className="organiser-logout organiser-settings"
+            onClick={() => {
+              close();
+              setShowSettings(true);
+            }}
+          >
+            <Settings2 size={14} aria-hidden="true" /> Settings
+          </button>
           {ClerkSignOutButton && (
             <ClerkSignOutButton redirectUrl="/login">
               <button type="button" className="organiser-logout">
@@ -201,6 +226,32 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
           {children}
         </main>
       </section>
+
+      {showSettings && (
+        <Modal title="Settings" onClose={() => setShowSettings(false)}>
+          <div className="modal-stack">
+            <section className="modal-card" aria-labelledby="settings-profile">
+              <h3 id="settings-profile">Profile</h3>
+              <p>Name: {user?.name || 'N/A'}</p>
+              <p>Email: {user?.email || 'N/A'}</p>
+            </section>
+            <section className="modal-card" aria-labelledby="settings-tour">
+              <h3 id="settings-tour">Onboarding</h3>
+              <p>Take the short guided tour of the portal again.</p>
+              <button
+                type="button"
+                className="modal-action"
+                onClick={() => {
+                  setShowSettings(false);
+                  startTour();
+                }}
+              >
+                Replay tour
+              </button>
+            </section>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

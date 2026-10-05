@@ -5,6 +5,11 @@ import userEvent from '@testing-library/user-event';
 // Mock @/hooks/useRequireRole so we control the logged-in user directly,
 // without going through Clerk or a real role check.
 const mockUseRequireRole = vi.fn();
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/organiser/test',
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
+
 vi.mock('@/hooks/useRequireRole', () => ({
   useRequireRole: () => mockUseRequireRole(),
 }));

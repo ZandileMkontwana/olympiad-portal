@@ -1,0 +1,181 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   Onboarding tour (Sprint 4, #317). Uses the theme variables from theme.css,
+   so it follows light and dark mode. Sits above everything else (modals use
+   z-index 1000, the mobile drawer 40).
+   ─────────────────────────────────────────────────────────────────────────── */
+.tour-root {
+  inset: 0;
+  position: fixed;
+  z-index: 1500;
+}
+.tour-backdrop {
+  inset: 0;
+  position: absolute;
+}
+.tour-backdrop-dim {
+  background: rgba(12, 9, 28, 0.62);
+}
+
+/* The spotlight is a transparent box whose huge shadow dims the rest of the page. */
+.tour-spotlight {
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 3px #a897f7,
+    0 0 0 9999px rgba(12, 9, 28, 0.62);
+  pointer-events: none;
+  position: fixed;
+  transition:
+    top 0.2s ease,
+    left 0.2s ease,
+    width 0.2s ease,
+    height 0.2s ease;
+}
+
+.tour-card {
+  background: var(--t-surface, #fff);
+  border: 1px solid var(--c-bd-ebe7f4, #ebe7f4);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(12, 9, 28, 0.35);
+  box-sizing: border-box;
+  color: var(--t-ink, #211b33);
+  max-width: min(380px, calc(100vw - 24px));
+  padding: 20px 20px 16px;
+  position: fixed;
+  width: 380px;
+}
+.tour-card:focus {
+  outline: none;
+}
+.tour-card:focus-visible {
+  outline: 3px solid var(--focus-ring, #5435c4) !important;
+}
+.tour-card-centered {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+/* Phones: dock the card at the bottom so it never covers the highlight. */
+.tour-card-docked {
+  border-radius: 16px 16px 0 0;
+  bottom: 0;
+  left: 0;
+  max-width: none;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+}
+
+.tour-close {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--t-ink-soft, #6b6480);
+  cursor: pointer;
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 36px;
+}
+.tour-close:hover {
+  background: rgb(139 92 246 / 0.14);
+}
+.tour-counter {
+  color: var(--t-ink-soft, #6b6480);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+.tour-title {
+  font-size: 18px;
+  line-height: 1.25;
+  margin: 0 28px 8px 0;
+}
+.tour-body {
+  color: var(--t-ink-soft, #6b6480);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+.tour-dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.tour-dot {
+  background: rgb(139 92 246 / 0.28);
+  border-radius: 999px;
+  height: 6px;
+  width: 6px;
+}
+.tour-dot-active {
+  background: #6c4fd8;
+  width: 18px;
+}
+.tour-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+.tour-nav {
+  display: flex;
+  gap: 8px;
+}
+.tour-skip {
+  background: transparent;
+  border: 0;
+  color: var(--t-ink-soft, #6b6480);
+  cursor: pointer;
+  font-size: 13px;
+  min-height: 44px;
+  padding: 0 4px;
+  text-decoration: underline;
+}
+.tour-skip:hover {
+  color: var(--t-ink, #211b33);
+}
+.tour-button {
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 40px;
+  padding: 0 18px;
+}
+.tour-button-primary {
+  background: var(--violet-fill, #6c4fd8);
+  border: 1px solid transparent;
+  color: #fff;
+}
+.tour-button-primary:hover {
+  background: var(--violet-dark-fill, #4a34a8);
+}
+.tour-button-ghost {
+  background: transparent;
+  border: 1px solid var(--c-bd-ebe7f4, #d8d2ea);
+  color: var(--t-ink, #211b33);
+}
+.tour-button-ghost:hover {
+  background: rgb(139 92 246 / 0.12);
+}
+@media (pointer: coarse) {
+  .tour-button {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-spotlight {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .tour-card,
+  .tour-spotlight {
+    border: 2px solid CanvasText;
+  }
+}
