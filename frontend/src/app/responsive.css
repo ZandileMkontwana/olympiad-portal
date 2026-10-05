@@ -103,6 +103,7 @@ textarea {
   .sidebar,
   .organiser-sidebar {
     box-shadow: none;
+    flex: none; /* Don't reserve space in flex container when position: fixed */
     height: 100dvh;
     inset: 0 auto 0 0;
     min-height: 0;
@@ -116,13 +117,7 @@ textarea {
     width: min(280px, 86vw);
     z-index: 40;
   }
-  /* When sidebar is a drawer, content takes full width */
-  .organiser-shell {
-    display: block;
-  }
-  .organiser-content {
-    width: 100%;
-  }
+  /* Sidebar is position:fixed + flex:none on mobile, so content fills full width */
   .sidebar-open,
   .organiser-sidebar.is-open {
     box-shadow: 12px 0 30px rgba(23, 37, 84, 0.18);
