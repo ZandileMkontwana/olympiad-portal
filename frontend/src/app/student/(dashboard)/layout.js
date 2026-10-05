@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import StudentSidebar from '@/components/StudentSidebar';
 import AppShell from '@/components/AppShell';
 import { getStudentSession } from '@/lib/studentSession';
@@ -14,13 +14,10 @@ function initialsFrom(name) {
 }
 
 export default function StudentLayout({ children }) {
-  const [initials, setInitials] = useState('');
-  useEffect(() => {
+  const [initials] = useState(() => {
     const session = getStudentSession();
-    if (session?.user) {
-      setInitials(initialsFrom(session.user.name || session.user.email || ''));
-    }
-  }, []);
+    return session?.user ? initialsFrom(session.user.name || session.user.email || '') : '';
+  });
   return (
     <AppShell
       section="Student overview"
