@@ -66,6 +66,7 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
   const { startTour } = useTour();
   const { getToken } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const initials = initialsFrom(user?.name || user?.email || '?');
   const pathname = usePathname();
   const router = useRouter();
@@ -224,6 +225,16 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
             className="organiser-logout organiser-settings"
             onClick={() => {
               close();
+              setShowCalendar(true);
+            }}
+          >
+            <CalendarDays size={14} aria-hidden="true" /> Calendar
+          </button>
+          <button
+            type="button"
+            className="organiser-logout organiser-settings"
+            onClick={() => {
+              close();
               setShowSettings(true);
             }}
           >
@@ -372,6 +383,16 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
                 Replay tour
               </button>
             </section>
+          </div>
+        </Modal>
+      )}
+
+      {showCalendar && (
+        <Modal title="Calendar" onClose={() => setShowCalendar(false)}>
+          <p className="modal-intro">Your upcoming deadlines and events will appear here.</p>
+          <div className="modal-empty">
+            <CalendarDays size={48} aria-hidden="true" />
+            <p>No upcoming events</p>
           </div>
         </Modal>
       )}
