@@ -30,10 +30,10 @@ import {
 /* ── helpers ──────────────────────────────────────────────────────────── */
 
 const STATE_STYLES = {
-  scheduled: { bg: 'rgba(139,92,246,0.08)', color: '#6d3fd1', label: 'Scheduled' },
-  open: { bg: 'rgba(63,174,122,0.1)', color: '#2b7854', label: 'Open now' },
-  closed: { bg: 'rgba(139,92,246,0.06)', color: '#706391', label: 'Closed' },
-  released: { bg: 'rgba(224,168,62,0.12)', color: '#85661e', label: 'Released' },
+  scheduled: { bg: 'rgba(139,92,246,0.08)', color: 'var(--c-t-6d3fd1)', label: 'Scheduled' },
+  open: { bg: 'rgba(63,174,122,0.1)', color: 'var(--c-t-2b7854)', label: 'Open now' },
+  closed: { bg: 'rgba(139,92,246,0.06)', color: 'var(--c-t-706391)', label: 'Closed' },
+  released: { bg: 'rgba(224,168,62,0.12)', color: 'var(--c-t-85661e)', label: 'Released' },
 };
 
 function timeUntil(iso) {
@@ -77,21 +77,21 @@ function todayFormatted() {
 }
 
 const ACCESS_BADGES = {
-  pending: { label: 'Requested', bg: 'rgba(245,158,11,0.12)', color: '#aa4f09' },
-  declined: { label: 'Declined', bg: 'rgba(224,97,95,0.1)', color: '#b42318' },
+  pending: { label: 'Requested', bg: 'rgba(245,158,11,0.12)', color: 'var(--c-t-aa4f09)' },
+  declined: { label: 'Declined', bg: 'rgba(224,97,95,0.1)', color: 'var(--c-t-b42318)' },
 };
 
 const META_CHIP_STYLE = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: '6px',
-  background: 'white',
+  background: 'var(--t-surface)',
   border: '1px solid rgba(139,92,246,0.1)',
   borderRadius: '20px',
   padding: '4px 12px',
   fontSize: '0.75em',
   fontWeight: 600,
-  color: '#4a4360',
+  color: 'var(--c-t-4a4360)',
 };
 
 /* ── Stat card ────────────────────────────────────────────────────────── */
@@ -129,7 +129,7 @@ function RoundRow({ round }) {
         gap: '10px',
         padding: '10px 12px',
         borderRadius: '10px',
-        background: 'white',
+        background: 'var(--t-surface)',
         border: '1px solid rgba(139,92,246,0.1)',
         textDecoration: 'none',
       }}
@@ -143,7 +143,7 @@ function RoundRow({ round }) {
           flexShrink: 0,
         }}
       />
-      <span style={{ flex: 1, fontSize: '0.88em', fontWeight: 600, color: '#2d2640' }}>
+      <span style={{ flex: 1, fontSize: '0.88em', fontWeight: 600, color: 'var(--c-t-2d2640)' }}>
         {round.name}
       </span>
       <span
@@ -160,7 +160,7 @@ function RoundRow({ round }) {
         {style.label}
       </span>
       {actionLabel && countdown && (
-        <span style={{ fontSize: '0.7em', color: '#706391', flexShrink: 0 }}>
+        <span style={{ fontSize: '0.7em', color: 'var(--c-t-706391)', flexShrink: 0 }}>
           {actionLabel} {countdown}
         </span>
       )}
@@ -183,13 +183,13 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
       style={{
         borderTop: '1px solid rgba(139,92,246,0.08)',
         padding: '14px',
-        background: '#fbfaff',
+        background: 'var(--c-bg-fbfaff)',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
       }}
     >
-      <p style={{ margin: 0, color: '#4a4360', fontSize: '0.88em', lineHeight: 1.5 }}>
+      <p style={{ margin: 0, color: 'var(--c-t-4a4360)', fontSize: '0.88em', lineHeight: 1.5 }}>
         {olympiad.description || 'No description yet.'}
       </p>
 
@@ -210,13 +210,13 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             fontWeight: 700,
-            color: '#706391',
+            color: 'var(--c-t-706391)',
           }}
         >
           Learners per school
         </p>
         {counts.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '0.82em', color: '#706391' }}>
+          <p style={{ margin: 0, fontSize: '0.82em', color: 'var(--c-t-706391)' }}>
             No learners registered yet.
           </p>
         ) : (
@@ -225,7 +225,7 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
               display: 'flex',
               flexDirection: 'column',
               gap: '6px',
-              background: 'white',
+              background: 'var(--t-surface)',
               border: '1px solid rgba(139,92,246,0.1)',
               borderRadius: '10px',
               padding: '10px 12px',
@@ -239,11 +239,11 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
                   justifyContent: 'space-between',
                   gap: '10px',
                   fontSize: '0.82em',
-                  color: '#4a4360',
+                  color: 'var(--c-t-4a4360)',
                 }}
               >
                 <span style={{ fontWeight: 600 }}>{entry.schoolName}</span>
-                <span style={{ color: '#706391' }}>
+                <span style={{ color: 'var(--c-t-706391)' }}>
                   {entry.entrantCount} learner{entry.entrantCount !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -260,7 +260,7 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
             border: '1px solid rgba(245,158,11,0.25)',
             borderRadius: '8px',
             padding: '9px 12px',
-            color: '#92600a',
+            color: 'var(--c-t-92600a)',
             fontSize: '0.8em',
           }}
         >
@@ -269,7 +269,7 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
       ) : (
         <div>
           {declined && (
-            <p style={{ margin: '0 0 6px', fontSize: '0.78em', color: '#b42318' }}>
+            <p style={{ margin: '0 0 6px', fontSize: '0.78em', color: 'var(--c-t-b42318)' }}>
               Your previous request was declined — you can ask again.
             </p>
           )}
@@ -278,7 +278,7 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
             onClick={() => onRequestAccess(olympiad)}
             disabled={requesting}
             style={{
-              background: requesting ? '#c9bdf0' : 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
+              background: requesting ? 'var(--c-bg-c9bdf0)' : 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
@@ -344,7 +344,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
               <span
                 style={{
                   background: 'rgba(245,158,11,0.1)',
-                  color: '#aa4f09',
+                  color: 'var(--c-t-aa4f09)',
                   padding: '1px 8px',
                   borderRadius: '10px',
                   fontSize: '0.85em',
@@ -359,7 +359,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
               <span
                 style={{
                   background: 'rgba(63,174,122,0.1)',
-                  color: '#277751',
+                  color: 'var(--c-t-277751)',
                   padding: '1px 8px',
                   borderRadius: '10px',
                   fontSize: '0.85em',
@@ -407,7 +407,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
         <ChevronRight
           size={15}
           style={{
-            color: '#716583',
+            color: 'var(--c-t-716583)',
             transform: expanded ? 'rotate(90deg)' : 'none',
             transition: 'transform 0.15s ease',
             flexShrink: 0,
@@ -423,14 +423,14 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
               padding: '14px',
               border: '1px solid rgba(139,92,246,0.15)',
               borderRadius: '10px',
-              background: '#faf8ff',
+              background: 'var(--c-bg-faf8ff)',
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
             }}
           >
             {rounds.length === 0 ? (
-              <p style={{ margin: 0, color: '#706391', fontSize: '0.85em', padding: '6px 4px' }}>
+              <p style={{ margin: 0, color: 'var(--c-t-706391)', fontSize: '0.85em', padding: '6px 4px' }}>
                 No rounds in this olympiad yet.
               </p>
             ) : (
@@ -524,7 +524,7 @@ export default function EducatorDashboard() {
   }, [allRounds]);
 
   if (checking) {
-    return <div style={{ padding: '48px 0', fontSize: '14px', color: '#6d667c' }}>Loading...</div>;
+    return <div style={{ padding: '48px 0', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</div>;
   }
 
   const openCount = roundsByState.open.length;
@@ -625,7 +625,7 @@ export default function EducatorDashboard() {
               <span
                 style={{
                   background: 'rgba(139,92,246,0.08)',
-                  color: '#6d3fd1',
+                  color: 'var(--c-t-6d3fd1)',
                   padding: '3px 10px',
                   borderRadius: '20px',
                   fontSize: '10px',
@@ -638,19 +638,19 @@ export default function EducatorDashboard() {
           </div>
 
           {status === 'loading' && (
-            <p style={{ color: '#6d667c', fontSize: '13px', marginTop: '18px' }}>
+            <p style={{ color: 'var(--c-t-6d667c)', fontSize: '13px', marginTop: '18px' }}>
               Loading olympiads...
             </p>
           )}
 
           {status === 'empty' && (
-            <p style={{ color: '#6f667d', fontSize: '12px', marginTop: '18px' }}>
+            <p style={{ color: 'var(--c-t-6f667d)', fontSize: '12px', marginTop: '18px' }}>
               No olympiads available yet.
             </p>
           )}
 
           {status === 'error' && (
-            <p role="alert" style={{ color: '#b42318', fontSize: '13px', marginTop: '18px' }}>
+            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '18px' }}>
               Couldn&apos;t load olympiads. Try refreshing.
             </p>
           )}
@@ -658,7 +658,7 @@ export default function EducatorDashboard() {
           {status === 'ready' && (
             <>
               {accessError && (
-                <p style={{ color: '#b42318', margin: '12px 0 0', fontSize: '12px' }}>
+                <p style={{ color: 'var(--c-t-b42318)', margin: '12px 0 0', fontSize: '12px' }}>
                   {accessError}
                 </p>
               )}

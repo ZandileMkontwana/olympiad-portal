@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import AuthRedirect from '@/components/AuthRedirect';
 import './landing.css';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const pathways = [
   {
@@ -74,6 +75,7 @@ export default function LandingPage() {
           <a href="#resources">Resources</a>
         </nav>
         <div className="header-actions">
+          <ThemeToggle />
           <Link className="login-link" href="/login">
             Log in
           </Link>

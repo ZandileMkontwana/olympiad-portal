@@ -453,7 +453,7 @@ function SubmissionTableContent() {
                 return (
                   <tr
                     key={entrant.id}
-                    style={isFailed ? { backgroundColor: '#fef2f2' } : undefined}
+                    style={isFailed ? { backgroundColor: 'var(--c-bg-fef2f2)' } : undefined}
                   >
                     <td style={{ padding: '8px 16px' }}>{entrant.name}</td>
                     {questions.map((q) => (

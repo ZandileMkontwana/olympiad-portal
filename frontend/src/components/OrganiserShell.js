@@ -19,6 +19,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const ClerkSignOutButton = dynamic(() => import('@clerk/nextjs').then((mod) => mod.SignOutButton), {
   ssr: false,
@@ -184,6 +185,7 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
             <strong>{breadcrumb || 'Overview'}</strong>
           </div>
           <div className="organiser-actions">
+            <ThemeToggle />
             <button className="icon-button" aria-label="Search" type="button">
               <Search size={18} />
             </button>

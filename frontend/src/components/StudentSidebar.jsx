@@ -70,7 +70,7 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
             </div>
           </div>
         </div>
-        <div style={{ padding: '20px', textAlign: 'center', color: '#706391', fontSize: '13px' }}>
+        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--c-t-706391)', fontSize: '13px' }}>
           Loading account...
         </div>
       </aside>
@@ -91,7 +91,7 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
             </div>
           </div>
         </div>
-        <div style={{ padding: '20px', textAlign: 'center', color: '#706391', fontSize: '13px' }}>
+        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--c-t-706391)', fontSize: '13px' }}>
           Not signed in
         </div>
       </aside>
@@ -198,7 +198,7 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
                     border: 'none',
                     padding: 0,
                     cursor: 'pointer',
-                    color: '#b42318',
+                    color: 'var(--c-t-b42318)',
                     fontSize: '9px',
                     fontWeight: 600,
                   }}

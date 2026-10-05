@@ -14,6 +14,8 @@
  *   LH_COOKIE="__session=...; __client_uat=..." node scripts/lighthouse-audit.mjs
  *
  * Replace the [id] placeholders below with real ids from your database.
+ * Dark theme: LH_THEME=dark node scripts/lighthouse-audit.mjs (run both themes;
+ * dark mode must also score 90+ — #338).
  * Output: a markdown table (paste into documents/docs/accessibility-audit.md)
  * and lighthouse-a11y-report.json. Exit code 1 if any page scores under 90.
  */
@@ -22,6 +24,8 @@ import { writeFileSync } from 'node:fs';
 const BASE = process.env.LH_BASE_URL || 'http://localhost:3000';
 const COOKIE = process.env.LH_COOKIE || '';
 const THRESHOLD = 90;
+// LH_THEME=dark audits the dark theme (forces prefers-color-scheme: dark).
+const DARK = process.env.LH_THEME === 'dark';
 const ROUND = process.env.LH_ROUND_ID || 'ROUND_ID';
 
 const PAGES = [
@@ -51,7 +55,7 @@ const PAGES = [
 const { default: lighthouse } = await import('lighthouse');
 const chromeLauncher = await import('chrome-launcher');
 
-const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless=new', '--no-sandbox'] });
+const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless=new', '--no-sandbox', ...(DARK ? ['--blink-settings=preferredColorScheme=1'] : [])] });
 const rows = [];
 const report = {};
 

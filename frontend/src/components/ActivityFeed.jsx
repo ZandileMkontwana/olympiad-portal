@@ -18,10 +18,10 @@ const TYPE_COLORS = {
 };
 
 const STATUS_META = {
-  connecting: { label: 'Connecting\u2026', color: '#706391', bg: 'rgba(139,127,168,0.12)' },
-  live: { label: 'Live', color: '#277751', bg: 'rgba(63,174,122,0.14)' },
-  reconnecting: { label: 'Reconnecting\u2026', color: '#8b6318', bg: 'rgba(224,168,62,0.15)' },
-  error: { label: 'Offline', color: '#b42318', bg: 'rgba(224,97,95,0.12)' },
+  connecting: { label: 'Connecting\u2026', color: 'var(--c-t-706391)', bg: 'rgba(139,127,168,0.12)' },
+  live: { label: 'Live', color: 'var(--c-t-277751)', bg: 'rgba(63,174,122,0.14)' },
+  reconnecting: { label: 'Reconnecting\u2026', color: 'var(--c-t-8b6318)', bg: 'rgba(224,168,62,0.15)' },
+  error: { label: 'Offline', color: 'var(--c-t-b42318)', bg: 'rgba(224,97,95,0.12)' },
 };
 
 function timeAgo(iso) {
@@ -119,7 +119,7 @@ export default function ActivityFeed() {
           marginBottom: '12px',
         }}
       >
-        <span style={{ fontSize: '0.78em', color: '#6d667c' }}>Real-time feed</span>
+        <span style={{ fontSize: '0.78em', color: 'var(--c-t-6d667c)' }}>Real-time feed</span>
         <span
           data-testid="activity-status"
           style={{
@@ -136,7 +136,7 @@ export default function ActivityFeed() {
       </div>
 
       {events.length === 0 ? (
-        <p style={{ margin: 0, fontSize: '0.8em', color: '#6e5fa5' }}>
+        <p style={{ margin: 0, fontSize: '0.8em', color: 'var(--c-t-6e5fa5)' }}>
           No activity yet — new submissions, round changes, and results will appear here the
           moment they happen.
         </p>
@@ -175,12 +175,12 @@ export default function ActivityFeed() {
                     margin: 0,
                     fontSize: '0.82em',
                     fontWeight: 500,
-                    color: '#4a4458',
+                    color: 'var(--c-t-4a4458)',
                   }}
                 >
                   {event.message}
                 </p>
-                <small style={{ fontSize: '0.72em', color: '#6e5fa5' }}>
+                <small style={{ fontSize: '0.72em', color: 'var(--c-t-6e5fa5)' }}>
                   {timeAgo(event.createdAt)}
                 </small>
               </div>

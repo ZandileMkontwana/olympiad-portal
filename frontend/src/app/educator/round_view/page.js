@@ -331,7 +331,7 @@ function RoundViewContent() {
               timeStyle: 'short',
             })}
             {round.olympiad?.timezone && (
-              <small style={{ marginLeft: '6px', color: '#706391' }}>
+              <small style={{ marginLeft: '6px', color: 'var(--c-t-706391)' }}>
                 ({round.olympiad.timezone})
               </small>
             )}
@@ -347,7 +347,7 @@ function RoundViewContent() {
               timeStyle: 'short',
             })}
             {round.olympiad?.timezone && (
-              <small style={{ marginLeft: '6px', color: '#706391' }}>
+              <small style={{ marginLeft: '6px', color: 'var(--c-t-706391)' }}>
                 ({round.olympiad.timezone})
               </small>
             )}
@@ -425,7 +425,7 @@ function RoundViewContent() {
                   >
                     <div>
                       <strong>{entrant.name}</strong>
-                      <span style={{ marginLeft: '12px', color: '#646b78', fontSize: '0.9em' }}>
+                      <span style={{ marginLeft: '12px', color: 'var(--c-t-646b78)', fontSize: '0.9em' }}>
                         Score: {entrant.score}
                       </span>
                     </div>
@@ -445,7 +445,7 @@ function RoundViewContent() {
               style={{
                 marginTop: '16px',
                 background: 'transparent',
-                color: '#b42318',
+                color: 'var(--c-t-b42318)',
                 border: '1px solid rgba(224,97,95,0.3)',
               }}
               disabled={releaseStatus === 'unreleasing'}
@@ -508,7 +508,7 @@ function RoundViewContent() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    borderBottom: '1px solid var(--lavender, #e5e5e5)',
+                    borderBottom: '1px solid var(--lavender, var(--c-bd-e5e5e5))',
                     paddingBottom: '8px',
                   }}
                 >
@@ -554,7 +554,7 @@ function RoundViewContent() {
               className="block rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
             />
             {remarkStatus === 'error' && (
-              <p id="remark-error" role="alert" style={{ color: '#b42318', fontSize: '0.9em' }}>
+              <p id="remark-error" role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em' }}>
                 {remarkError}
               </p>
             )}

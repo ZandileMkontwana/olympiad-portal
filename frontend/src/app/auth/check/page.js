@@ -70,13 +70,13 @@ function AuthCheckContent() {
         style={{
           width: '40px',
           height: '40px',
-          border: '3px solid #f0edf6',
+          border: '3px solid var(--c-bd-f0edf6)',
           borderTopColor: '#6c4fd8',
           borderRadius: '50%',
           animation: 'spin 1s linear infinite',
         }}
       />
-      <p role="status" style={{ color: '#6d667f', fontSize: '14px' }}>
+      <p role="status" style={{ color: 'var(--c-t-6d667f)', fontSize: '14px' }}>
         Signing you in...
       </p>
       <style>{`
@@ -100,7 +100,7 @@ export default function AuthCheckPage() {
             minHeight: '100vh',
           }}
         >
-          <p style={{ color: '#6d667f', fontSize: '14px' }}>Loading...</p>
+          <p style={{ color: 'var(--c-t-6d667f)', fontSize: '14px' }}>Loading...</p>
         </div>
       }
     >

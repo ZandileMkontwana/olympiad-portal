@@ -1,0 +1,511 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   Theme layer (Sprint 4, #316): light + dark palettes.
+
+   How it works
+   - The active theme is the `data-theme` attribute on <html> ("light" | "dark"),
+     set before first paint by the inline script in layout.js and kept in sync
+     by components/ThemeProvider.jsx. The user's choice is stored in
+     localStorage; with no choice the OS setting (prefers-color-scheme) decides.
+   - Hard-coded colours in the CSS and inline styles were replaced by variables:
+       --c-bg-<hex>   background colours that are pale in light mode
+       --c-bd-<hex>   pale border colours
+       --c-t-<hex>    text colours that need a lighter twin on dark surfaces
+     The name carries the original light value, so light mode is unchanged.
+     Saturated brand colours (buttons, gradients, status dots) are shared by
+     both themes. Dark values were generated and verified to meet WCAG AA by
+     `npm run a11y:contrast` (it checks both themes).
+   - Hand-tuned tokens (page background, text, Tailwind tokens, the custom
+     properties used by the landing, auth and organiser areas) are below.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: light;
+  --surface-rgb: 255 255 255;
+
+  /* Tailwind tokens (see @theme in globals.css) */
+  --t-paper: #f7f5fb;
+  --t-surface: #ffffff;
+  --t-ink: #211b33;
+  --t-ink-soft: #6b6480;
+  --t-slate: #6f6b80;
+
+  /* Brand fills used behind white text: identical in both themes */
+  --violet-fill: #6c4fd8;
+  --violet-dark-fill: #4a34a8;
+  --violet-deep-fill: #201a3d;
+
+  /* Charts */
+  --chart-line: #7c3aed;
+  --chart-grid: rgba(139, 92, 246, 0.08);
+  --chart-track: rgba(139, 92, 246, 0.1);
+  --chart-dot: #ffffff;
+  --focus-ring: #5435c4;
+
+  /* Score colours: text-safe on light surfaces (>= 4.5:1) */
+  --score-good: #1f7a4f;
+  --score-mid: #8a5c00;
+  --score-low: #c0302d;
+  --score-none: #6c628c;
+}
+
+/* ── Generated palette (light = original value, dark = adapted twin) ─────── */
+:root {
+  --c-bd-cccccc: #cccccc;
+  --c-bd-cfc1f4: #cfc1f4;
+  --c-bd-e3dcf8: #e3dcf8;
+  --c-bd-e5e5e5: #e5e5e5;
+  --c-bd-e5e7eb: #e5e7eb;
+  --c-bd-e8ebf2: #e8ebf2;
+  --c-bd-e9e5ff: #e9e5ff;
+  --c-bd-ebe7f4: #ebe7f4;
+  --c-bd-ecd9a3: #ecd9a3;
+  --c-bd-eeeeee: #eeeeee;
+  --c-bd-f0edf6: #f0edf6;
+  --c-bd-f0f1f5: #f0f1f5;
+  --c-bd-f3c2c2: #f3c2c2;
+  --c-bd-f8f7fc: #f8f7fc;
+  --c-bd-ffffff: #ffffff;
+  --c-bg-b6efc5: #b6efc5;
+  --c-bg-c4b5fd: #c4b5fd;
+  --c-bg-c8b7f3: #c8b7f3;
+  --c-bg-c9bdf0: #c9bdf0;
+  --c-bg-d7c8fb: #d7c8fb;
+  --c-bg-d8c9fb: #d8c9fb;
+  --c-bg-d9ceff: #d9ceff;
+  --c-bg-dcd0ee: #dcd0ee;
+  --c-bg-e4dafa: #e4dafa;
+  --c-bg-e4dcff: #e4dcff;
+  --c-bg-e6f7ed: #e6f7ed;
+  --c-bg-e7ddff: #e7ddff;
+  --c-bg-e8ddea: #e8ddea;
+  --c-bg-e8ebf2: #e8ebf2;
+  --c-bg-e9e0ff: #e9e0ff;
+  --c-bg-e9f8f1: #e9f8f1;
+  --c-bg-eaf4ff: #eaf4ff;
+  --c-bg-eceef4: #eceef4;
+  --c-bg-eee5f7: #eee5f7;
+  --c-bg-eee9ff: #eee9ff;
+  --c-bg-eff6ff: #eff6ff;
+  --c-bg-f0ebff: #f0ebff;
+  --c-bg-f0edff: #f0edff;
+  --c-bg-f0fdf4: #f0fdf4;
+  --c-bg-f1ecff: #f1ecff;
+  --c-bg-f1edff: #f1edff;
+  --c-bg-f3f4f8: #f3f4f8;
+  --c-bg-f4e2d4: #f4e2d4;
+  --c-bg-f7f4ff: #f7f4ff;
+  --c-bg-f7f6ff: #f7f6ff;
+  --c-bg-f7f8fc: #f7f8fc;
+  --c-bg-f8f7fc: #f8f7fc;
+  --c-bg-f9fafb: #f9fafb;
+  --c-bg-faf5ff: #faf5ff;
+  --c-bg-faf8ff: #faf8ff;
+  --c-bg-faf9fc: #faf9fc;
+  --c-bg-fbfaff: #fbfaff;
+  --c-bg-fdf0f0: #fdf0f0;
+  --c-bg-fdf7e8: #fdf7e8;
+  --c-bg-fef2f2: #fef2f2;
+  --c-bg-fff5dd: #fff5dd;
+  --c-bg-ffffff: #ffffff;
+  --c-t-0b5f3a: #0b5f3a;
+  --c-t-117b38: #117b38;
+  --c-t-172554: #172554;
+  --c-t-1a7a3a: #1a7a3a;
+  --c-t-1e5eea: #1e5eea;
+  --c-t-217952: #217952;
+  --c-t-241f38: #241f38;
+  --c-t-267755: #267755;
+  --c-t-277751: #277751;
+  --c-t-2b7854: #2b7854;
+  --c-t-2c6dad: #2c6dad;
+  --c-t-2d2640: #2d2640;
+  --c-t-30394b: #30394b;
+  --c-t-326da2: #326da2;
+  --c-t-326da6: #326da6;
+  --c-t-334052: #334052;
+  --c-t-374151: #374151;
+  --c-t-394456: #394456;
+  --c-t-3b4656: #3b4656;
+  --c-t-3d4655: #3d4655;
+  --c-t-3fae7a: #3fae7a;
+  --c-t-40745a: #40745a;
+  --c-t-49318e: #49318e;
+  --c-t-4a3600: #4a3600;
+  --c-t-4a4360: #4a4360;
+  --c-t-4a4458: #4a4458;
+  --c-t-4b5563: #4b5563;
+  --c-t-4c3f82: #4c3f82;
+  --c-t-4f3768: #4f3768;
+  --c-t-514579: #514579;
+  --c-t-555555: #555555;
+  --c-t-5a6478: #5a6478;
+  --c-t-5d4275: #5d4275;
+  --c-t-5d6a7f: #5d6a7f;
+  --c-t-5e5478: #5e5478;
+  --c-t-606a7c: #606a7c;
+  --c-t-606a7e: #606a7e;
+  --c-t-606b7d: #606b7d;
+  --c-t-616a7b: #616a7b;
+  --c-t-616b7b: #616b7b;
+  --c-t-616b7c: #616b7c;
+  --c-t-616b7d: #616b7d;
+  --c-t-616b7e: #616b7e;
+  --c-t-625783: #625783;
+  --c-t-626b7d: #626b7d;
+  --c-t-626b7e: #626b7e;
+  --c-t-646b78: #646b78;
+  --c-t-6546d8: #6546d8;
+  --c-t-666666: #666666;
+  --c-t-674b70: #674b70;
+  --c-t-6957d1: #6957d1;
+  --c-t-6a6a6a: #6a6a6a;
+  --c-t-6b4c8a: #6b4c8a;
+  --c-t-6b50d3: #6b50d3;
+  --c-t-6d3fd1: #6d3fd1;
+  --c-t-6d50e0: #6d50e0;
+  --c-t-6d667c: #6d667c;
+  --c-t-6d667f: #6d667f;
+  --c-t-6e5fa5: #6e5fa5;
+  --c-t-6e6687: #6e6687;
+  --c-t-6e6778: #6e6778;
+  --c-t-6f609e: #6f609e;
+  --c-t-6f667d: #6f667d;
+  --c-t-6f6681: #6f6681;
+  --c-t-6f6682: #6f6682;
+  --c-t-706391: #706391;
+  --c-t-70677c: #70677c;
+  --c-t-716583: #716583;
+  --c-t-7a5a13: #7a5a13;
+  --c-t-80622a: #80622a;
+  --c-t-85661e: #85661e;
+  --c-t-8a4f31: #8a4f31;
+  --c-t-8b6216: #8b6216;
+  --c-t-8b6318: #8b6318;
+  --c-t-8b7fa8: #8b7fa8;
+  --c-t-8c6219: #8c6219;
+  --c-t-8e600a: #8e600a;
+  --c-t-8f2f2f: #8f2f2f;
+  --c-t-92600a: #92600a;
+  --c-t-9333ea: #9333ea;
+  --c-t-936010: #936010;
+  --c-t-a05804: #a05804;
+  --c-t-a89fc9: #a89fc9;
+  --c-t-aa4f09: #aa4f09;
+  --c-t-b04c27: #b04c27;
+  --c-t-b33636: #b33636;
+  --c-t-b42318: #b42318;
+  --c-t-b4473e: #b4473e;
+  --c-t-cf2121: #cf2121;
+  --c-t-dc2626: #dc2626;
+  --c-t-e0615f: #e0615f;
+}
+:root[data-theme='dark'] {
+  --c-bd-cccccc: #453e60;
+  --c-bd-cfc1f4: #3b2e5f;
+  --c-bd-e3dcf8: #322852;
+  --c-bd-e5e5e5: #38324e;
+  --c-bd-e5e7eb: #343b49;
+  --c-bd-e8ebf2: #2d3649;
+  --c-bd-e9e5ff: #2b254c;
+  --c-bd-ebe7f4: #342a4c;
+  --c-bd-ecd9a3: #6e5f35;
+  --c-bd-eeeeee: #332e48;
+  --c-bd-f0edf6: #342948;
+  --c-bd-f0f1f5: #2d3143;
+  --c-bd-f3c2c2: #5f2e2e;
+  --c-bd-f8f7fc: #2a2345;
+  --c-bd-ffffff: #2a263b;
+  --c-bg-b6efc5: #223f2a;
+  --c-bg-c4b5fd: #28223f;
+  --c-bg-c8b7f3: #2a223f;
+  --c-bg-c9bdf0: #29223f;
+  --c-bg-d7c8fb: #271f3a;
+  --c-bg-d8c9fb: #271f3a;
+  --c-bg-d9ceff: #241e38;
+  --c-bg-dcd0ee: #2b213b;
+  --c-bg-e4dafa: #251d36;
+  --c-bg-e4dcff: #221c34;
+  --c-bg-e6f7ed: #1c3426;
+  --c-bg-e7ddff: #231c34;
+  --c-bg-e8ddea: #322435;
+  --c-bg-e8ebf2: #202531;
+  --c-bg-e9e0ff: #221c33;
+  --c-bg-e9f8f1: #1b3328;
+  --c-bg-eaf4ff: #1a2531;
+  --c-bg-eceef4: #1f232f;
+  --c-bg-eee5f7: #281c34;
+  --c-bg-eee9ff: #1f1a31;
+  --c-bg-eff6ff: #19232f;
+  --c-bg-f0ebff: #201a30;
+  --c-bg-f0edff: #1d1a30;
+  --c-bg-f0fdf4: #1a3020;
+  --c-bg-f1ecff: #201a30;
+  --c-bg-f1edff: #1f1a30;
+  --c-bg-f3f4f8: #1d202d;
+  --c-bg-f4e2d4: #392a1f;
+  --c-bg-f7f4ff: #1f192e;
+  --c-bg-f7f6ff: #1b182d;
+  --c-bg-f7f8fc: #191d2d;
+  --c-bg-f8f7fc: #1d192d;
+  --c-bg-f9fafb: #1d2329;
+  --c-bg-faf5ff: #23192e;
+  --c-bg-faf8ff: #1e182d;
+  --c-bg-faf9fc: #201b2b;
+  --c-bg-fbfaff: #1c182c;
+  --c-bg-fdf0f0: #301a1a;
+  --c-bg-fdf7e8: #322b1b;
+  --c-bg-fef2f2: #2f1919;
+  --c-bg-fff5dd: #342d1c;
+  --c-bg-ffffff: #1d192c;
+  --c-t-0b5f3a: #b0f0d4;
+  --c-t-117b38: #a2ebbd;
+  --c-t-172554: #b9c3e7;
+  --c-t-1a7a3a: #a4e5ba;
+  --c-t-1e5eea: #8caaeb;
+  --c-t-217952: #a6e0c6;
+  --c-t-241f38: #cfcbdf;
+  --c-t-267755: #a7ddc6;
+  --c-t-277751: #a7dcc3;
+  --c-t-2b7854: #a7d9c2;
+  --c-t-2c6dad: #8ab2d9;
+  --c-t-2d2640: #cdc7db;
+  --c-t-30394b: #c2c8d5;
+  --c-t-326da2: #91b5d5;
+  --c-t-326da6: #8eb2d5;
+  --c-t-334052: #bec7d3;
+  --c-t-374151: #bfc6d1;
+  --c-t-394456: #bcc3d0;
+  --c-t-3b4656: #bcc4ce;
+  --c-t-3d4655: #bdc3cd;
+  --c-t-3fae7a: #8bcdae;
+  --c-t-40745a: #abccbc;
+  --c-t-49318e: #b1a3d9;
+  --c-t-4a3600: #f5e6bc;
+  --c-t-4a4360: #bbb7ca;
+  --c-t-4a4458: #c0bcc9;
+  --c-t-4b5563: #b6bcc5;
+  --c-t-4c3f82: #aea6cf;
+  --c-t-4f3768: #c1b1d2;
+  --c-t-514579: #b0a9c9;
+  --c-t-555555: #bab7c6;
+  --c-t-5a6478: #aab0bd;
+  --c-t-5d4275: #bcabcb;
+  --c-t-5d6a7f: #a6aebb;
+  --c-t-5e5478: #b0aac0;
+  --c-t-606a7c: #a8aeb9;
+  --c-t-606a7e: #a7adb9;
+  --c-t-606b7d: #a8aeb9;
+  --c-t-616a7b: #aba7ba;
+  --c-t-616b7b: #aba7ba;
+  --c-t-616b7c: #a8aeb9;
+  --c-t-616b7d: #a8aeb9;
+  --c-t-616b7e: #a7adb9;
+  --c-t-625783: #ada7c1;
+  --c-t-626b7d: #a8adb8;
+  --c-t-626b7e: #a7adb8;
+  --c-t-646b78: #aba7ba;
+  --c-t-6546d8: #afa1e4;
+  --c-t-666666: #b0acbe;
+  --c-t-674b70: #c0aec5;
+  --c-t-6957d1: #ada4e0;
+  --c-t-6a6a6a: #adaabc;
+  --c-t-6b4c8a: #b5a3c7;
+  --c-t-6b50d3: #aea1e0;
+  --c-t-6d3fd1: #b5a1e1;
+  --c-t-6d50e0: #b0a2e7;
+  --c-t-6d667c: #aca8bb;
+  --c-t-6d667f: #aba7ba;
+  --c-t-6e5fa5: #aea6c9;
+  --c-t-6e6687: #aca8ba;
+  --c-t-6e6778: #ada9bc;
+  --c-t-6f609e: #afa8c6;
+  --c-t-6f667d: #aca8bb;
+  --c-t-6f6681: #aaa7ba;
+  --c-t-6f6682: #ada8b8;
+  --c-t-706391: #afa8c0;
+  --c-t-70677c: #aca8bb;
+  --c-t-716583: #aea7b9;
+  --c-t-7a5a13: #ead4a3;
+  --c-t-80622a: #dac7a3;
+  --c-t-85661e: #e2ce9f;
+  --c-t-8a4f31: #d6b19e;
+  --c-t-8b6216: #e7cc9b;
+  --c-t-8b6318: #e6cc9b;
+  --c-t-8b7fa8: #aea7bf;
+  --c-t-8c6219: #e5ca9a;
+  --c-t-8e600a: #efd197;
+  --c-t-8f2f2f: #d79b9b;
+  --c-t-92600a: #efce95;
+  --c-t-9333ea: #c599ec;
+  --c-t-936010: #ebca96;
+  --c-t-a05804: #efc491;
+  --c-t-a89fc9: #aea7c9;
+  --c-t-aa4f09: #eeb58a;
+  --c-t-b04c27: #dc9f88;
+  --c-t-b33636: #d99a9a;
+  --c-t-b42318: #e7948d;
+  --c-t-b4473e: #d49b96;
+  --c-t-cf2121: #e69494;
+  --c-t-dc2626: #e69595;
+  --c-t-e0615f: #e29695;
+}
+
+/* ── Hand-tuned dark tokens ──────────────────────────────────────────────── */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --surface-rgb: 30 26 51;
+
+  --background: #120f1f;
+  --foreground: #e8e3f5;
+  /* --lavender intentionally not remapped: .button pairs it with white text,
+     so the saturated brand violet must stay dark in this theme too. */
+  --dark-lavender: #c9aee3;
+  --light-lavender: #241d3a;
+  --border-lavender: #3a3158;
+
+  --t-paper: #17132a;
+  --t-surface: #1e1a33;
+  --t-ink: #ece8f7;
+  --t-ink-soft: #b3abcb;
+  --t-slate: #a39bbd;
+
+  --chart-line: #a78bfa;
+  --chart-grid: rgba(196, 181, 253, 0.16);
+  --chart-track: rgba(196, 181, 253, 0.18);
+  --chart-dot: #1e1a33;
+  --focus-ring: #c4b8fa;
+
+  --score-good: #5fd0a0;
+  --score-mid: #f0c060;
+  --score-low: #ff8f8d;
+  --score-none: #a79fc4;
+}
+
+/* Areas that define their own palette on a wrapper class. */
+:root[data-theme='dark'] .auth-page,
+:root[data-theme='dark'] .landing,
+:root[data-theme='dark'] .organiser-shell {
+  --ink: #ece8f7;
+  --ink-soft: #b3abcb;
+  --violet: #a897f7;
+  --violet-dark: #c4b8fa;
+  --violet-deep: #e8e3f5;
+  --mint: #2a2447;
+  --cream: #1e1a33;
+  --line: #36305a;
+}
+:root[data-theme='dark'] .landing {
+  --background: #120f1f;
+  --foreground: #ece8f7;
+}
+:root[data-theme='dark'] .app-shell {
+  --line: #36305a;
+}
+
+/* ── Tailwind utilities that use fixed palette colours ───────────────────── */
+:root[data-theme='dark'] .bg-white {
+  background-color: var(--t-surface);
+}
+:root[data-theme='dark'] .bg-red-50 {
+  background-color: #3a1620;
+}
+:root[data-theme='dark'] .bg-red-50\/60 {
+  background-color: rgb(58 22 32 / 0.6);
+}
+:root[data-theme='dark'] .bg-red-100 {
+  background-color: #4a1c28;
+}
+:root[data-theme='dark'] .border-red-200 {
+  border-color: #7f2a38;
+}
+:root[data-theme='dark'] .text-red-600,
+:root[data-theme='dark'] .text-red-700,
+:root[data-theme='dark'] .text-red-800 {
+  color: #fca5a5;
+}
+/* Tokens that are also used as backgrounds keep their value; only the text
+   utilities get a lighter twin. */
+:root[data-theme='dark'] .text-lavender {
+  color: #b2a6f2;
+}
+:root[data-theme='dark'] .text-lavender-deep,
+:root[data-theme='dark'] .hover\:text-lavender-deep:hover {
+  color: #c4baf7;
+}
+:root[data-theme='dark'] .text-gold {
+  color: #d9b36a;
+}
+:root[data-theme='dark'] .text-sage {
+  color: #7fc4a3;
+}
+:root[data-theme='dark'] input[type='file']::file-selector-button {
+  color: #c4baf7;
+}
+
+/* ── Images and charts ───────────────────────────────────────────────────── */
+/* The logo is a black silhouette; flip it on dark surfaces. The white
+   variant (tree-mark-white.png) is not matched and stays as it is. */
+:root[data-theme='dark'] img[src*='tree-mark.png'] {
+  filter: invert(1);
+}
+.chart-line {
+  stroke: var(--chart-line);
+}
+.chart-grid {
+  stroke: var(--chart-grid);
+}
+.chart-track {
+  stroke: var(--chart-track);
+}
+.chart-dot {
+  fill: var(--chart-dot);
+}
+
+/* ── Focus ring in dark mode ─────────────────────────────────────────────── */
+:root[data-theme='dark'] :focus-visible {
+  outline-color: var(--focus-ring) !important;
+}
+
+/* ── Theme toggle button ─────────────────────────────────────────────────── */
+.theme-toggle {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--c-bd-ebe7f4, #ebe7f4);
+  border-radius: 10px;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+.theme-toggle:hover {
+  background: rgb(139 92 246 / 0.12);
+}
+.theme-toggle-on-dark {
+  border-color: rgb(255 255 255 / 0.4);
+  color: #fff;
+}
+.theme-toggle-on-dark:hover {
+  background: rgb(255 255 255 / 0.16);
+}
+.theme-toggle-floating {
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  z-index: 50;
+  background: rgb(var(--surface-rgb) / 0.85);
+  color: var(--foreground);
+}
+@media (pointer: coarse) {
+  .theme-toggle {
+    height: 44px;
+    width: 44px;
+  }
+}
+@media (forced-colors: active) {
+  .theme-toggle {
+    border-color: ButtonText;
+  }
+}
