@@ -5,7 +5,7 @@ sidebar_label: api-reference
 
 All endpoints are mounted under the `/api` prefix.
 
-**Production base URL:** `https://olympiad-portal.onrender.com` — e.g. `https://olympiad-portal.onrender.com/api/olympiads`. For local development the backend runs at `http://localhost:5000`.
+**Production base URL:** `https://olympiad-portal-backend.onrender.com` — e.g. `https://olympiad-portal-backend.onrender.com/api/olympiads`. For local development the backend runs at `http://localhost:5000`.
 
 ## Authentication
 Authentication is handled by **Clerk** (`@clerk/express`). Protected endpoints require a valid Clerk session — the frontend uses Clerk's `<SignIn>` / `<SignUp>` components, and the backend validates the session via `requireAuth()` middleware or `clerkMiddleware()` globally.
