@@ -375,6 +375,20 @@ export default function QuestionsPage() {
                         {QUESTION_TYPES.find((t) => t.value === question.type)?.label}
                       </span>
                       <span className="text-sm text-gray-600">{question.marks} marks</span>
+                      {question.difficulty !== null && question.difficulty !== undefined && (
+                        <span
+                          className={`text-xs font-medium px-2 py-1 rounded ${
+                            question.difficulty >= 0.7
+                              ? 'bg-green-100 text-green-700'
+                              : question.difficulty >= 0.4
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-red-100 text-red-700'
+                          }`}
+                          title={`Difficulty: ${Math.round(question.difficulty * 100)}% success rate`}
+                        >
+                          {Math.round(question.difficulty * 100)}% success
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-900 whitespace-pre-wrap">{question.text}</p>
                     {question.memoAnswer && (

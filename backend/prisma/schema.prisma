@@ -148,6 +148,7 @@ model Question {
   memoAnswer   String?           // correct answer for auto-marking (if applicable)
   options      Json?             // MCQ options, e.g. [{"label": "A", "text": "..."}, ...]
   rubric       Json?             // marking rubric for essay/short answer questions
+  difficulty   Float?            // success rate (0.0-1.0): correct attempts / total attempts; null = no data
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   paper        Paper             @relation(fields: [paperId], references: [id])

@@ -17,6 +17,7 @@ const {
 } = require('../lib/email');
 const { requireOlympiadAccess, isOlympiadOrganiser } = require('../lib/authorization');
 const { toUTCDate } = require('../lib/timezone');
+const { updateQuestionDifficulty } = require('../lib/difficulty');
 
 const router = express.Router();
 
@@ -1006,6 +1007,15 @@ router.post(
         return res.status(409).json({
           error: 'Round state changed while releasing results - it is no longer closed',
         });
+      }
+
+      // Calculate and update question difficulty based on this round's submissions
+      try {
+        const difficultyCount = await updateQuestionDifficulty(round.id);
+        console.log(`Updated difficulty for ${difficultyCount} questions from round ${round.id}`);
+      } catch (diffErr) {
+        // Log but don't fail the release if difficulty calculation fails
+        console.error('Failed to calculate difficulty:', diffErr);
       }
 
       // Live activity feed (US-4.1): results went out for this round.
