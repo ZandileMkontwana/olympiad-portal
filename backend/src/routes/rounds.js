@@ -831,6 +831,11 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       include: {
         result: true,
         entrant: { include: { school: true } },
+        sitting: {
+          select: {
+            variantChoices: true,
+          },
+        },
       },
     });
 
@@ -841,6 +846,7 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
         schoolName: s.entrant.school.name,
         score: s.result.score,
         submittedAt: s.submittedAt,
+        variantChoices: s.sitting?.variantChoices || null,
       }))
       .sort((a, b) => b.score - a.score);
 

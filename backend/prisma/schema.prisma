@@ -243,15 +243,16 @@ model RoundEntrant {
 }
 
 model Sitting {
-  id          String    @id @default(uuid())
-  entrantId   String
-  roundId     String
-  answers     Json?
-  startedAt   DateTime  @default(now())
-  expiresAt   DateTime
-  completedAt DateTime?
-  entrant     Entrant   @relation(fields: [entrantId], references: [id])
-  round       Round     @relation(fields: [roundId], references: [id])
+  id               String    @id @default(uuid())
+  entrantId        String
+  roundId          String
+  answers          Json?
+  variantChoices   Json?     // Map of questionId -> variantId for this sitting
+  startedAt        DateTime  @default(now())
+  expiresAt        DateTime
+  completedAt      DateTime?
+  entrant          Entrant   @relation(fields: [entrantId], references: [id])
+  round            Round     @relation(fields: [roundId], references: [id])
 
   @@unique([roundId, entrantId])
 }
