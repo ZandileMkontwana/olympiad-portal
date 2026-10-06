@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import OrganiserShell from '@/components/OrganiserShell';
 import {
   listAllOrganisers,
   listRemarkQueue,
@@ -167,14 +166,12 @@ export default function RemarksPage() {
 
   if (checking) {
     return (
-      <main id="main-content" tabIndex={-1} className="organiser-shell">
-        <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
-      </main>
+      <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
     );
   }
 
   return (
-    <OrganiserShell activeNav="remarks" breadcrumb="Appeals" user={user}>
+    <>
       <div className="organiser-page-heading">
         <h1>Appeals</h1>
         <p>
@@ -406,6 +403,6 @@ export default function RemarksPage() {
           </div>
         </form>
       )}
-    </OrganiserShell>
+    </>
   );
 }

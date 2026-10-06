@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from '@/components/Modal';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -10,7 +10,6 @@ import {
   ClipboardCheck,
   Trophy,
   BookOpen,
-  CalendarDays,
   Settings2,
   CircleHelp,
   ArrowRight,
@@ -33,23 +32,50 @@ const WORKSPACE_LINKS = [
     href: '/student',
     icon: LayoutDashboard,
     label: 'Dashboard',
-    match: (p) => p === '/student' || p.startsWith('/student/result'),
+    match: (p, hash) => (p === '/student' && !hash) || p.startsWith('/student/result'),
   },
   {
     href: '/student#tests',
     icon: ClipboardCheck,
     label: 'My tests',
-    match: (p) => p === '/student',
+    hash: 'tests',
+    match: (p, hash) => p === '/student' && hash === 'tests',
   },
-  { href: '/student#results', icon: Trophy, label: 'Results', match: () => false },
+  {
+    href: '/student#results',
+    icon: Trophy,
+    label: 'Results',
+    hash: 'results',
+    match: (p, hash) => p === '/student' && hash === 'results',
+  },
 ];
 
 export default function StudentSidebar({ open = false, onClose } = {}) {
   const pathname = usePathname() || '';
+  const [hash, setHash] = useState(typeof window !== 'undefined' ? window.location.hash.slice(1) : '');
   const { user, checking, signOut } = useStudentAuth();
-  const [showCalendar, setShowCalendar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showResources, setShowResources] = useState(false);
+
+  useEffect(() => {
+    function onHashChange() {
+      setHash(window.location.hash.slice(1));
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  function handleNavClick(e, linkHash) {
+    if (!linkHash) return;
+    e.preventDefault();
+    const el = document.getElementById(linkHash);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.history.replaceState(null, '', `#${linkHash}`);
+      setHash(linkHash);
+    }
+    onClose?.();
+  }
 
   async function handleLogout() {
     if (!window.confirm('Log out of the Olympiad Portal?')) return;
@@ -127,15 +153,21 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
         </div>
         <nav className="side-nav" aria-label="Main navigation">
           <p className="nav-label">Workspace</p>
-          {WORKSPACE_LINKS.map(({ href, icon: Icon, label, match }) => {
-            const active = match(pathname);
+          {WORKSPACE_LINKS.map(({ href, icon: Icon, label, match, hash: linkHash }) => {
+            const active = match(pathname, hash);
             return (
               <Link
                 key={label}
                 href={href}
                 className={`nav-item${active ? ' nav-selected' : ''}`}
                 aria-current={active ? 'page' : undefined}
-                onClick={onClose}
+                onClick={(e) => {
+                  if (linkHash) {
+                    handleNavClick(e, linkHash);
+                  } else {
+                    onClose?.();
+                  }
+                }}
               >
                 <Icon /> <span>{label}</span>
               </Link>
@@ -144,7 +176,6 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
           <button
             className="nav-item"
             onClick={() => {
-              onClose?.();
               setShowResources(true);
             }}
           >
@@ -155,17 +186,6 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
           <button
             className="nav-item"
             onClick={() => {
-              onClose?.();
-              setShowCalendar(true);
-            }}
-          >
-            <CalendarDays />
-            <span>Calendar</span>
-          </button>
-          <button
-            className="nav-item"
-            onClick={() => {
-              onClose?.();
               setShowSettings(true);
             }}
           >
@@ -199,7 +219,7 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
                     padding: 0,
                     cursor: 'pointer',
                     color: 'var(--c-t-b42318)',
-                    fontSize: '9px',
+                    fontSize: '12px',
                     fontWeight: 600,
                   }}
                 >
@@ -211,16 +231,6 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
           <MoreHorizontal className="profile-more" />
         </div>
       </aside>
-
-      {showCalendar && (
-        <Modal title="Calendar" onClose={() => setShowCalendar(false)}>
-          <p className="modal-intro">Your upcoming deadlines and events will appear here.</p>
-          <div className="modal-empty">
-            <CalendarDays size={48} aria-hidden="true" />
-            <p>No upcoming events</p>
-          </div>
-        </Modal>
-      )}
 
       {showSettings && (
         <Modal title="Settings" onClose={() => setShowSettings(false)}>

@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import '@/app/auth.css';
 import {
   Archive as ArchiveIcon,
   Bell,
-  CalendarDays,
   ChevronRight,
   ClipboardCheck,
   History,
@@ -16,7 +15,6 @@ import {
   MessageSquareQuote,
   Menu,
   MoreHorizontal,
-  Search,
   Settings2,
   X,
 } from 'lucide-react';
@@ -24,6 +22,8 @@ import ThemeToggle from '@/components/ThemeToggle';
 import Modal from '@/components/Modal';
 import { TourHost, useTour } from '@/components/OnboardingTour';
 import { ORGANISER_TOUR } from '@/lib/tour';
+import { buildActivityStreamUrl } from '@/lib/api';
+import { useAuth } from '@clerk/nextjs';
 
 const ClerkSignOutButton = dynamic(() => import('@clerk/nextjs').then((mod) => mod.SignOutButton), {
   ssr: false,
@@ -57,19 +57,64 @@ export default function OrganiserShell(props) {
 
 function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
   const { startTour } = useTour();
+  const { getToken } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const initials = initialsFrom(user?.name || user?.email || '?');
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const menuButtonRef = useRef(null);
   const wasOpen = useRef(false);
   const close = useCallback(() => setOpen(false), []);
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+
+  // Connect to the activity SSE stream for the notifications dropdown.
+  useEffect(() => {
+    if (!notifOpen) return undefined;
+    let es;
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      es = new EventSource(buildActivityStreamUrl(token));
+      es.addEventListener('history', (e) => {
+        try { setNotifications(JSON.parse(e.data).slice(0, 8)); } catch {}
+      });
+      es.addEventListener('message', (e) => {
+        try {
+          const item = JSON.parse(e.data);
+          setNotifications((prev) => [item, ...prev].slice(0, 8));
+        } catch {}
+      });
+    })();
+    return () => { if (es) es.close(); };
+  }, [notifOpen, getToken]);
+
+  // Close dropdown on click outside or Escape.
+  useEffect(() => {
+    if (!notifOpen) return undefined;
+    const onClick = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setNotifOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [notifOpen]);
 
   // Close the mobile drawer whenever the route changes. (state adjusted during render, not in an effect)
   const [lastPathname, setLastPathname] = useState(pathname);
   if (lastPathname !== pathname) {
     setLastPathname(pathname);
     setOpen(false);
+    setNotifOpen(false);
   }
 
   useEffect(() => {
@@ -108,7 +153,7 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
         >
           <X size={20} aria-hidden="true" />
         </button>
-        <Link href="/" className="organiser-brand">
+        <Link href="/organiser" className="organiser-brand">
           <span className="organiser-brand-mark">
             <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-hidden="true">
               <circle cx="20" cy="20" r="18" stroke="#6c4fd8" strokeWidth="2.5" fill="none" />
@@ -157,7 +202,6 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
             type="button"
             className="organiser-logout organiser-settings"
             onClick={() => {
-              close();
               setShowSettings(true);
             }}
           >
@@ -211,13 +255,32 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
           </div>
           <div className="organiser-actions">
             <ThemeToggle />
-            <button className="icon-button" aria-label="Search" type="button">
-              <Search size={18} />
-            </button>
-            <button className="icon-button" aria-label="Notifications" type="button">
-              <Bell size={18} />
-              <i />
-            </button>
+            <div className="organiser-dropdown-wrap" ref={notifRef}>
+              <button
+                className="icon-button"
+                aria-label="Notifications"
+                aria-expanded={notifOpen}
+                type="button"
+                onClick={() => setNotifOpen((v) => !v)}
+              >
+                <Bell size={18} />
+                {notifications.length > 0 && <i />}
+              </button>
+              {notifOpen && (
+                <div className="organiser-dropdown organiser-notif-dropdown" role="region" aria-label="Notifications">
+                  <h4 className="organiser-dropdown-heading">Recent activity</h4>
+                  {notifications.length === 0 && (
+                    <p className="organiser-search-empty">No recent activity</p>
+                  )}
+                  {notifications.map((n, i) => (
+                    <div key={`${n.type}-${n.ts}-${i}`} className="organiser-notif-item">
+                      <span className="organiser-notif-type">{formatNotifType(n.type)}</span>
+                      <span className="organiser-notif-detail">{n.detail || n.type}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <span className="top-avatar">{initials}</span>
           </div>
         </header>
@@ -260,4 +323,11 @@ function initialsFrom(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
+}
+
+function formatNotifType(type) {
+  if (!type) return 'Activity';
+  return type
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }

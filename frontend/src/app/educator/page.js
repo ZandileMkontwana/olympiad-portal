@@ -8,7 +8,6 @@ import { listOlympiads, requestOlympiadAccess } from '@/lib/api';
 import '@/app/auth.css';
 import {
   ChevronRight,
-  ArrowRight,
   ClipboardList,
   Clock,
   FileText,
@@ -17,7 +16,6 @@ import {
   Trophy,
   Users,
   CalendarDays,
-  Plus,
   ChevronDown,
 } from 'lucide-react';
 
@@ -396,7 +394,7 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
               color: badge.color,
               padding: '3px 10px',
               borderRadius: '20px',
-              fontSize: '10px',
+              fontSize: '12px',
               fontWeight: 700,
               flexShrink: 0,
             }}
@@ -545,9 +543,6 @@ export default function EducatorDashboard() {
             Here&apos;s what&apos;s happening across your Olympiads today.
           </p>
         </div>
-        <button className="button primary">
-          <Plus /> Create olympiad
-        </button>
       </section>
 
       {/* Educator banner */}
@@ -628,7 +623,7 @@ export default function EducatorDashboard() {
                   color: 'var(--c-t-6d3fd1)',
                   padding: '3px 10px',
                   borderRadius: '20px',
-                  fontSize: '10px',
+                  fontSize: '12px',
                   fontWeight: 700,
                 }}
               >
@@ -677,60 +672,6 @@ export default function EducatorDashboard() {
               </div>
             </>
           )}
-          <Link href="/educator" className="full-link">
-            View all olympiads <ArrowRight />
-          </Link>
-        </div>
-
-        {/* Quick actions panel */}
-        <div className="panel calendar-panel" data-tour="educator-quick-actions">
-          <div className="panel-heading">
-            <div>
-              <h2>Quick actions</h2>
-              <p>Common tasks for your school.</p>
-            </div>
-            <Sparkles className="heading-icon" />
-          </div>
-          <div className="quick-actions">
-            <Link href="/educator/school">
-              <div className="quick-icon purple">
-                <Users />
-              </div>
-              <span>
-                <strong>School dashboard</strong>
-                <small>View learner progress and participation</small>
-              </span>
-              <ArrowRight />
-            </Link>
-            <Link href="/educator/archive">
-              <div className="quick-icon blue">
-                <FileText />
-              </div>
-              <span>
-                <strong>Archive</strong>
-                <small>Browse past olympiads and results</small>
-              </span>
-              <ArrowRight />
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                const olympiadSection = document.querySelector('.content-grid .panel:first-child');
-                if (olympiadSection) {
-                  olympiadSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }}
-            >
-              <div className="quick-icon amber">
-                <Trophy />
-              </div>
-              <span>
-                <strong>Browse olympiads</strong>
-                <small>Find the next challenge for your school</small>
-              </span>
-              <ArrowRight />
-            </button>
-          </div>
         </div>
       </section>
     </>
