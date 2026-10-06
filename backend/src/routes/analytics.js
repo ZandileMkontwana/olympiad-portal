@@ -138,7 +138,7 @@ function calculateRoundAnalytics(submissions, round) {
 
   // Score distribution
   const scores = completedSubmissions
-    .map((s) => s.result?.totalScore)
+    .map((s) => s.result?.score)
     .filter((score) => score !== null && score !== undefined);
 
   const maxScore = round.paper.questions.reduce((sum, q) => sum + q.marks, 0);
@@ -205,7 +205,7 @@ function calculateSchoolAnalytics(submissions, round) {
   const completionRate = totalEntrants > 0 ? completedSubmissions.length / totalEntrants : 0;
 
   const scores = completedSubmissions
-    .map((s) => s.result?.totalScore)
+    .map((s) => s.result?.score)
     .filter((score) => score !== null && score !== undefined);
 
   const maxScore = round.paper.questions.reduce((sum, q) => sum + q.marks, 0);
@@ -287,7 +287,7 @@ function calculateQuestionAnalytics(submissions, questions) {
         // Try to extract question-specific score from breakdown
         // For now, use the overall score as a proxy
         // In a real implementation, you'd parse result.breakdown
-        return result.totalScore;
+        return result.score;
       })
       .filter((s) => s !== null);
 
@@ -334,7 +334,7 @@ function calculateSchoolBreakdown(submissions) {
 
     if (s.sitting?.completedAt) {
       school.completed++;
-      school.totalScore += s.result?.totalScore || 0;
+      school.totalScore += s.result?.score || 0;
     }
   });
 
