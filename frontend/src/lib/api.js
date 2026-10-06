@@ -1019,3 +1019,23 @@ export function deleteVariant(variantId, token) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+// Analytics API functions
+
+/**
+ * Fetch comprehensive analytics for a round (organiser only)
+ */
+export async function fetchRoundAnalytics(roundId, token) {
+  return requestJson(`/api/analytics/rounds/${roundId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Fetch analytics for a specific school in a round
+ */
+export async function fetchSchoolAnalytics(roundId, schoolId, token) {
+  return requestJson(`/api/analytics/rounds/${roundId}/schools/${schoolId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
