@@ -10,7 +10,12 @@ import {
   ApiError,
   releaseResults,
   unreleaseResults,
+  fetchCurrentUser,
+  fetchSchoolAnalytics,
 } from '@/lib/api';
+import ParticipationChart from '@/components/charts/ParticipationChart';
+import ScoreDistributionChart from '@/components/charts/ScoreDistributionChart';
+import QuestionPerformanceChart from '@/components/charts/QuestionPerformanceChart';
 
 function formatRemaining(ms) {
   if (ms <= 0) return 'closing any moment';
@@ -39,6 +44,11 @@ function RoundViewContent() {
   const [certificateLoading, setCertificateLoading] = useState(false);
   const [releaseStatus, setReleaseStatus] = useState('idle'); // idle | releasing | unreleasing | error
   const [releaseMessage, setReleaseMessage] = useState('');
+
+  const [schoolId, setSchoolId] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsStatus, setAnalyticsStatus] = useState('idle'); // idle | loading | ready | error
+  const [analyticsError, setAnalyticsError] = useState('');
 
   const [submissions, setSubmissions] = useState([]);
   const [submissionsStatus, setSubmissionsStatus] = useState('loading'); // loading | ready | error
@@ -189,6 +199,63 @@ function RoundViewContent() {
 
     loadCertificateData();
   }, [roundId, round?.state, getToken]);
+
+  // Resolve the signed-in educator's own school once, so the analytics
+  // fetch below can scope the request to it (GET
+  // /analytics/rounds/:roundId/schools/:schoolId — backend/src/routes/analytics.js).
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSchoolId() {
+      const token = await getToken();
+      const user = await fetchCurrentUser(token);
+      if (!cancelled && user?.school?.id) {
+        setSchoolId(user.school.id);
+      }
+    }
+
+    loadSchoolId();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken]);
+
+  // School-level analytics only make sense once the round has stopped
+  // taking submissions — same gating as the organiser view in
+  // rounds/[id]/closed_round/page.js (#278).
+  useEffect(() => {
+    if (!roundId || !schoolId) return;
+    if (round?.state !== 'closed' && round?.state !== 'released') return;
+
+    let cancelled = false;
+
+    async function loadAnalytics() {
+      setAnalyticsStatus('loading');
+      setAnalyticsError('');
+      try {
+        const token = await getToken();
+        const data = await fetchSchoolAnalytics(roundId, schoolId, token);
+        if (!cancelled) {
+          setAnalytics(data);
+          setAnalyticsStatus('ready');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setAnalyticsStatus('error');
+          setAnalyticsError(
+            err instanceof ApiError ? err.message : 'Could not load your school’s analytics.'
+          );
+        }
+      }
+    }
+
+    loadAnalytics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roundId, schoolId, round?.state, getToken]);
 
   async function handleDownload() {
     setDownloadError('');
@@ -484,6 +551,73 @@ function RoundViewContent() {
           </div>
         )}
       </div>
+
+      {(round.state === 'closed' || round.state === 'released') && (
+        <div className="card" aria-label="Your school's analytics">
+          <h2>Your School&apos;s Analytics</h2>
+
+          {analyticsStatus === 'loading' && (
+            <p className="description">Loading your school&apos;s analytics...</p>
+          )}
+
+          {analyticsStatus === 'error' && (
+            <p className="message" role="alert">
+              {analyticsError}
+            </p>
+          )}
+
+          {analyticsStatus === 'ready' && analytics && (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '16px',
+                  marginTop: '8px',
+                  marginBottom: '16px',
+                }}
+              >
+                <div className="card" style={{ flex: '1 1 160px' }}>
+                  <strong>Average Score</strong>
+                  <p style={{ fontSize: '1.4em', margin: '4px 0 0 0' }}>
+                    {analytics.scores.average.toFixed(1)} / {analytics.round.maxScore}
+                  </p>
+                </div>
+                <div className="card" style={{ flex: '1 1 160px' }}>
+                  <strong>Median Score</strong>
+                  <p style={{ fontSize: '1.4em', margin: '4px 0 0 0' }}>
+                    {analytics.scores.median.toFixed(1)} / {analytics.round.maxScore}
+                  </p>
+                </div>
+                <div className="card" style={{ flex: '1 1 160px' }}>
+                  <strong>Completion Rate</strong>
+                  <p style={{ fontSize: '1.4em', margin: '4px 0 0 0' }}>
+                    {Math.round(analytics.participation.completionRate * 100)}%
+                  </p>
+                </div>
+              </div>
+
+              <div className="card" style={{ marginBottom: '16px' }}>
+                <ParticipationChart
+                  totalEntrants={analytics.participation.totalEntrants}
+                  completedSubmissions={analytics.participation.completedSubmissions}
+                />
+              </div>
+
+              <div className="card" style={{ marginBottom: '16px' }}>
+                <ScoreDistributionChart
+                  data={analytics.scores.distribution}
+                  maxScore={analytics.round.maxScore}
+                />
+              </div>
+
+              <div className="card">
+                <QuestionPerformanceChart questions={analytics.questions} />
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <h2>Submissions &amp; Remarks</h2>
