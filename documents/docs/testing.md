@@ -14,25 +14,25 @@ npm run test:coverage
 ```
 This runs the full backend and frontend suites with coverage enabled, from the repo root.
 
-## Current coverage (as of Sprint 3 close)
+## Current coverage (as of the Sprint 4 QA sweep, 6 October 2026)
 
-**Backend** — 22 test files, 501 tests, all passing
+**Backend** — 26 test files, 550 tests, all passing
 | Metric | Coverage |
 |---|---|
-| Statements | 89.33% |
-| Branches | 78.06% |
-| Functions | 95.36% |
-| Lines | 89.94% |
+| Statements | 85.73% |
+| Branches | 75.95% |
+| Functions | 89.86% |
+| Lines | 86.11% |
 
-Every backend route file is covered — the scheduler (including all four notification jobs), auth middleware, the email library, certificates generation, timezone utilities, qualification logic, and all 14 route files (rounds, sittings, submissions, marking, remark, entrants, schools, students, studentAuth, papers, auth, certificates, olympiadOrganisers, audit log). `index.js` (the app entry point) and some branch logic in `authorization.js` are the main gaps.
+The core is well covered — the scheduler (including all four notification jobs), auth middleware, the email library, certificates generation, timezone utilities, qualification logic, and the main route files (rounds, sittings, submissions, marking, remark, entrants, schools, students, studentAuth, papers, auth, certificates, olympiadOrganisers, audit log). `index.js` (the app entry point), the external/API-key routes and some branch logic in `authorization.js` are the main gaps.
 
-**Frontend** — 18 test files, 249 tests, all passing
+**Frontend** — 28 test files, 355 tests, all passing
 | Metric | Coverage |
 |---|---|
-| Statements | 96% |
-| Branches | 87.62% |
+| Statements | 94.82% |
+| Branches | 87.4% |
 | Functions | 100% |
-| Lines | 98.35% |
+| Lines | 98.24% |
 
 Covers the full API client (all exported functions including Sprint 3 additions: marking queue, remark/appeals, co-organisers, audit log, replay, results management, standings), the student session library, all auth-related React hooks (`useAuthRedirect`, `useRequireRole`, `useStudentAuth`), and component tests for the student sitting page, student dashboard and results review, the student registration page, the educator school dashboard, round view with appeals, the marking page, the standings page, and the set-password page.
 
@@ -56,6 +56,9 @@ Both suites enforce coverage thresholds in their `vitest.config.mjs` (80% lines/
 - Student session storage (localStorage get/set/clear with validation)
 - Student auth hook (session check, redirect, signOut, getToken, unmount safety)
 - Frontend auth redirect hooks, the full API client (all exported functions), and page components (sitting, student dashboard/results, registration, school dashboard, standings, round view with appeals, marking page, set-password)
+- The Sprint 4 additions: the SSE activity feed (event bus, stream route, pre-Clerk query-token promotion) and the branded email template library
+- The theme system (light/dark with stored preference and system default) and the onboarding tour state library
+- Accessibility checks via axe (`expectNoAxeViolations`) inside the covered page suites
 
 ## Test policy
 
