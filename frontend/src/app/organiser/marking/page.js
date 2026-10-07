@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import OrganiserShell from '@/components/OrganiserShell';
 import { listMarkingQueue, assignMarkingTask, submitMarking, ApiError } from '@/lib/api';
 
 function questionIdsFromAnswers(answers) {
@@ -122,14 +121,12 @@ export default function MarkingPage() {
 
   if (checking) {
     return (
-      <main id="main-content" tabIndex={-1} className="organiser-shell">
-        <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
-      </main>
+      <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
     );
   }
 
   return (
-    <OrganiserShell activeNav="marking" breadcrumb="Marking Queue" user={user}>
+    <>
       <div className="organiser-page-heading">
         <h1>Marking Queue</h1>
         <p>Review and mark submissions assigned to you.</p>
@@ -245,6 +242,6 @@ export default function MarkingPage() {
           </div>
         </form>
       )}
-    </OrganiserShell>
+    </>
   );
 }

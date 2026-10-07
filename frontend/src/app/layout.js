@@ -1,4 +1,5 @@
 import { ClerkProvider } from '@clerk/nextjs';
+import Script from 'next/script';
 import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import './theme.css';
@@ -55,7 +56,9 @@ export default function RootLayout({ children }) {
         className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} h-full antialiased`}
       >
         <head>
-          <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+          <Script id="theme-init" strategy="beforeInteractive">
+            {themeInitScript}
+          </Script>
         </head>
         <body className="min-h-full flex flex-col">
           <ThemeProvider>

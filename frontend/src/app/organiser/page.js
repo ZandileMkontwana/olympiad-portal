@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import OrganiserShell from '@/components/OrganiserShell';
 import ActivityFeed from '@/components/ActivityFeed';
 import {
   listOlympiads,
@@ -310,16 +309,14 @@ export default function OrganiserDashboard() {
 
   if (checking) {
     return (
-      <main id="main-content" tabIndex={-1} className="organiser-shell">
-        <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
-      </main>
+      <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
     );
   }
 
   const firstName = (user?.name || user?.email || 'Organiser').split(/[\s@]/)[0];
 
   return (
-    <OrganiserShell activeNav="dashboard" breadcrumb="Overview" user={user}>
+    <>
       {/* Welcome row */}
       <div className="organiser-welcome-row">
         <div>
@@ -631,7 +628,7 @@ export default function OrganiserDashboard() {
                             style={{
                               display: 'block',
                               marginBottom: '4px',
-                              fontSize: '11px',
+                              fontSize: '13px',
                               fontWeight: 600,
                             }}
                           >
@@ -652,7 +649,7 @@ export default function OrganiserDashboard() {
                             style={{
                               display: 'block',
                               marginBottom: '4px',
-                              fontSize: '11px',
+                              fontSize: '13px',
                               fontWeight: 600,
                             }}
                           >
@@ -675,7 +672,7 @@ export default function OrganiserDashboard() {
                           style={{
                             display: 'block',
                             marginBottom: '4px',
-                            fontSize: '11px',
+                            fontSize: '13px',
                             fontWeight: 600,
                           }}
                         >
@@ -704,7 +701,7 @@ export default function OrganiserDashboard() {
                             style={{
                               display: 'block',
                               marginBottom: '4px',
-                              fontSize: '11px',
+                              fontSize: '13px',
                               fontWeight: 600,
                             }}
                           >
@@ -726,7 +723,7 @@ export default function OrganiserDashboard() {
                               style={{
                                 display: 'block',
                                 marginBottom: '4px',
-                                fontSize: '11px',
+                                fontSize: '13px',
                                 fontWeight: 600,
                               }}
                             >
@@ -746,7 +743,7 @@ export default function OrganiserDashboard() {
                               style={{
                                 display: 'block',
                                 marginBottom: '4px',
-                                fontSize: '11px',
+                                fontSize: '13px',
                                 fontWeight: 600,
                               }}
                             >
@@ -766,7 +763,7 @@ export default function OrganiserDashboard() {
                       {editStatus === 'error' && (
                         <p
                           role="alert"
-                          style={{ color: 'var(--c-t-b42318)', fontSize: '11px', marginTop: '8px' }}
+                          style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '8px' }}
                         >
                           {editError}
                         </p>
@@ -784,7 +781,7 @@ export default function OrganiserDashboard() {
                           type="submit"
                           disabled={editStatus === 'submitting'}
                           className="button"
-                          style={{ fontSize: '11px', padding: '6px 14px' }}
+                          style={{ fontSize: '13px', padding: '6px 14px' }}
                         >
                           {editStatus === 'submitting' ? 'Saving...' : 'Save details'}
                         </button>
@@ -795,7 +792,7 @@ export default function OrganiserDashboard() {
                             background: 'none',
                             border: 'none',
                             color: 'var(--c-t-6d667f)',
-                            fontSize: '11px',
+                            fontSize: '13px',
                             cursor: 'pointer',
                           }}
                         >
@@ -808,7 +805,7 @@ export default function OrganiserDashboard() {
                         <div style={{ marginTop: '14px' }}>
                           <p
                             style={{
-                              fontSize: '11px',
+                              fontSize: '13px',
                               fontWeight: 700,
                               marginBottom: '6px',
                               color: 'var(--c-t-6d667f)',
@@ -848,7 +845,7 @@ export default function OrganiserDashboard() {
                                       style={{
                                         textTransform: 'capitalize',
                                         opacity: 0.6,
-                                        fontSize: '11px',
+                                        fontSize: '13px',
                                       }}
                                     >
                                       {round.state}
@@ -863,7 +860,7 @@ export default function OrganiserDashboard() {
                                       borderRadius: '6px',
                                       border: '1px solid rgba(139, 92, 246, 0.15)',
                                       textDecoration: 'none',
-                                      fontSize: '11px',
+                                      fontSize: '13px',
                                       color: 'rgba(139, 92, 246, 0.9)',
                                       background: 'var(--c-bg-ffffff)',
                                     }}
@@ -880,9 +877,9 @@ export default function OrganiserDashboard() {
                       {olympiad.rounds.length === 0 && (
                         <div style={{ marginTop: '12px' }}>
                           <Link
-                            href={`/rounds/new?olympiadId=${olympiad.id}&olympiadName=${encodeURIComponent(olympiad.name)}`}
+                            href={`/organiser/rounds/new?olympiadId=${olympiad.id}&olympiadName=${encodeURIComponent(olympiad.name)}`}
                             className="panel-create"
-                            style={{ fontSize: '11px' }}
+                            style={{ fontSize: '13px' }}
                           >
                             <Plus size={13} /> Add a round
                           </Link>
@@ -905,7 +902,7 @@ export default function OrganiserDashboard() {
                             marginBottom: '6px',
                           }}
                         >
-                          <strong style={{ fontSize: '11px', color: 'var(--c-t-6d667f)' }}>
+                          <strong style={{ fontSize: '13px', color: 'var(--c-t-6d667f)' }}>
                             Co-organisers
                           </strong>
                           <button
@@ -919,7 +916,7 @@ export default function OrganiserDashboard() {
                               background: 'none',
                               border: 'none',
                               color: 'var(--violet)',
-                              fontSize: '10px',
+                              fontSize: '12px',
                               fontWeight: 700,
                               cursor: 'pointer',
                             }}
@@ -931,7 +928,7 @@ export default function OrganiserDashboard() {
                         {(organisersByOlympiad[olympiad.id] || []).length === 0 ? (
                           <p
                             style={{
-                              fontSize: '11px',
+                              fontSize: '13px',
                               fontStyle: 'italic',
                               color: 'var(--c-t-6f667d)',
                               margin: '2px 0',
@@ -949,7 +946,7 @@ export default function OrganiserDashboard() {
                                   justifyContent: 'space-between',
                                   alignItems: 'center',
                                   padding: '3px 0',
-                                  fontSize: '11px',
+                                  fontSize: '13px',
                                   borderBottom: '1px solid rgba(139, 92, 246, 0.08)',
                                 }}
                               >
@@ -959,7 +956,7 @@ export default function OrganiserDashboard() {
                                     <span
                                       style={{
                                         marginLeft: '4px',
-                                        fontSize: '9px',
+                                        fontSize: '12px',
                                         color: 'rgba(139, 92, 246, 0.6)',
                                       }}
                                     >
@@ -978,7 +975,7 @@ export default function OrganiserDashboard() {
                                       border: 'none',
                                       color: 'var(--c-t-b42318)',
                                       cursor: 'pointer',
-                                      fontSize: '10px',
+                                      fontSize: '12px',
                                     }}
                                   >
                                     Remove
@@ -1008,7 +1005,7 @@ export default function OrganiserDashboard() {
                                 padding: '4px 6px',
                                 borderRadius: '6px',
                                 border: '1px solid rgba(139, 92, 246, 0.25)',
-                                fontSize: '11px',
+                                fontSize: '13px',
                               }}
                               required
                             >
@@ -1030,7 +1027,7 @@ export default function OrganiserDashboard() {
                               type="submit"
                               disabled={organiserStatus === 'submitting'}
                               className="button"
-                              style={{ fontSize: '10px', padding: '4px 10px' }}
+                              style={{ fontSize: '12px', padding: '4px 10px' }}
                             >
                               {organiserStatus === 'submitting' ? 'Adding...' : 'Add'}
                             </button>
@@ -1042,7 +1039,7 @@ export default function OrganiserDashboard() {
                             role="alert"
                             style={{
                               color: 'var(--c-t-b42318)',
-                              fontSize: '10px',
+                              fontSize: '12px',
                               margin: '4px 0 0',
                             }}
                           >
@@ -1149,7 +1146,7 @@ export default function OrganiserDashboard() {
           {decisionError && (
             <p
               role="alert"
-              style={{ color: 'var(--c-t-b42318)', fontSize: '11px', marginTop: '8px' }}
+              style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '8px' }}
             >
               {decisionError}
             </p>
@@ -1177,6 +1174,6 @@ export default function OrganiserDashboard() {
 
         <ActivityFeed />
       </section>
-    </OrganiserShell>
+    </>
   );
 }

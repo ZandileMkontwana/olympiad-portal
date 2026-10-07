@@ -53,7 +53,7 @@ node load-test.js --students=20 --concurrency=10 --reads=400 --autosaves=3
 Against the deployed backend (fixtures are seeded into the same Supabase database the deployment uses):
 
 ```bash
-node load-test.js --base-url=https://olympiad-portal.onrender.com --students=10 --concurrency=5
+node load-test.js --base-url=https://olympiad-portal-backend.onrender.com --students=10 --concurrency=5
 node load-test.js --cleanup   # remove the load-test round and its data
 ```
 
@@ -119,7 +119,7 @@ Exactly-once verification: **all checks PASS** — 20/20 sittings, 20/20 complet
 
 ### Main harness — Deployed backend (same day, smoke run)
 
-Environment: Render (`https://olympiad-portal.onrender.com`), same Supabase database. Config: **10 students, concurrency 5, 200 reads, 3 autosaves** — 275 requests.
+Environment: Render — the original manual service (`https://olympiad-portal.onrender.com`, later superseded by the Blueprint-managed `olympiad-portal-backend`; see the 6 October full-size re-run below), same Supabase database. Config: **10 students, concurrency 5, 200 reads, 3 autosaves** — 275 requests.
 
 | Scenario | Requests | OK | Errors | Req/s | Avg (ms) | p95 | p99 |
 |---|---|---|---|---|---|---|---|
@@ -154,6 +154,24 @@ The Supabase eu-west-2 pooler was unstable during this window: one harness run a
 
 Stale `LOADTEST-` rows from the September crashes (3 olympiads, 3 rounds, 82 entrants — plus 58 stray auto-registrations the then-deployed scheduler had written into the load-test round before the `SchoolOlympiad` approval gate existed) were swept from the shared database before the re-run.
 
+### Main harness — Deployed full-size re-run (6 October 2026)
+
+Environment: Render — the Blueprint-managed service defined in `render.yaml` (`https://olympiad-portal-backend.onrender.com`), running the same `main` that serves production. Config: **full size — 20 students, concurrency 10, 400 reads, 3 autosaves** — 565 requests.
+
+| Scenario | Requests | OK | Errors | Req/s | Avg (ms) | p95 | p99 |
+|---|---|---|---|---|---|---|---|
+| warmup | 5 | 5 | 0 | 0.9 | 1 396 | 1 888 | 1 888 |
+| public_reads | 400 | 400 | 0 | 7.7 | 1 311 | 1 497 | 2 178 |
+| student_login | 20 | 20 | 0 | 1.3 | 4 240 | 6 043 | 6 174 |
+| start_sitting | 20 | 20 | 0 | 1.8 | 6 769 | 8 370 | 9 563 |
+| autosave | 60 | 60 | 0 | 4.3 | 2 786 | 3 770 | 3 931 |
+| submit | 20 | 20 | 0 | 0.7 | 4 651 | 5 052 | 5 214 |
+| submit_duplicate | 40 | 40 | 0 | 1.4 | 6 036 | 6 847 | 7 228 |
+
+Exactly-once verification: **all checks PASS** — 20/20 sittings, 20/20 completed, 20 submissions with 0 duplicated idempotency keys, 20/20 automarked at the expected 40%.
+
+This is the first deployed run with **zero error responses in any scenario** and the first at full harness size, closing both gaps left by the September smoke run. The free-tier cold start (~27 s before the first response) was absorbed by the warmup phase; latencies are higher than the local runs above because every hop goes laptop → Render (public internet) → Supabase. Before the run, the Vercel frontend was repointed from the retired `olympiad-portal.onrender.com` service to this Blueprint service (verified by grepping the deployed `/login` bundle for the new host), so production and the harness now exercise the exact same backend.
+
 ### Boundary tests — Shared Supabase database
 
 | Run | Script / concurrency | Outcome |
@@ -180,6 +198,6 @@ The submissions script produced no results at scale. Its scenarios have not been
 
 - Absolute latencies include Supabase network time; treat the numbers as relative indicators, not server CPU benchmarks. The 4 October re-run's local numbers were taken on a degraded database network path (~2× the 27 September latencies); the 27 September tables remain the healthy-path reference.
 - API-level only — no browser rendering or static-asset load.
-- The deployed smoke run used small counts and was captured before the idempotency fix shipped to Render. A full-size re-run against the deployment remains outstanding — and during the 4 October window the Render service was returning fast 500s on every database-touching endpoint (the health check included) while the same code and database served 200s from a local backend and fresh external connections succeeded. Check the Render logs and its `DATABASE_URL` before re-running. Render's free tier also spins down when idle — the first request after a cold start is slow (the warmup phase exists to absorb that).
+- The deployed smoke run used small counts and was captured before the idempotency fix shipped to Render; the full-size deployed re-run of 6 October 2026 closed that gap — zero errors across all 565 requests. The fast 500s of the 4 October window turned out to belong to the original manual service (`olympiad-portal.onrender.com`), which production no longer references — the Vercel frontend and the live-URL docs now point at the Blueprint-managed `olympiad-portal-backend`. Render's free tier still spins down when idle — the first request after a cold start is slow (the warmup phase exists to absorb that; the 6 October run's cold start took ~27 s).
 - Every run reuses (and resets) the same dedicated load-test round; it never touches real olympiad data.
 - Whether a larger `connection_limit` or `pool_timeout` raises the concurrency at which requests start failing has not been tested.

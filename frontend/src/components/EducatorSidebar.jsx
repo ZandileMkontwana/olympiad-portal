@@ -11,7 +11,6 @@ import {
   Trophy,
   Users,
   FileText,
-  CalendarDays,
   Settings2,
   CircleHelp,
   ArrowRight,
@@ -57,7 +56,6 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
   const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
   const { startTour } = useTour();
-  const [showCalendar, setShowCalendar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   if (!clerkUser) {
@@ -164,18 +162,6 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
           <button
             className="nav-item"
             onClick={() => {
-              onClose?.();
-              setShowCalendar(true);
-            }}
-            title={collapsed ? 'Calendar' : undefined}
-          >
-            <CalendarDays />
-            {!collapsed && <span>Calendar</span>}
-          </button>
-          <button
-            className="nav-item"
-            onClick={() => {
-              onClose?.();
               setShowSettings(true);
             }}
             title={collapsed ? 'Settings' : undefined}
@@ -209,7 +195,7 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
                       padding: 0,
                       cursor: 'pointer',
                       color: 'var(--c-t-b42318)',
-                      fontSize: '9px',
+                      fontSize: '12px',
                       fontWeight: 600,
                     }}
                   >
@@ -222,16 +208,6 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
           </>
         )}
       </aside>
-
-      {showCalendar && (
-        <Modal title="Calendar" onClose={() => setShowCalendar(false)}>
-          <p className="modal-intro">Your upcoming deadlines and events will appear here.</p>
-          <div className="modal-empty">
-            <CalendarDays size={48} aria-hidden="true" />
-            <p>No upcoming events</p>
-          </div>
-        </Modal>
-      )}
 
       {showSettings && (
         <Modal title="Settings" onClose={() => setShowSettings(false)}>

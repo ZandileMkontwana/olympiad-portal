@@ -475,7 +475,10 @@ body {
   display: flex;
   flex-direction: column;
   padding: 25px 16px 18px;
-  min-height: 100vh;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
   z-index: 20;
 }
 .sidebar-top {
@@ -513,14 +516,14 @@ body {
 .brand span {
   display: block;
   color: var(--c-t-606b7d);
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.2em;
   margin-top: 4px;
 }
 .nav-label {
   color: var(--c-t-626b7e);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -583,14 +586,14 @@ body {
 .sidebar-help strong,
 .sidebar-profile strong {
   display: block;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--c-t-30394b);
 }
 .sidebar-help span,
 .sidebar-profile span {
   display: block;
   color: var(--c-t-616a7b);
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 3px;
 }
 .sidebar-help > svg {
@@ -614,7 +617,7 @@ body {
   border-radius: 50%;
   color: #fff;
   background: linear-gradient(145deg, #b0503a, #a63f38);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
 }
 .profile-more {
@@ -640,14 +643,14 @@ body {
   align-items: center;
   gap: 9px;
   color: var(--c-t-616b7c);
-  font-size: 12px;
+  font-size: 13px;
 }
 .breadcrumbs svg {
   width: 13px;
 }
 .breadcrumbs strong {
   color: var(--c-t-3d4655);
-  font-size: 12px;
+  font-size: 13px;
 }
 .top-actions {
   display: flex;
@@ -707,7 +710,7 @@ body {
 }
 .eyebrow {
   color: var(--c-t-616a7b);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.08em;
   margin: 0 0 10px;
@@ -736,7 +739,7 @@ body {
   border: 0;
   border-radius: 9px;
   padding: 11px 15px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
@@ -799,7 +802,7 @@ body {
   align-items: center;
   gap: 6px;
   color: #ddd6ff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -824,7 +827,7 @@ body {
   gap: 18px;
   margin: 21px 0 19px;
   color: #eeeaff;
-  font-size: 11px;
+  font-size: 13px;
 }
 .hero-meta span {
   display: flex;
@@ -864,7 +867,7 @@ body {
 }
 .hero-ring span {
   color: #d5d0ef;
-  font-size: 10px;
+  font-size: 12px;
 }
 .section-heading {
   display: flex;
@@ -881,7 +884,7 @@ body {
 .section-heading p,
 .panel-heading p {
   color: var(--c-t-616b7c);
-  font-size: 11px;
+  font-size: 13px;
   margin-top: 5px;
 }
 .text-button,
@@ -892,7 +895,7 @@ body {
   gap: 6px;
   color: var(--c-t-6546d8);
   background: transparent;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   text-decoration: none;
@@ -953,7 +956,7 @@ body {
 }
 .stat-card p {
   color: var(--c-t-616b7b);
-  font-size: 10px;
+  font-size: 12px;
   margin-bottom: 5px;
 }
 .stat-card strong {
@@ -965,7 +968,7 @@ body {
 .stat-card span {
   color: var(--c-t-40745a);
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 4px;
 }
 .content-grid {
@@ -1017,7 +1020,7 @@ body {
 .test-main strong {
   color: var(--c-t-334052);
   display: block;
-  font-size: 11px;
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1025,7 +1028,7 @@ body {
 .test-main span {
   color: var(--c-t-616b7c);
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1057,7 +1060,7 @@ body {
   white-space: nowrap;
   padding: 5px 8px;
   border-radius: 6px;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
 }
 .status-badge.purple {
@@ -1078,7 +1081,7 @@ body {
 }
 .test-side small {
   color: var(--c-t-616b7b);
-  font-size: 9px;
+  font-size: 12px;
 }
 .row-arrow {
   color: var(--c-t-606a7e);
@@ -1115,7 +1118,7 @@ body {
   line-height: 1;
 }
 .calendar-date span {
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
   margin-top: 3px;
 }
@@ -1129,11 +1132,11 @@ body {
 }
 .calendar-card strong {
   color: var(--c-t-394456);
-  font-size: 11px;
+  font-size: 13px;
 }
 .calendar-card span {
   color: var(--c-t-616b7d);
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 4px;
 }
 .calendar-card small {
@@ -1141,7 +1144,7 @@ body {
   display: flex;
   gap: 5px;
   color: var(--c-t-40745a);
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 7px;
 }
 .calendar-card small svg {
@@ -1176,7 +1179,7 @@ body {
 }
 .banner-stat span {
   color: #d7eff1;
-  font-size: 10px;
+  font-size: 12px;
 }
 .banner-stat div {
   width: 150px;
@@ -1201,7 +1204,7 @@ body {
   padding: 7px 9px;
   color: var(--c-t-606a7c);
   background: var(--c-bg-ffffff);
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
 }
 .filter-button svg {
@@ -1214,7 +1217,7 @@ body {
   display: flex;
   gap: 14px;
   color: var(--c-t-616b7c);
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 8px;
 }
 .round-meta span {
@@ -1257,11 +1260,11 @@ body {
 }
 .quick-actions strong {
   color: var(--c-t-3b4656);
-  font-size: 11px;
+  font-size: 13px;
 }
 .quick-actions small {
   color: var(--c-t-616b7c);
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 3px;
 }
 .quick-actions button > svg {
@@ -1348,7 +1351,7 @@ body {
     font-size: 20px;
   }
   .hero-ring span {
-    font-size: 8px;
+    font-size: 12px;
   }
   .hero-card h2,
   .educator-banner h2 {
@@ -1401,7 +1404,7 @@ body {
     min-height: 86px;
   }
   .stat-card p {
-    font-size: 9px;
+    font-size: 12px;
   }
   .hero-ring {
     opacity: 0.65;

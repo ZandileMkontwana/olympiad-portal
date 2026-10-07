@@ -5,7 +5,7 @@ sidebar_position: 1
 ![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-98.8%25-brightgreen)
 ![Tests](https://img.shields.io/badge/tests-117%20passing-brightgreen)
 
-**Live API (Render):** <https://olympiad-portal.onrender.com> — e.g. <https://olympiad-portal.onrender.com/api/olympiads>
+**Live API (Render):** <https://olympiad-portal-backend.onrender.com> — e.g. <https://olympiad-portal-backend.onrender.com/api/olympiads>
 
 # Getting Started — Backend
 

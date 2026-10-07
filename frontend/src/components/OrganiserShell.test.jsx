@@ -15,6 +15,10 @@ vi.mock('next/link', () => ({
 vi.mock('next/dynamic', () => ({
   default: () => () => null,
 }));
+vi.mock('@clerk/nextjs', () => ({
+  useAuth: () => ({ getToken: () => Promise.resolve('test-token') }),
+  useUser: () => ({ user: { id: 'test-user', fullName: 'Test User' } }),
+}));
 
 import OrganiserShell from './OrganiserShell';
 import { getTourState, saveTourState } from '@/lib/tour';
