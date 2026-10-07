@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const cron = require('node-cron');
 const sgMail = require('@sendgrid/mail');
 const prisma = require('./lib/prisma');
+const difficulty = require('./lib/difficulty');
 const { startScheduler } = require('./scheduler');
 
 describe('startScheduler', () => {
@@ -28,6 +29,7 @@ describe('startScheduler', () => {
     vi.spyOn(prisma.schoolOlympiad, 'findMany').mockResolvedValue([]);
     vi.spyOn(prisma.auditLog, 'createMany').mockResolvedValue({ count: 0 });
     vi.spyOn(prisma.auditLog, 'create').mockResolvedValue({ id: 'audit-1' });
+    vi.spyOn(difficulty, 'updateQuestionDifficulty').mockResolvedValue(0);
     vi.spyOn(sgMail, 'send').mockResolvedValue({});
     vi.spyOn(console, 'log').mockImplementation(() => {});
   });
@@ -79,6 +81,19 @@ describe('startScheduler', () => {
       },
       data: { state: 'closed' },
     });
+  });
+
+  it('recalculates difficulty for each round that closes', async () => {
+    startScheduler();
+
+    prisma.round.updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+    prisma.round.findMany.mockResolvedValueOnce([
+      { id: 'round-1', name: 'Round 1', olympiadId: 'oly-1' },
+    ]);
+
+    await scheduledCallback();
+
+    expect(difficulty.updateQuestionDifficulty).toHaveBeenCalledWith('round-1');
   });
 
   it('logs opened count when rounds are opened', async () => {

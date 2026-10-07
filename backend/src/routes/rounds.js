@@ -804,7 +804,19 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       schoolId = educator?.schoolId ?? null;
     }
 
-    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: {
+        paper: {
+          include: {
+            questions: {
+              include: { variants: true },
+              orderBy: { number: 'asc' },
+            },
+          },
+        },
+      },
+    });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
@@ -840,6 +852,34 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       },
     });
 
+    // Only questions with more than one variant produce meaningful "variant
+    // info" — a single-variant question still gets an assignment recorded
+    // (see lib/variantAssignment.js), but there's nothing to distinguish, so
+    // it's left out of the summary rather than cluttering every row (#263).
+    const variantMetaByQuestionId = new Map();
+    for (const question of round.paper?.questions || []) {
+      if (question.variants.length > 1) {
+        variantMetaByQuestionId.set(question.id, {
+          questionNumber: question.number,
+          labelsById: new Map(question.variants.map((v) => [v.id, v.label])),
+        });
+      }
+    }
+
+    function summarizeVariants(variantChoices) {
+      if (!variantChoices) return [];
+      const summary = [];
+      for (const [questionId, variantId] of Object.entries(variantChoices)) {
+        const meta = variantMetaByQuestionId.get(questionId);
+        if (!meta) continue; // question has 0 or 1 variants — nothing to show
+        summary.push({
+          questionNumber: meta.questionNumber,
+          variantLabel: meta.labelsById.get(variantId) || 'Unknown variant',
+        });
+      }
+      return summary.sort((a, b) => a.questionNumber - b.questionNumber);
+    }
+
     const ranked = submissions
       .map((s) => ({
         entrantId: s.entrant.id,
@@ -847,7 +887,7 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
         schoolName: s.entrant.school.name,
         score: s.result.score,
         submittedAt: s.submittedAt,
-        variantChoices: s.sitting?.variantChoices || null,
+        variants: summarizeVariants(s.sitting?.variantChoices),
       }))
       .sort((a, b) => b.score - a.score);
 

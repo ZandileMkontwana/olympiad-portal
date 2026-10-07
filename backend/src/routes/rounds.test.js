@@ -1368,6 +1368,107 @@ describe('Rounds routes', () => {
       );
     });
 
+    it("resolves each entrant's assigned variant labels, skipping single-variant questions (#263)", async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+        olympiadId: 'oly-1',
+        paper: {
+          questions: [
+            {
+              id: 'q-1',
+              number: 1,
+              variants: [
+                { id: 'variant-1a', label: 'Variant A' },
+                { id: 'variant-1b', label: 'Variant B' },
+              ],
+            },
+            {
+              id: 'q-2',
+              number: 2,
+              // Only one variant — assignVariant still records an
+              // assignment for it, but it carries no distinguishing
+              // information, so it should be left out of the summary.
+              variants: [{ id: 'variant-2a', label: 'Variant A' }],
+            },
+            {
+              id: 'q-3',
+              number: 3,
+              variants: [
+                { id: 'variant-3a', label: 'Variant A' },
+                { id: 'variant-3b', label: 'Variant B' },
+              ],
+            },
+          ],
+        },
+      });
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: {
+            id: 'entrant-1',
+            name: 'Thabo',
+            school: { name: 'Wits High School' },
+          },
+          result: { score: 80 },
+          submittedAt: '2026-09-12T20:56:55.855Z',
+          sitting: {
+            variantChoices: {
+              'q-1': 'variant-1b',
+              'q-2': 'variant-2a',
+              'q-3': 'variant-3a',
+            },
+          },
+        },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].variants).toEqual([
+        { questionNumber: 1, variantLabel: 'Variant B' },
+        { questionNumber: 3, variantLabel: 'Variant A' },
+      ]);
+    });
+
+    it('returns an empty variants array when the sitting has no variant choices', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+        olympiadId: 'oly-1',
+        paper: {
+          questions: [
+            {
+              id: 'q-1',
+              number: 1,
+              variants: [
+                { id: 'variant-1a', label: 'Variant A' },
+                { id: 'variant-1b', label: 'Variant B' },
+              ],
+            },
+          ],
+        },
+      });
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: {
+            id: 'entrant-1',
+            name: 'Thabo',
+            school: { name: 'Wits High School' },
+          },
+          result: { score: 80 },
+          submittedAt: '2026-09-12T20:56:55.855Z',
+          sitting: null,
+        },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].variants).toEqual([]);
+    });
+
     it('ranks entrants by score, highest first', async () => {
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',

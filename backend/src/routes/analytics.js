@@ -48,7 +48,6 @@ router.get('/analytics/rounds/:roundId', requireAuth, async (req, res) => {
         entrant: {
           include: { school: true },
         },
-        sitting: true,
       },
     });
 
@@ -115,7 +114,6 @@ router.get('/analytics/rounds/:roundId/schools/:schoolId', requireAuth, async (r
         entrant: {
           include: { school: true },
         },
-        sitting: true,
       },
     });
 
@@ -133,7 +131,9 @@ router.get('/analytics/rounds/:roundId/schools/:schoolId', requireAuth, async (r
  */
 function calculateRoundAnalytics(submissions, round) {
   const totalEntrants = submissions.length;
-  const completedSubmissions = submissions.filter((s) => s.sitting?.completedAt);
+  // Submission has no relation to Sitting. A result is the durable signal that
+  // a submitted attempt has completed marking and can contribute to analytics.
+  const completedSubmissions = submissions.filter((s) => s.result);
   const completionRate = totalEntrants > 0 ? completedSubmissions.length / totalEntrants : 0;
 
   // Score distribution
@@ -141,29 +141,20 @@ function calculateRoundAnalytics(submissions, round) {
     .map((s) => s.result?.score)
     .filter((score) => score !== null && score !== undefined);
 
-  const maxScore = round.paper.questions.reduce((sum, q) => sum + q.marks, 0);
+  // A round can be closed before a paper is uploaded. Return empty question
+  // metrics in that case instead of failing the entire analytics request.
+  const questions = round.paper?.questions ?? [];
+  const maxScore = questions.reduce((sum, q) => sum + q.marks, 0);
 
   const scoreDistribution = buildScoreDistribution(scores, maxScore);
 
-  // Submission timing
-  const submissionTimes = completedSubmissions
-    .map((s) => {
-      const started = s.sitting?.startedAt;
-      const completed = s.sitting?.completedAt;
-      if (started && completed) {
-        return (new Date(completed) - new Date(started)) / 1000 / 60; // minutes
-      }
-      return null;
-    })
-    .filter((t) => t !== null);
-
-  const avgCompletionTime =
-    submissionTimes.length > 0
-      ? submissionTimes.reduce((sum, t) => sum + t, 0) / submissionTimes.length
-      : 0;
+  // Submission does not store a sitting ID or start time, so completion-duration
+  // metrics cannot be calculated reliably from the current data model.
+  const submissionTimes = [];
+  const avgCompletionTime = 0;
 
   // Question-level analytics
-  const questionAnalytics = calculateQuestionAnalytics(submissions, round.paper.questions);
+  const questionAnalytics = calculateQuestionAnalytics(submissions, questions);
 
   // School breakdown
   const schoolBreakdown = calculateSchoolBreakdown(submissions);
@@ -201,17 +192,22 @@ function calculateRoundAnalytics(submissions, round) {
  */
 function calculateSchoolAnalytics(submissions, round) {
   const totalEntrants = submissions.length;
-  const completedSubmissions = submissions.filter((s) => s.sitting?.completedAt);
+  // Submission has no relation to Sitting. A result is the durable signal that
+  // a submitted attempt has completed marking and can contribute to analytics.
+  const completedSubmissions = submissions.filter((s) => s.result);
   const completionRate = totalEntrants > 0 ? completedSubmissions.length / totalEntrants : 0;
 
   const scores = completedSubmissions
     .map((s) => s.result?.score)
     .filter((score) => score !== null && score !== undefined);
 
-  const maxScore = round.paper.questions.reduce((sum, q) => sum + q.marks, 0);
+  // A round can be closed before a paper is uploaded. Return empty question
+  // metrics in that case instead of failing the entire analytics request.
+  const questions = round.paper?.questions ?? [];
+  const maxScore = questions.reduce((sum, q) => sum + q.marks, 0);
   const scoreDistribution = buildScoreDistribution(scores, maxScore);
 
-  const questionAnalytics = calculateQuestionAnalytics(submissions, round.paper.questions);
+  const questionAnalytics = calculateQuestionAnalytics(submissions, questions);
 
   return {
     round: {
@@ -332,9 +328,9 @@ function calculateSchoolBreakdown(submissions) {
     const school = schoolMap.get(schoolId);
     school.entrants++;
 
-    if (s.sitting?.completedAt) {
+    if (s.result) {
       school.completed++;
-      school.totalScore += s.result?.score || 0;
+      school.totalScore += s.result.score;
     }
   });
 

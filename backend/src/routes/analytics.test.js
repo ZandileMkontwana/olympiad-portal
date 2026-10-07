@@ -131,6 +131,11 @@ describe('Analytics Routes', () => {
       const res = await request(app).get('/api/analytics/rounds/round-1');
 
       expect(res.status).toBe(200);
+      expect(prisma.submission.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.not.objectContaining({ sitting: true }),
+        })
+      );
       expect(res.body).toHaveProperty('round');
       expect(res.body).toHaveProperty('participation');
       expect(res.body).toHaveProperty('scores');
@@ -149,6 +154,27 @@ describe('Analytics Routes', () => {
       expect(res.body.scores.average).toBeCloseTo(15);
       expect(res.body.scores.median).toBe(15);
       expect(res.body.scores.distribution).toBeInstanceOf(Array);
+    });
+
+    it('returns empty question metrics when a closed round has no paper', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+        olympiadId: 'olympiad-1',
+        paper: null,
+      });
+      prisma.submission.findMany.mockResolvedValue([]);
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue({
+        id: 'oo-1',
+        olympiadId: 'olympiad-1',
+        organiserId: 'user-1',
+      });
+
+      const res = await request(app).get('/api/analytics/rounds/round-1');
+
+      expect(res.status).toBe(200);
+      expect(res.body.round.maxScore).toBe(0);
+      expect(res.body.questions).toEqual([]);
     });
 
     it('handles empty submissions gracefully', async () => {

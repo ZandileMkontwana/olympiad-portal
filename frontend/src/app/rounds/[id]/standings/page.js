@@ -41,6 +41,12 @@ export default function StandingsPage() {
     };
   }, [roundId, getToken]);
 
+  // Only show the Variants column when at least one entrant actually has a
+  // resolved variant assignment to show (backend/src/routes/rounds.js —
+  // GET /rounds/:id/standings — omits it entirely for single-variant
+  // questions, so most rounds without multi-variant papers show nothing).
+  const hasVariantInfo = standings.some((row) => row.variants && row.variants.length > 0);
+
   // Per-school standings — fetched lazily, only once the tab is first opened
   const [schoolStandings, setSchoolStandings] = useState([]);
   const [schoolStatus, setSchoolStatus] = useState('idle'); // idle | loading | empty | ready | error
@@ -153,6 +159,11 @@ export default function StandingsPage() {
                     <th scope="col" className="px-4 py-3 font-medium text-ink-soft">
                       School
                     </th>
+                    {hasVariantInfo && (
+                      <th scope="col" className="px-4 py-3 font-medium text-ink-soft">
+                        Variants
+                      </th>
+                    )}
                     <th scope="col" className="px-4 py-3 text-right font-medium text-ink-soft">
                       Score
                     </th>
@@ -167,6 +178,19 @@ export default function StandingsPage() {
                       <td className="px-4 py-3 font-mono text-ink-soft">{row.rank}</td>
                       <td className="px-4 py-3 font-medium text-ink">{row.entrantName}</td>
                       <td className="px-4 py-3 text-ink-soft">{row.schoolName}</td>
+                      {hasVariantInfo && (
+                        <td className="px-4 py-3 text-ink-soft">
+                          {row.variants && row.variants.length > 0 ? (
+                            <span className="text-xs">
+                              {row.variants
+                                .map((v) => `Q${v.questionNumber}: ${v.variantLabel}`)
+                                .join(', ')}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-ink-soft/60">—</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-right font-mono text-ink">
                         {row.score.toFixed(2)}
                       </td>
