@@ -30,7 +30,10 @@ describe('Variant-specific automarking', () => {
     vi.spyOn(prisma.sitting, 'update');
     vi.spyOn(prisma.submission, 'create');
     vi.spyOn(prisma.submission, 'findUnique');
-    vi.spyOn(prisma.result, 'create');
+    // getDbNow() reads the database clock via $queryRaw, and the submit
+    // route wraps the submission + completion stamp in $transaction.
+    vi.spyOn(prisma, '$queryRaw').mockResolvedValue([{ now: new Date() }]);
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => callback(prisma));
     vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
       id: 'user-1',
       email: 'student@test.com',
@@ -123,11 +126,7 @@ describe('Variant-specific automarking', () => {
         answers: sitting.answers,
         idempotencyKey: 'sitting:sitting-1',
         submittedAt: new Date(),
-      });
-      prisma.result.create.mockResolvedValue({
-        id: 'result-1',
-        submissionId: 'sub-1',
-        score: 50, // q-2 correct (10 marks), q-1 wrong (0 marks) = 10/15 = 66.67%
+        result: { id: 'result-1', submissionId: 'sub-1', score: 66.67 },
       });
       prisma.sitting.update.mockResolvedValue({
         ...sitting,
@@ -137,14 +136,14 @@ describe('Variant-specific automarking', () => {
       const res = await request(app).post('/api/sittings/sitting-1/submit');
 
       expect(res.status).toBe(201);
-      expect(prisma.result.create).toHaveBeenCalled();
+      expect(prisma.submission.create).toHaveBeenCalled();
 
       // Check the score calculation
-      const createCall = prisma.result.create.mock.calls[0][0];
+      const createCall = prisma.submission.create.mock.calls[0][0];
       // q-1: answered '4', variant v-1 expects '11' -> wrong (0 marks)
       // q-2: answered 'photosynthesis process', expects 'photosynthesis process' -> correct (10 marks)
       // Total: 10/15 = 66.67%
-      expect(createCall.data.score).toBeCloseTo(66.67, 1);
+      expect(createCall.data.result.create.score).toBeCloseTo(66.67, 1);
     });
 
     it('marks correctly when different variant is assigned', async () => {
@@ -160,11 +159,7 @@ describe('Variant-specific automarking', () => {
         answers: sitting.answers,
         idempotencyKey: 'sitting:sitting-1',
         submittedAt: new Date(),
-      });
-      prisma.result.create.mockResolvedValue({
-        id: 'result-1',
-        submissionId: 'sub-1',
-        score: 66.67,
+        result: { id: 'result-1', submissionId: 'sub-1', score: 66.67 },
       });
       prisma.sitting.update.mockResolvedValue({
         ...sitting,
@@ -176,11 +171,11 @@ describe('Variant-specific automarking', () => {
       expect(res.status).toBe(201);
 
       // Check the score calculation
-      const createCall = prisma.result.create.mock.calls[0][0];
+      const createCall = prisma.submission.create.mock.calls[0][0];
       // q-1: answered '4', variant v-2 expects '10' -> wrong (0 marks)
       // q-2: answered 'photosynthesis process', expects 'photosynthesis process' -> correct (10 marks)
       // Total: 10/15 = 66.67%
-      expect(createCall.data.score).toBeCloseTo(66.67, 1);
+      expect(createCall.data.result.create.score).toBeCloseTo(66.67, 1);
     });
 
     it('marks against base question memo when no variant is assigned', async () => {
@@ -195,11 +190,7 @@ describe('Variant-specific automarking', () => {
         answers: sitting.answers,
         idempotencyKey: 'sitting:sitting-1',
         submittedAt: new Date(),
-      });
-      prisma.result.create.mockResolvedValue({
-        id: 'result-1',
-        submissionId: 'sub-1',
-        score: 100,
+        result: { id: 'result-1', submissionId: 'sub-1', score: 100 },
       });
       prisma.sitting.update.mockResolvedValue({
         ...sitting,
@@ -211,11 +202,11 @@ describe('Variant-specific automarking', () => {
       expect(res.status).toBe(201);
 
       // Check the score calculation
-      const createCall = prisma.result.create.mock.calls[0][0];
+      const createCall = prisma.submission.create.mock.calls[0][0];
       // q-1: answered '4', base question expects '4' -> correct (5 marks)
       // q-2: answered 'photosynthesis process', expects 'photosynthesis process' -> correct (10 marks)
       // Total: 15/15 = 100%
-      expect(createCall.data.score).toBe(100);
+      expect(createCall.data.result.create.score).toBe(100);
     });
 
     it('gives full marks when variant answer matches', async () => {
@@ -231,11 +222,7 @@ describe('Variant-specific automarking', () => {
         answers: sitting.answers,
         idempotencyKey: 'sitting:sitting-1',
         submittedAt: new Date(),
-      });
-      prisma.result.create.mockResolvedValue({
-        id: 'result-1',
-        submissionId: 'sub-1',
-        score: 100,
+        result: { id: 'result-1', submissionId: 'sub-1', score: 100 },
       });
       prisma.sitting.update.mockResolvedValue({
         ...sitting,
@@ -246,11 +233,11 @@ describe('Variant-specific automarking', () => {
 
       expect(res.status).toBe(201);
 
-      const createCall = prisma.result.create.mock.calls[0][0];
+      const createCall = prisma.submission.create.mock.calls[0][0];
       // q-1: answered '11', variant v-1 expects '11' -> correct (5 marks)
       // q-2: answered 'photosynthesis process', expects 'photosynthesis process' -> correct (10 marks)
       // Total: 15/15 = 100%
-      expect(createCall.data.score).toBe(100);
+      expect(createCall.data.result.create.score).toBe(100);
     });
 
     it('handles mixed scenarios with some variants and some base questions', async () => {
@@ -265,11 +252,7 @@ describe('Variant-specific automarking', () => {
         answers: sitting.answers,
         idempotencyKey: 'sitting:sitting-1',
         submittedAt: new Date(),
-      });
-      prisma.result.create.mockResolvedValue({
-        id: 'result-1',
-        submissionId: 'sub-1',
-        score: 33.33,
+        result: { id: 'result-1', submissionId: 'sub-1', score: 33.33 },
       });
       prisma.sitting.update.mockResolvedValue({
         ...sitting,
@@ -280,11 +263,11 @@ describe('Variant-specific automarking', () => {
 
       expect(res.status).toBe(201);
 
-      const createCall = prisma.result.create.mock.calls[0][0];
+      const createCall = prisma.submission.create.mock.calls[0][0];
       // q-1: answered '10', variant v-2 expects '10' -> correct (5 marks)
       // q-2: answered 'wrong answer', expects 'photosynthesis process' -> wrong (0 marks)
       // Total: 5/15 = 33.33%
-      expect(createCall.data.score).toBeCloseTo(33.33, 1);
+      expect(createCall.data.result.create.score).toBeCloseTo(33.33, 1);
     });
 
     it('handles questions without memo answers gracefully', async () => {
@@ -301,11 +284,7 @@ describe('Variant-specific automarking', () => {
         answers: sitting.answers,
         idempotencyKey: 'sitting:sitting-1',
         submittedAt: new Date(),
-      });
-      prisma.result.create.mockResolvedValue({
-        id: 'result-1',
-        submissionId: 'sub-1',
-        score: 33.33,
+        result: { id: 'result-1', submissionId: 'sub-1', score: 33.33 },
       });
       prisma.sitting.update.mockResolvedValue({
         ...sitting,
@@ -316,11 +295,11 @@ describe('Variant-specific automarking', () => {
 
       expect(res.status).toBe(201);
 
-      const createCall = prisma.result.create.mock.calls[0][0];
+      const createCall = prisma.submission.create.mock.calls[0][0];
       // q-1: answered '11', variant v-1 expects '11' -> correct (5 marks)
       // q-2: no memo answer -> cannot be marked (0 marks out of 10)
       // Total: 5/15 = 33.33%
-      expect(createCall.data.score).toBeCloseTo(33.33, 1);
+      expect(createCall.data.result.create.score).toBeCloseTo(33.33, 1);
     });
   });
 });

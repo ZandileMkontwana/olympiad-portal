@@ -116,7 +116,8 @@ describe('QuestionsPage', () => {
       setup();
       await waitFor(() => {
         expect(screen.getByText('1')).toBeInTheDocument(); // Question number
-        expect(screen.getByText('SHORT ANSWER')).toBeInTheDocument();
+        // The type badge is visually uppercased via CSS; the DOM text is as written
+        expect(screen.getByText('Short Answer')).toBeInTheDocument();
         expect(screen.getByText('5 marks')).toBeInTheDocument();
       });
     });
@@ -308,7 +309,8 @@ describe('QuestionsPage', () => {
         target: { value: 'Variant B' },
       });
 
-      fireEvent.click(screen.getAllByRole('button', { name: /save/i })[1]);
+      // Only the variant form is open, so its Save is the only one rendered
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
 
       await waitFor(() => {
         expect(api.createVariant).toHaveBeenCalledWith(
@@ -330,7 +332,8 @@ describe('QuestionsPage', () => {
       const variantButtons = screen.getAllByText(/variants \(\d+\)/i);
       fireEvent.click(variantButtons[0]);
 
-      const deleteVariantButton = screen.getAllByTitle('Delete')[2]; // After question delete buttons
+      // Document order: q-1 delete, then the expanded variant's delete, then q-2's
+      const deleteVariantButton = screen.getAllByTitle('Delete')[1];
       vi.spyOn(window, 'confirm').mockReturnValue(true);
       fireEvent.click(deleteVariantButton);
 
@@ -383,7 +386,8 @@ describe('QuestionsPage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/no questions yet\. click "add question" to create one\./i)
+          // The component renders typographic quotes (react/no-unescaped-entities)
+          screen.getByText(/no questions yet\. click “add question” to create one\./i)
         ).toBeInTheDocument();
       });
     });

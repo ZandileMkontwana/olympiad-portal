@@ -259,10 +259,14 @@ export default function QuestionsPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor="question-number"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
                     Question Number
                   </label>
                   <input
+                    id="question-number"
                     type="number"
                     min="1"
                     required
@@ -272,8 +276,14 @@ export default function QuestionsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Marks</label>
+                  <label
+                    htmlFor="question-marks"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Marks
+                  </label>
                   <input
+                    id="question-marks"
                     type="number"
                     min="0"
                     step="0.5"
@@ -286,10 +296,14 @@ export default function QuestionsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="question-type"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Question Type
                 </label>
                 <select
+                  id="question-type"
                   required
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -304,10 +318,14 @@ export default function QuestionsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="question-text"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Question Text
                 </label>
                 <textarea
+                  id="question-text"
                   required
                   rows={4}
                   value={formData.text}
@@ -317,10 +335,14 @@ export default function QuestionsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="question-memo"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Memo Answer (for auto-marking)
                 </label>
                 <input
+                  id="question-memo"
                   type="text"
                   value={formData.memoAnswer}
                   onChange={(e) => setFormData({ ...formData, memoAnswer: e.target.value })}
@@ -476,10 +498,14 @@ export default function QuestionsPage() {
                         <div className="bg-white border border-gray-300 rounded p-4">
                           <form onSubmit={handleVariantSubmit} className="space-y-3">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label
+                                htmlFor="variant-label"
+                                className="block text-sm font-medium text-gray-700 mb-1"
+                              >
                                 Variant Label
                               </label>
                               <input
+                                id="variant-label"
                                 type="text"
                                 required
                                 value={variantData.label}
@@ -491,10 +517,14 @@ export default function QuestionsPage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label
+                                htmlFor="variant-text"
+                                className="block text-sm font-medium text-gray-700 mb-1"
+                              >
                                 Question Text (optional)
                               </label>
                               <textarea
+                                id="variant-text"
                                 rows={2}
                                 value={variantData.text}
                                 onChange={(e) =>
@@ -505,10 +535,14 @@ export default function QuestionsPage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label
+                                htmlFor="variant-memo"
+                                className="block text-sm font-medium text-gray-700 mb-1"
+                              >
                                 Memo Answer (optional)
                               </label>
                               <input
+                                id="variant-memo"
                                 type="text"
                                 value={variantData.memoAnswer}
                                 onChange={(e) =>

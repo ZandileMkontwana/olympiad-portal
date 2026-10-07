@@ -24,6 +24,8 @@ vi.mock('@/lib/api', () => ({
   requestRemark: vi.fn(),
   releaseResults: vi.fn(),
   unreleaseResults: vi.fn(),
+  fetchCurrentUser: vi.fn(),
+  fetchSchoolAnalytics: vi.fn(),
   ApiError: class ApiError extends Error {
     constructor(message, status) {
       super(message);
@@ -35,6 +37,7 @@ vi.mock('@/lib/api', () => ({
 import RoundViewPage from './page';
 import {
   ApiError,
+  fetchCurrentUser,
   listRoundSubmissions,
   releaseResults,
   requestRemark,
@@ -69,6 +72,9 @@ describe('Educator round view appeal submission', () => {
     vi.stubGlobal('fetch', vi.fn());
     mockGetToken.mockResolvedValue('test-token');
     mockRoundLoad();
+    // The page resolves the signed-in educator on mount (loadSchoolId); a user
+    // without a school keeps the school-analytics effect dormant.
+    fetchCurrentUser.mockResolvedValue({});
     listRoundSubmissions.mockResolvedValue([scoredSubmission]);
   });
 
