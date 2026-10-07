@@ -134,7 +134,9 @@ export default function MarkingPage() {
 
       {status === 'loading' && <p className="description">Loading marking queue...</p>}
       {status === 'error' && (
-        <p className="message" role="alert">Couldn&apos;t load the marking queue. Try refreshing.</p>
+        <p className="message" role="alert">
+          Couldn&apos;t load the marking queue. Try refreshing.
+        </p>
       )}
       {status === 'empty' && <p className="description">No submissions waiting to be marked.</p>}
 
@@ -217,7 +219,12 @@ export default function MarkingPage() {
           <p style={{ fontWeight: 600 }}>Total: {totalScore()}</p>
 
           {formStatus === 'error' && (
-            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', marginBottom: '8px' }}>{formError}</p>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', marginBottom: '8px' }}
+            >
+              {formError}
+            </p>
           )}
 
           <div style={{ display: 'flex', gap: '10px' }}>

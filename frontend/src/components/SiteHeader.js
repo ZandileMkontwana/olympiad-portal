@@ -4,7 +4,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from '@/components/ThemeToggle';
 
-const AUTHED_PREFIXES = ['/student', '/educator', '/organiser', '/archive', '/auth', '/set-password', '/rounds'];
+const AUTHED_PREFIXES = [
+  '/student',
+  '/educator',
+  '/organiser',
+  '/archive',
+  '/auth',
+  '/set-password',
+  '/rounds',
+];
 
 export default function SiteHeader() {
   const pathname = usePathname();

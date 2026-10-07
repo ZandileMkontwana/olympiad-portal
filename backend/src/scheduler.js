@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const prisma = require('./lib/prisma');
 const activityBus = require('./lib/activityBus');
 const { getDbNow } = require('./lib/dbTime');
+const difficulty = require('./lib/difficulty');
 const {
   sendRoundOpeningNotification,
   sendRoundClosingNotification,
@@ -137,6 +138,14 @@ function startScheduler() {
           roundId: round.id,
           olympiadId: round.olympiadId,
         });
+
+        // Keep question difficulty current as soon as a round closes. A failure
+        // here must not interrupt the remaining scheduler work or reopen the round.
+        try {
+          await difficulty.updateQuestionDifficulty(round.id);
+        } catch (error) {
+          console.error(`Failed to update difficulty for closed round ${round.id}:`, error);
+        }
       }
     }
 

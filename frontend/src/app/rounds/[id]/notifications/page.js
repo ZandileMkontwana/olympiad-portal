@@ -218,12 +218,21 @@ export default function NotificationsConfigPage() {
                     </div>
 
                     {testResult.recipients.length > 0 && (
-                      <ul style={{ margin: '0 0 12px 0', paddingLeft: '20px', color: 'var(--c-t-374151)' }}>
+                      <ul
+                        style={{
+                          margin: '0 0 12px 0',
+                          paddingLeft: '20px',
+                          color: 'var(--c-t-374151)',
+                        }}
+                      >
                         {testResult.recipients.map((r, i) => (
                           <li key={i}>
                             {r.email}
                             {r.entrantName && (
-                              <span style={{ color: 'var(--c-t-646b78)' }}> (re: {r.entrantName})</span>
+                              <span style={{ color: 'var(--c-t-646b78)' }}>
+                                {' '}
+                                (re: {r.entrantName})
+                              </span>
                             )}
                             {r.alreadyNotified && (
                               <span

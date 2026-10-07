@@ -34,7 +34,11 @@ export default function OrganiserLayout({ children }) {
   const route = ROUTE_MAP[pathname] || { activeNav: 'dashboard', breadcrumb: 'Overview' };
 
   return (
-    <OrganiserShell activeNav={route.activeNav} breadcrumb={route.breadcrumb} user={{ ...organiserUser, name: organiserUser.name || initials }}>
+    <OrganiserShell
+      activeNav={route.activeNav}
+      breadcrumb={route.breadcrumb}
+      user={{ ...organiserUser, name: organiserUser.name || initials }}
+    >
       {children}
     </OrganiserShell>
   );

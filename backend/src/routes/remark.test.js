@@ -67,6 +67,9 @@ describe('Remark routes', () => {
     vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(organiser);
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findMany');
+    // isOlympiadOrganiser falls back to the olympiad creator — default to
+    // "no creator match" so the non-member reviewer still gets a 404.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => callback(prisma));
     vi.spyOn(console, 'error').mockImplementation(() => {});
 

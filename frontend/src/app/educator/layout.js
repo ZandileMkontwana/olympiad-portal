@@ -16,7 +16,9 @@ function initialsFrom(name) {
 
 export default function EducatorLayout({ children }) {
   const { user } = useUser();
-  const initials = initialsFrom(user?.fullName || user?.firstName || user?.emailAddresses?.[0]?.emailAddress || '');
+  const initials = initialsFrom(
+    user?.fullName || user?.firstName || user?.emailAddresses?.[0]?.emailAddress || ''
+  );
   return (
     <TourHost tour={EDUCATOR_TOUR} userId={user?.id}>
       <AppShell

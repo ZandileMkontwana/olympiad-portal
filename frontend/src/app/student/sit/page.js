@@ -235,7 +235,9 @@ function SitContent() {
           >
             <span>
               Time remaining:{' '}
-              <strong style={{ color: timeRemaining === 'expired' ? 'var(--c-t-dc2626)' : undefined }}>
+              <strong
+                style={{ color: timeRemaining === 'expired' ? 'var(--c-t-dc2626)' : undefined }}
+              >
                 {timeRemaining === 'expired' ? 'EXPIRED' : timeRemaining}
               </strong>
             </span>
@@ -355,7 +357,13 @@ function SitContent() {
 
 export default function SitPage() {
   return (
-    <Suspense fallback={<main id="main-content" tabIndex={-1} className="round-page">Loading...</main>}>
+    <Suspense
+      fallback={
+        <main id="main-content" tabIndex={-1} className="round-page">
+          Loading...
+        </main>
+      }
+    >
       <SitContent />
     </Suspense>
   );

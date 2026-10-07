@@ -276,7 +276,9 @@ function OlympiadInfoPanel({ olympiad, onRequestAccess, requesting }) {
             onClick={() => onRequestAccess(olympiad)}
             disabled={requesting}
             style={{
-              background: requesting ? 'var(--c-bg-c9bdf0)' : 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
+              background: requesting
+                ? 'var(--c-bg-c9bdf0)'
+                : 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
@@ -428,7 +430,14 @@ function OlympiadCard({ olympiad, expanded, onToggle, onRequestAccess, requestin
             }}
           >
             {rounds.length === 0 ? (
-              <p style={{ margin: 0, color: 'var(--c-t-706391)', fontSize: '0.85em', padding: '6px 4px' }}>
+              <p
+                style={{
+                  margin: 0,
+                  color: 'var(--c-t-706391)',
+                  fontSize: '0.85em',
+                  padding: '6px 4px',
+                }}
+              >
                 No rounds in this olympiad yet.
               </p>
             ) : (
@@ -522,7 +531,11 @@ export default function EducatorDashboard() {
   }, [allRounds]);
 
   if (checking) {
-    return <div style={{ padding: '48px 0', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</div>;
+    return (
+      <div style={{ padding: '48px 0', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>
+        Loading...
+      </div>
+    );
   }
 
   const openCount = roundsByState.open.length;
@@ -645,7 +658,10 @@ export default function EducatorDashboard() {
           )}
 
           {status === 'error' && (
-            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '18px' }}>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '18px' }}
+            >
               Couldn&apos;t load olympiads. Try refreshing.
             </p>
           )}

@@ -21,6 +21,8 @@ const olympiadOrganisersRouter = require('./routes/olympiadOrganisers');
 const apiKeysRouter = require('./routes/apiKeys');
 const externalRouter = require('./routes/external');
 const activityRouter = require('./routes/activity');
+const questionsRouter = require('./routes/questions');
+const analyticsRouter = require('./routes/analytics');
 const { startScheduler } = require('./scheduler');
 const { clerkMiddleware } = require('@clerk/express');
 
@@ -95,6 +97,8 @@ app.use('/api', studentAuthRouter);
 app.use('/api', certificatesRouter);
 app.use('/api', olympiadOrganisersRouter);
 app.use('/api', activityRouter);
+app.use('/api', questionsRouter);
+app.use('/api', analyticsRouter);
 app.use('/api/api-keys', apiKeysRouter);
 
 // External read-only API with rate limiting

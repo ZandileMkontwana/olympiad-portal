@@ -480,7 +480,10 @@ export default function OrganiserDashboard() {
           </div>
 
           {createStatus === 'error' && (
-            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '12px', marginTop: '10px' }}>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '12px', marginTop: '10px' }}
+            >
               {createError}
             </p>
           )}
@@ -539,7 +542,10 @@ export default function OrganiserDashboard() {
           )}
 
           {status === 'error' && (
-            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '18px' }}>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '18px' }}
+            >
               Couldn&apos;t load olympiads. Try refreshing.
             </p>
           )}
@@ -1031,7 +1037,11 @@ export default function OrganiserDashboard() {
                         {organiserError && (
                           <p
                             role="alert"
-                            style={{ color: 'var(--c-t-b42318)', fontSize: '12px', margin: '4px 0 0' }}
+                            style={{
+                              color: 'var(--c-t-b42318)',
+                              fontSize: '12px',
+                              margin: '4px 0 0',
+                            }}
                           >
                             {organiserError}
                           </p>
@@ -1080,7 +1090,10 @@ export default function OrganiserDashboard() {
           )}
 
           {accessStatus === 'error' && (
-            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '18px' }}>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '18px' }}
+            >
               Couldn&apos;t load requests.
             </p>
           )}
@@ -1131,7 +1144,10 @@ export default function OrganiserDashboard() {
           )}
 
           {decisionError && (
-            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '8px' }}>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '13px', marginTop: '8px' }}
+            >
               {decisionError}
             </p>
           )}

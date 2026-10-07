@@ -80,7 +80,9 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
       if (!token) return;
       es = new EventSource(buildActivityStreamUrl(token));
       es.addEventListener('history', (e) => {
-        try { setNotifications(JSON.parse(e.data).slice(0, 8)); } catch {}
+        try {
+          setNotifications(JSON.parse(e.data).slice(0, 8));
+        } catch {}
       });
       es.addEventListener('message', (e) => {
         try {
@@ -89,7 +91,9 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
         } catch {}
       });
     })();
-    return () => { if (es) es.close(); };
+    return () => {
+      if (es) es.close();
+    };
   }, [notifOpen, getToken]);
 
   // Close dropdown on click outside or Escape.
@@ -267,7 +271,11 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
                 {notifications.length > 0 && <i />}
               </button>
               {notifOpen && (
-                <div className="organiser-dropdown organiser-notif-dropdown" role="region" aria-label="Notifications">
+                <div
+                  className="organiser-dropdown organiser-notif-dropdown"
+                  role="region"
+                  aria-label="Notifications"
+                >
                   <h4 className="organiser-dropdown-heading">Recent activity</h4>
                   {notifications.length === 0 && (
                     <p className="organiser-search-empty">No recent activity</p>
@@ -327,7 +335,5 @@ function initialsFrom(name) {
 
 function formatNotifType(type) {
   if (!type) return 'Activity';
-  return type
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }

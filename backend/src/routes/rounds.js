@@ -17,6 +17,7 @@ const {
 } = require('../lib/email');
 const { requireOlympiadAccess, isOlympiadOrganiser } = require('../lib/authorization');
 const { toUTCDate } = require('../lib/timezone');
+const { updateQuestionDifficulty } = require('../lib/difficulty');
 
 const router = express.Router();
 
@@ -803,7 +804,19 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       schoolId = educator?.schoolId ?? null;
     }
 
-    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: {
+        paper: {
+          include: {
+            questions: {
+              include: { variants: true },
+              orderBy: { number: 'asc' },
+            },
+          },
+        },
+      },
+    });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
@@ -834,6 +847,43 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       },
     });
 
+    // Submission has no Prisma relation to Sitting — each entrant's variant
+    // assignment lives on the sitting for the same roundId+entrantId, so it
+    // is fetched separately and keyed by entrantId for the summary below.
+    const sittings = await prisma.sitting.findMany({
+      where: { roundId },
+      select: { entrantId: true, variantChoices: true },
+    });
+    const variantChoicesByEntrant = new Map(sittings.map((s) => [s.entrantId, s.variantChoices]));
+
+    // Only questions with more than one variant produce meaningful "variant
+    // info" — a single-variant question still gets an assignment recorded
+    // (see lib/variantAssignment.js), but there's nothing to distinguish, so
+    // it's left out of the summary rather than cluttering every row (#263).
+    const variantMetaByQuestionId = new Map();
+    for (const question of round.paper?.questions || []) {
+      if (question.variants.length > 1) {
+        variantMetaByQuestionId.set(question.id, {
+          questionNumber: question.number,
+          labelsById: new Map(question.variants.map((v) => [v.id, v.label])),
+        });
+      }
+    }
+
+    function summarizeVariants(variantChoices) {
+      if (!variantChoices) return [];
+      const summary = [];
+      for (const [questionId, variantId] of Object.entries(variantChoices)) {
+        const meta = variantMetaByQuestionId.get(questionId);
+        if (!meta) continue; // question has 0 or 1 variants — nothing to show
+        summary.push({
+          questionNumber: meta.questionNumber,
+          variantLabel: meta.labelsById.get(variantId) || 'Unknown variant',
+        });
+      }
+      return summary.sort((a, b) => a.questionNumber - b.questionNumber);
+    }
+
     const ranked = submissions
       .map((s) => ({
         entrantId: s.entrant.id,
@@ -841,6 +891,7 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
         schoolName: s.entrant.school.name,
         score: s.result.score,
         submittedAt: s.submittedAt,
+        variants: summarizeVariants(variantChoicesByEntrant.get(s.entrant.id)),
       }))
       .sort((a, b) => b.score - a.score);
 
@@ -1000,6 +1051,15 @@ router.post(
         return res.status(409).json({
           error: 'Round state changed while releasing results - it is no longer closed',
         });
+      }
+
+      // Calculate and update question difficulty based on this round's submissions
+      try {
+        const difficultyCount = await updateQuestionDifficulty(round.id);
+        console.log(`Updated difficulty for ${difficultyCount} questions from round ${round.id}`);
+      } catch (diffErr) {
+        // Log but don't fail the release if difficulty calculation fails
+        console.error('Failed to calculate difficulty:', diffErr);
       }
 
       // Live activity feed (US-4.1): results went out for this round.

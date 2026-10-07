@@ -174,9 +174,7 @@ export default function RemarksPage() {
     <>
       <div className="organiser-page-heading">
         <h1>Appeals</h1>
-        <p>
-          Route pending appeals to a reviewer, then decide the ones assigned to you.
-        </p>
+        <p>Route pending appeals to a reviewer, then decide the ones assigned to you.</p>
       </div>
 
       <h2 style={{ marginBottom: '8px' }}>Pending appeals</h2>
@@ -241,7 +239,10 @@ export default function RemarksPage() {
                 </div>
               </div>
               {assignErrorId === r.id && (
-                <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', margin: '8px 0 0 0' }}>
+                <p
+                  role="alert"
+                  style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', margin: '8px 0 0 0' }}
+                >
                   {assignError}
                 </p>
               )}
@@ -383,7 +384,10 @@ export default function RemarksPage() {
           </div>
 
           {formStatus === 'error' && (
-            <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', marginBottom: '8px' }}>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', marginBottom: '8px' }}
+            >
               {formError}
             </p>
           )}
