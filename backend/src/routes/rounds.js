@@ -844,13 +844,17 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       include: {
         result: true,
         entrant: { include: { school: true } },
-        sitting: {
-          select: {
-            variantChoices: true,
-          },
-        },
       },
     });
+
+    // Submission has no Prisma relation to Sitting — each entrant's variant
+    // assignment lives on the sitting for the same roundId+entrantId, so it
+    // is fetched separately and keyed by entrantId for the summary below.
+    const sittings = await prisma.sitting.findMany({
+      where: { roundId },
+      select: { entrantId: true, variantChoices: true },
+    });
+    const variantChoicesByEntrant = new Map(sittings.map((s) => [s.entrantId, s.variantChoices]));
 
     // Only questions with more than one variant produce meaningful "variant
     // info" — a single-variant question still gets an assignment recorded
@@ -887,7 +891,7 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
         schoolName: s.entrant.school.name,
         score: s.result.score,
         submittedAt: s.submittedAt,
-        variants: summarizeVariants(s.sitting?.variantChoices),
+        variants: summarizeVariants(variantChoicesByEntrant.get(s.entrant.id)),
       }))
       .sort((a, b) => b.score - a.score);
 

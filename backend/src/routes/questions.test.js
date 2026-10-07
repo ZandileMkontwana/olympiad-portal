@@ -45,6 +45,9 @@ describe('Questions routes', () => {
       olympiadId: 'oly-1',
       organiserId: 'user-1',
     });
+    // isOlympiadOrganiser falls back to the olympiad creator — no join row
+    // and no creator match means the 403 tests below still deny access.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
       id: 'user-1',
       email: 'organiser@olympiad.com',

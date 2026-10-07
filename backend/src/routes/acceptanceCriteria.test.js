@@ -53,7 +53,9 @@ describe('#171 – Multi-olympiad support', () => {
     vi.spyOn(prisma.schoolOlympiad, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findMany');
-    vi.spyOn(prisma.olympiad, 'findUnique');
+    // No creator match by default — the isOlympiadOrganiser fallback finds
+    // nothing, so AC2's non-member denial stays 403.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.olympiad, 'findMany');
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -322,6 +324,9 @@ describe('#181 – Audit log', () => {
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.schoolOlympiad, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    // isOlympiadOrganiser falls back to the olympiad creator — default to
+    // "no creator match" so the non-member denial tests below stay 403.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -508,6 +513,9 @@ describe('#186 – Round replay', () => {
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.schoolOlympiad, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    // isOlympiadOrganiser falls back to the olympiad creator — default to
+    // "no creator match" so the non-member denial tests below stay 403.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -735,7 +743,8 @@ describe('#242 – Co-organiser access', () => {
     vi.spyOn(prisma.round, 'findUnique');
     vi.spyOn(prisma.round, 'findMany');
     vi.spyOn(prisma.roundEntrant, 'findMany');
-    vi.spyOn(prisma.olympiad, 'findUnique');
+    // The fallback creator lookup must not rescue AC4's removed co-organiser.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findMany');
     vi.spyOn(prisma.olympiadOrganiser, 'create');

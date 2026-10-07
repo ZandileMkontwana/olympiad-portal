@@ -5,6 +5,10 @@ const prisma = require('../lib/prisma');
 describe('Difficulty calculation', () => {
   beforeEach(() => {
     vi.spyOn(prisma.submission, 'findMany');
+    // Variant choices are resolved via a separate sitting lookup keyed by
+    // entrantId (Submission has no Prisma relation to Sitting) — default to
+    // "no sittings recorded" so questions fall back to their base memos.
+    vi.spyOn(prisma.sitting, 'findMany').mockResolvedValue([]);
     vi.spyOn(prisma.round, 'findUnique');
     vi.spyOn(prisma.question, 'update');
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -48,7 +52,9 @@ describe('Difficulty calculation', () => {
     });
 
     it('returns empty map when round has no paper', async () => {
-      prisma.submission.findMany.mockResolvedValue([{ id: 'sub-1', answers: {} }]);
+      prisma.submission.findMany.mockResolvedValue([
+        { id: 'sub-1', entrantId: 'entrant-1', answers: {} },
+      ]);
       prisma.round.findUnique.mockResolvedValue({ id: 'round-1', paper: null });
 
       const result = await calculateDifficultyForRound('round-1');
@@ -60,13 +66,13 @@ describe('Difficulty calculation', () => {
       const submissions = [
         {
           id: 'sub-1',
+          entrantId: 'entrant-1',
           answers: { 'q-1': '4', 'q-2': '6' },
-          sitting: { variantChoices: {} },
         },
         {
           id: 'sub-2',
+          entrantId: 'entrant-2',
           answers: { 'q-1': '4', 'q-2': 'wrong' },
-          sitting: { variantChoices: {} },
         },
       ];
 
@@ -88,22 +94,28 @@ describe('Difficulty calculation', () => {
       const submissions = [
         {
           id: 'sub-1',
+          entrantId: 'entrant-1',
           answers: { 'q-1': '4', 'q-2': '6' },
-          sitting: { variantChoices: { 'q-2': 'v-1' } }, // Variant A expects '6'
         },
         {
           id: 'sub-2',
+          entrantId: 'entrant-2',
           answers: { 'q-1': '4', 'q-2': 'six' },
-          sitting: { variantChoices: { 'q-2': 'v-2' } }, // Variant B expects 'six'
         },
         {
           id: 'sub-3',
+          entrantId: 'entrant-3',
           answers: { 'q-1': 'wrong', 'q-2': '6' },
-          sitting: { variantChoices: { 'q-2': 'v-2' } }, // Variant B expects 'six', got '6'
         },
       ];
 
       prisma.submission.findMany.mockResolvedValue(submissions);
+      // Variant choices live on each entrant's sitting, fetched separately.
+      prisma.sitting.findMany.mockResolvedValue([
+        { entrantId: 'entrant-1', variantChoices: { 'q-2': 'v-1' } }, // Variant A expects '6'
+        { entrantId: 'entrant-2', variantChoices: { 'q-2': 'v-2' } }, // Variant B expects 'six'
+        { entrantId: 'entrant-3', variantChoices: { 'q-2': 'v-2' } }, // Variant B expects 'six', got '6'
+      ]);
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         paper: { questions: mockQuestions },
@@ -135,8 +147,8 @@ describe('Difficulty calculation', () => {
       const submissions = [
         {
           id: 'sub-1',
+          entrantId: 'entrant-1',
           answers: { 'q-1': '4', 'q-2': '6', 'q-3': 'some answer' },
-          sitting: { variantChoices: {} },
         },
       ];
 
@@ -159,12 +171,14 @@ describe('Difficulty calculation', () => {
       const submissions = [
         {
           id: 'sub-1',
+          entrantId: 'entrant-1',
           answers: { 'q-1': '4', 'q-2': '6' },
-          sitting: null, // Legacy sitting with no variant data
         },
       ];
 
       prisma.submission.findMany.mockResolvedValue(submissions);
+      // No sitting row recorded for this entrant (legacy data)
+      prisma.sitting.findMany.mockResolvedValue([]);
       prisma.round.findUnique.mockResolvedValue({
         id: 'round-1',
         paper: { questions: mockQuestions },
@@ -181,13 +195,13 @@ describe('Difficulty calculation', () => {
       const submissions = [
         {
           id: 'sub-1',
+          entrantId: 'entrant-1',
           answers: { 'q-1': 'wrong', 'q-2': 'wrong' },
-          sitting: { variantChoices: {} },
         },
         {
           id: 'sub-2',
+          entrantId: 'entrant-2',
           answers: { 'q-1': 'also wrong', 'q-2': 'also wrong' },
-          sitting: { variantChoices: {} },
         },
       ];
 
@@ -209,8 +223,8 @@ describe('Difficulty calculation', () => {
       const submissions = [
         {
           id: 'sub-1',
+          entrantId: 'entrant-1',
           answers: { 'q-1': '4', 'q-2': '6' },
-          sitting: { variantChoices: {} },
         },
       ];
 

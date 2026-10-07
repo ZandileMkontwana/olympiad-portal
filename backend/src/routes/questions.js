@@ -1,6 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
-const { requireRole } = require('../middleware/auth');
+const { requireRole, requireAuth, loadAuthUser } = require('../middleware/auth');
 const { isOlympiadOrganiser } = require('../lib/authorization');
 
 const router = express.Router();
@@ -9,8 +9,13 @@ const QUESTION_TYPES = ['multiple_choice', 'short_answer', 'essay', 'numeric'];
 
 // GET /papers/:paperId/questions
 // List all questions for a paper, ordered by question number
-router.get('/papers/:paperId/questions', async (req, res) => {
+router.get('/papers/:paperId/questions', requireAuth, async (req, res) => {
   try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const paper = await prisma.paper.findUnique({
       where: { id: req.params.paperId },
       include: { round: { include: { olympiad: true } } },
@@ -20,7 +25,7 @@ router.get('/papers/:paperId/questions', async (req, res) => {
     }
 
     // Only organisers of this olympiad can view questions
-    if (!(await isOlympiadOrganiser(req.user?.id, paper.round.olympiadId))) {
+    if (!(await isOlympiadOrganiser(user.id, paper.round.olympiadId))) {
       return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 
@@ -117,8 +122,13 @@ router.post('/papers/:paperId/questions', ...requireRole('organiser'), async (re
 
 // GET /questions/:id
 // Get a single question with its variants
-router.get('/questions/:id', async (req, res) => {
+router.get('/questions/:id', requireAuth, async (req, res) => {
   try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const question = await prisma.question.findUnique({
       where: { id: req.params.id },
       include: {
@@ -132,7 +142,7 @@ router.get('/questions/:id', async (req, res) => {
     }
 
     // Only organisers of this olympiad can view questions
-    if (!(await isOlympiadOrganiser(req.user?.id, question.paper.round.olympiadId))) {
+    if (!(await isOlympiadOrganiser(user.id, question.paper.round.olympiadId))) {
       return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 
@@ -253,8 +263,13 @@ router.delete('/questions/:id', ...requireRole('organiser'), async (req, res) =>
 
 // GET /questions/:id/variants
 // List all variants for a question
-router.get('/questions/:id/variants', async (req, res) => {
+router.get('/questions/:id/variants', requireAuth, async (req, res) => {
   try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const question = await prisma.question.findUnique({
       where: { id: req.params.id },
       include: { paper: { include: { round: { include: { olympiad: true } } } } },
@@ -264,7 +279,7 @@ router.get('/questions/:id/variants', async (req, res) => {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    if (!(await isOlympiadOrganiser(req.user?.id, question.paper.round.olympiadId))) {
+    if (!(await isOlympiadOrganiser(user.id, question.paper.round.olympiadId))) {
       return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 

@@ -50,6 +50,9 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.user, 'findMany');
     vi.spyOn(prisma.submission, 'findMany');
     vi.spyOn(prisma.submission, 'findFirst');
+    // Standings resolve variant choices via a separate sitting lookup keyed
+    // by entrantId (Submission has no Prisma relation to Sitting).
+    vi.spyOn(prisma.sitting, 'findMany').mockResolvedValue([]);
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
@@ -1412,12 +1415,18 @@ describe('Rounds routes', () => {
           },
           result: { score: 80 },
           submittedAt: '2026-09-12T20:56:55.855Z',
-          sitting: {
-            variantChoices: {
-              'q-1': 'variant-1b',
-              'q-2': 'variant-2a',
-              'q-3': 'variant-3a',
-            },
+        },
+      ]);
+
+      // Variant choices are resolved from the entrant's sitting, which the
+      // route fetches separately (Submission has no Sitting relation).
+      prisma.sitting.findMany.mockResolvedValue([
+        {
+          entrantId: 'entrant-1',
+          variantChoices: {
+            'q-1': 'variant-1b',
+            'q-2': 'variant-2a',
+            'q-3': 'variant-3a',
           },
         },
       ]);
@@ -1459,9 +1468,11 @@ describe('Rounds routes', () => {
           },
           result: { score: 80 },
           submittedAt: '2026-09-12T20:56:55.855Z',
-          sitting: null,
         },
       ]);
+
+      // No sitting recorded for this entrant — no variant choices to show.
+      prisma.sitting.findMany.mockResolvedValue([]);
 
       const res = await request(app).get('/api/rounds/round-1/standings');
 

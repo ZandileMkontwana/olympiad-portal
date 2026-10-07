@@ -24,21 +24,23 @@ const prisma = require('../lib/prisma');
  * @returns {Promise<Map<string, number|null>>} Map of questionId to difficulty (0.0-1.0 or null)
  */
 async function calculateDifficultyForRound(roundId) {
-  // Fetch all submissions for this round with their answers and sitting's variant choices
+  // Fetch all submissions for this round with their answers
   const submissions = await prisma.submission.findMany({
     where: { roundId },
-    include: {
-      sitting: {
-        select: {
-          variantChoices: true,
-        },
-      },
-    },
   });
 
   if (submissions.length === 0) {
     return new Map();
   }
+
+  // Submission has no Prisma relation to Sitting — each entrant's variant
+  // assignment lives on the sitting for the same roundId+entrantId, so it is
+  // fetched separately and keyed by entrantId for the lookups below.
+  const sittings = await prisma.sitting.findMany({
+    where: { roundId },
+    select: { entrantId: true, variantChoices: true },
+  });
+  const variantChoicesByEntrant = new Map(sittings.map((s) => [s.entrantId, s.variantChoices]));
 
   // Fetch the paper's questions with their variants
   const round = await prisma.round.findUnique({
@@ -73,7 +75,7 @@ async function calculateDifficultyForRound(roundId) {
   // Process each submission
   for (const submission of submissions) {
     const answers = submission.answers || {};
-    const variantChoices = submission.sitting?.variantChoices || {};
+    const variantChoices = variantChoicesByEntrant.get(submission.entrantId) || {};
 
     // Mark each question for this submission
     for (const question of questions) {

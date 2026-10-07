@@ -35,6 +35,10 @@ describe('Analytics Routes', () => {
     // calls the real implementation, which queries this table. Mock the
     // underlying query instead (same approach as marking.test.js).
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    // isOlympiadOrganiser also falls back to the olympiad creator
+    // (Olympiad.organiserId) when no join row exists — default to "no
+    // creator match" so the denial paths below keep returning 403.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma, '$transaction').mockImplementation(async (fn) => fn(prisma));
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -117,6 +121,20 @@ describe('Analytics Routes', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('Not authorized');
+    });
+
+    it('allows the olympiad creator even when the join row is missing', async () => {
+      prisma.round.findUnique.mockResolvedValue(mockRound);
+      prisma.submission.findMany.mockResolvedValue([]);
+      // No OlympiadOrganiser row for this user...
+      prisma.olympiadOrganiser.findUnique.mockResolvedValue(null);
+      // ...but they own the olympiad, so access must still be granted.
+      prisma.olympiad.findUnique.mockResolvedValue({ organiserId: 'user-1' });
+
+      const res = await request(app).get('/api/analytics/rounds/round-1');
+
+      expect(res.status).toBe(200);
+      expect(res.body.participation.totalEntrants).toBe(0);
     });
 
     it('returns comprehensive analytics for organisers', async () => {

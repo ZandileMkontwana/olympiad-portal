@@ -37,6 +37,9 @@ describe('Olympiad isolation', () => {
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.schoolOlympiad, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    // isOlympiadOrganiser falls back to the olympiad creator — default to
+    // "no creator match" so the isolation denial tests below stay 403.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     // Default: loadAuthUser returns an educator
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',

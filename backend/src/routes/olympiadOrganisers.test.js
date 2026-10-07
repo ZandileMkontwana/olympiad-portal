@@ -21,7 +21,10 @@ describe('Olympiad Organisers routes', () => {
   let app;
 
   beforeEach(() => {
-    vi.spyOn(prisma.olympiad, 'findUnique');
+    // No creator match by default — the fallback in isOlympiadOrganiser
+    // finds nothing, so access-denial tests stay 403. Tests that need an
+    // olympiad override this.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.olympiadOrganiser, 'findMany');
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'create');
