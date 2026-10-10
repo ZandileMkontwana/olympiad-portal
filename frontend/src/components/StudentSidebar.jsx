@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Modal from '@/components/Modal';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -56,9 +56,13 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
   const pathname = usePathname() || '';
   const router = useRouter();
   const { user, checking, signOut, getToken } = useStudentAuth();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const deleteDialogRef = useRef(null);
+  const deleteDialogWasOpen = useRef(false);
   const [hash, setHash] = useState(typeof window !== 'undefined' ? window.location.hash.slice(1) : '');
   const [showSettings, setShowSettings] = useState(false);
   const [showResources, setShowResources] = useState(false);
@@ -83,11 +87,6 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
     onClose?.();
   }
 
-  async function handleLogout() {
-    if (!window.confirm('Log out of the Olympiad Portal?')) return;
-    await signOut({ redirectUrl: '/login' });
-  }
-
   async function handleDeleteAccount() {
     setDeleting(true);
     setDeleteError('');
@@ -102,6 +101,39 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
       setDeleting(false);
     }
   }
+
+  // Lock scroll while delete dialog is open.
+  useEffect(() => {
+    if (showDeleteDialog) {
+      deleteDialogWasOpen.current = true;
+      requestAnimationFrame(() => {
+        deleteDialogRef.current?.focus();
+      });
+      const preventScroll = (e) => {
+        if (deleteDialogRef.current && deleteDialogRef.current.contains(e.target)) return;
+        e.preventDefault();
+      };
+      const preventScrollKey = (e) => {
+        const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+        if (scrollKeys.includes(e.key) && !(deleteDialogRef.current && deleteDialogRef.current.contains(e.target))) {
+          e.preventDefault();
+        }
+      };
+      document.addEventListener('wheel', preventScroll, { passive: false });
+      document.addEventListener('touchmove', preventScroll, { passive: false });
+      document.addEventListener('keydown', preventScrollKey);
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.removeEventListener('wheel', preventScroll);
+        document.removeEventListener('touchmove', preventScroll);
+        document.removeEventListener('keydown', preventScrollKey);
+        document.body.style.overflow = previousOverflow;
+      };
+    } else if (deleteDialogWasOpen.current) {
+      deleteDialogWasOpen.current = false;
+    }
+  }, [showDeleteDialog]);
 
   if (checking) {
     return (
@@ -213,6 +245,15 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
             <Settings2 />
             <span>Settings</span>
           </button>
+          <button
+            className="nav-item"
+            disabled={signingOut}
+            onClick={() => setShowSignOutConfirm(true)}
+          >
+            <span style={{ color: 'var(--c-t-b42318)' }}>
+              {signingOut ? 'Signing out…' : 'Sign out'}
+            </span>
+          </button>
         </nav>
         <div className="sidebar-help">
           <div className="help-icon">
@@ -228,42 +269,6 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
           <div className="avatar">{userInitials}</div>
           <div>
             <strong>{name}</strong>
-            <span style={{ display: 'flex', gap: '8px' }}>
-              {checking ? (
-                'Loading...'
-              ) : (
-                <>
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      color: 'var(--c-t-b42318)',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Log out
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteDialog(true)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      color: 'var(--c-t-706391)',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Delete account
-                  </button>
-                </>
-              )}
-            </span>
           </div>
           <MoreHorizontal className="profile-more" />
         </div>
@@ -281,6 +286,22 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
               <h3 id="settings-prefs">Preferences</h3>
               <p>Notification settings and preferences will be available here.</p>
             </section>
+            <section className="modal-card" aria-labelledby="settings-danger">
+              <h3 id="settings-danger">Danger zone</h3>
+              <p>Permanently delete your account and all associated data.</p>
+              <button
+                type="button"
+                className="modal-action"
+                onClick={() => {
+                  setDeleteError('');
+                  setShowSettings(false);
+                  setShowDeleteDialog(true);
+                }}
+                style={{ background: '#dc2626' }}
+              >
+                Delete account
+              </button>
+            </section>
           </div>
         </Modal>
       )}
@@ -295,17 +316,67 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
         </Modal>
       )}
 
+      {/* Sign out confirmation dialog */}
+      {showSignOutConfirm && !signingOut && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="student-signout-heading"
+            tabIndex={-1}
+            className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+          >
+            <h2 id="student-signout-heading" className="font-display text-xl font-semibold text-ink">Sign out?</h2>
+            <p className="mt-3 text-sm text-ink-soft">
+              Are you sure you want to sign out?
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowSignOutConfirm(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-ink-soft hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setSigningOut(true);
+                  await signOut({ redirectUrl: '/login' });
+                }}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-page signing out overlay */}
+      {signingOut && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white">
+          <div className="auth-spinner" />
+          <p className="mt-4 text-base font-medium text-ink">Signing out…</p>
+        </div>
+      )}
+
       {/* Delete account confirmation dialog */}
       {showDeleteDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
+        <div className="fixed inset-0 z-[1001] flex items-center justify-center bg-black/50">
+          <div
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="student-delete-heading"
+            tabIndex={-1}
+            className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+          >
+            <h2 id="student-delete-heading" className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
             <p className="mt-3 text-sm text-ink-soft">
               This will permanently delete your account and all your data, including your test
               history, results, and submissions. This cannot be undone.
             </p>
             {deleteError && (
-              <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{deleteError}</div>
+              <div role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{deleteError}</div>
             )}
             <div className="mt-6 flex justify-end gap-3">
               <button
@@ -323,7 +394,7 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
                 disabled={deleting}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {deleting ? 'Deleting...' : 'Delete my account'}
+                {deleting ? 'Deleting…' : 'Delete my account'}
               </button>
             </div>
           </div>

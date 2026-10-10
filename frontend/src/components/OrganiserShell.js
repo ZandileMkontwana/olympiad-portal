@@ -273,18 +273,6 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
           >
             Sign out
           </button>
-          <button
-            type="button"
-            className="organiser-logout"
-            ref={deleteButtonRef}
-            onClick={() => {
-              setDeleteError('');
-              setShowDeleteDialog(true);
-            }}
-            style={{ color: 'var(--c-t-706391, #666)' }}
-          >
-            Delete account
-          </button>
           <div className="organiser-profile">
             <span className="profile-avatar">{initials}</span>
             <span>
@@ -385,6 +373,23 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
                 }}
               >
                 Replay tour
+              </button>
+            </section>
+            <section className="modal-card" aria-labelledby="settings-danger">
+              <h3 id="settings-danger">Danger zone</h3>
+              <p>Permanently delete your account and all associated data.</p>
+              <button
+                type="button"
+                className="modal-action"
+                ref={deleteButtonRef}
+                onClick={() => {
+                  setDeleteError('');
+                  setShowSettings(false);
+                  setShowDeleteDialog(true);
+                }}
+                style={{ background: '#dc2626' }}
+              >
+                Delete account
               </button>
             </section>
           </div>
