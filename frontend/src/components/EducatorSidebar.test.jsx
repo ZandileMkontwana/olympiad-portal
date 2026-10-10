@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 // Mutable state — individual tests override before rendering.
 const clerkState = vi.hoisted(() => ({
@@ -9,14 +9,19 @@ const clerkState = vi.hoisted(() => ({
 const pathState = vi.hoisted(() => ({ pathname: '/educator' }));
 
 const mockSignOut = vi.fn();
+const mockGetToken = vi.fn(() => Promise.resolve('test-token'));
+const mockReplace = vi.fn();
+const mockDeleteAccount = vi.fn();
 
 vi.mock('@clerk/nextjs', () => ({
   useClerk: () => ({ signOut: mockSignOut }),
   useUser: () => ({ user: clerkState.user }),
+  useAuth: () => ({ getToken: mockGetToken }),
 }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathState.pathname,
+  useRouter: () => ({ push: vi.fn(), replace: mockReplace }),
 }));
 
 vi.mock('next/link', () => ({
@@ -25,6 +30,10 @@ vi.mock('next/link', () => ({
       {children}
     </a>
   ),
+}));
+
+vi.mock('@/lib/api', () => ({
+  deleteAccount: (...args) => mockDeleteAccount(...args),
 }));
 
 import EducatorSidebar from './EducatorSidebar';
@@ -211,5 +220,91 @@ describe('EducatorSidebar onboarding (#317)', () => {
       'data-tour',
       'educator-nav-school'
     );
+  });
+});
+
+describe('EducatorSidebar delete account', () => {
+  beforeEach(() => {
+    clerkState.user = {
+      fullName: 'Ms Teacher',
+      primaryEmailAddress: { emailAddress: 'teacher@school.com' },
+    };
+    pathState.pathname = '/educator';
+    mockDeleteAccount.mockReset();
+    mockReplace.mockReset();
+    mockGetToken.mockReset();
+    mockGetToken.mockImplementation(() => Promise.resolve('test-token'));
+  });
+
+  it('shows a delete account button in the sidebar', () => {
+    render(<EducatorSidebar />);
+    expect(screen.getByRole('button', { name: /delete account/i })).toBeInTheDocument();
+  });
+
+  it('opens the delete confirmation dialog when the button is clicked', async () => {
+    render(<EducatorSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /delete my account/i })).toBeInTheDocument();
+  });
+
+  it('closes the dialog when cancel is clicked', async () => {
+    render(<EducatorSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(screen.queryByText(/delete your account\?/i)).not.toBeInTheDocument();
+  });
+
+  it('calls deleteAccount and redirects on success', async () => {
+    mockDeleteAccount.mockResolvedValueOnce({});
+    render(<EducatorSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+    await waitFor(() => {
+      expect(mockDeleteAccount).toHaveBeenCalledWith('test-token');
+      expect(mockReplace).toHaveBeenCalledWith('/login?deleted=1');
+    });
+  });
+
+  it('shows error message when deletion fails', async () => {
+    mockDeleteAccount.mockRejectedValueOnce(new Error('Could not delete the account'));
+    render(<EducatorSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/could not delete the account/i);
+    });
+  });
+
+  it('clears error message when dialog is closed', async () => {
+    mockDeleteAccount.mockRejectedValueOnce(new Error('Some error'));
+    render(<EducatorSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    // Reopen dialog
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

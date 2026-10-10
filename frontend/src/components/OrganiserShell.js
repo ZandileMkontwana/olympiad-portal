@@ -357,8 +357,10 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
           <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h2 className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
             <p className="mt-3 text-sm text-ink-soft">
-              This will permanently delete your account and all associated data, including any
-              olympiads you own and their rounds. This cannot be undone.
+              This will permanently delete your account and all associated data. This cannot be undone.
+            </p>
+            <p className="mt-2 text-sm text-ink-soft">
+              If you own any olympiads, you must transfer ownership to another organiser first.
             </p>
             {deleteError && (
               <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{deleteError}</div>

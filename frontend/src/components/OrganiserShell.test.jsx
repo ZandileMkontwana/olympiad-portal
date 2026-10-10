@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
+const mockReplace = vi.fn();
 vi.mock('next/navigation', () => ({
   usePathname: () => '/organiser',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: mockReplace }),
 }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }) => (
@@ -18,6 +19,12 @@ vi.mock('next/dynamic', () => ({
 vi.mock('@clerk/nextjs', () => ({
   useAuth: () => ({ getToken: () => Promise.resolve('test-token') }),
   useUser: () => ({ user: { id: 'test-user', fullName: 'Test User' } }),
+}));
+
+const mockDeleteAccount = vi.fn();
+vi.mock('@/lib/api', () => ({
+  deleteAccount: (...args) => mockDeleteAccount(...args),
+  buildActivityStreamUrl: () => 'http://localhost:5000/api/activity/stream',
 }));
 
 import OrganiserShell from './OrganiserShell';
@@ -119,5 +126,85 @@ describe('OrganiserShell onboarding (#317)', () => {
       expect(screen.getByRole('dialog', { name: 'Create an olympiad' })).toBeInTheDocument()
     );
     expect(screen.queryByRole('dialog', { name: 'Settings' })).not.toBeInTheDocument();
+  });
+});
+
+describe('OrganiserShell delete account', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows a delete account button in the sidebar', () => {
+    renderShell();
+    expect(screen.getByRole('button', { name: /delete account/i })).toBeInTheDocument();
+  });
+
+  it('opens the delete confirmation dialog when the button is clicked', async () => {
+    renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/transfer ownership/i)).toBeInTheDocument();
+  });
+
+  it('closes the dialog when cancel is clicked', async () => {
+    renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(screen.queryByText(/delete your account\?/i)).not.toBeInTheDocument();
+  });
+
+  it('calls deleteAccount and redirects on success', async () => {
+    mockDeleteAccount.mockResolvedValueOnce({});
+    renderShell();
+
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+
+    await waitFor(() => {
+      expect(mockDeleteAccount).toHaveBeenCalledWith('test-token');
+      expect(mockReplace).toHaveBeenCalledWith('/login?deleted=1');
+    });
+  });
+
+  it('shows error message when deletion fails with 409', async () => {
+    mockDeleteAccount.mockRejectedValueOnce(new Error('You still own olympiads. Transfer ownership to another organiser before deleting your account.'));
+    renderShell();
+
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/transfer ownership/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows generic error message when deletion fails', async () => {
+    mockDeleteAccount.mockRejectedValueOnce(new Error('Network error'));
+    renderShell();
+
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/network error/i)).toBeInTheDocument();
+    });
+  });
+
+  it('clears error message when dialog is closed', async () => {
+    mockDeleteAccount.mockRejectedValueOnce(new Error('Network error'));
+    renderShell();
+
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/network error/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+
+    expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
   });
 });
