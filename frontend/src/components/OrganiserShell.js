@@ -10,6 +10,7 @@ import {
   Bell,
   ChevronRight,
   ClipboardCheck,
+  Copy,
   History,
   LayoutDashboard,
   MessageSquareQuote,
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { href: '/organiser', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
   { href: '/organiser/marking', label: 'Marking', icon: ClipboardCheck, key: 'marking' },
   { href: '/organiser/remarks', label: 'Remarks', icon: MessageSquareQuote, key: 'remarks' },
+  { href: '/organiser/duplicates', label: 'Duplicates', icon: Copy, key: 'duplicates' },
   { href: '/organiser/replay', label: 'Replay', icon: History, key: 'replay' },
   { href: '/organiser/archive', label: 'Archive', icon: ArchiveIcon, key: 'archive' },
 ];

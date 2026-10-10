@@ -382,7 +382,7 @@ router.get('/entrants/duplicates', ...requireRole('educator'), async (req, res) 
 
 // GET /entrants/duplicates/all
 // Organiser-only: detects potential duplicate entrants across all schools.
-// Heuristic: same normalized name + same grade + same school = likely duplicate.
+// Heuristic: same normalized name + same grade = likely duplicate (cross-school).
 router.get(
   '/entrants/duplicates/all',
   ...requireRole('organiser'),
@@ -395,10 +395,10 @@ router.get(
       // Normalize name: lowercase, trim, collapse whitespace
       const normalize = (name) => name.toLowerCase().trim().replace(/\s+/g, ' ');
 
-      // Group by (normalized name, grade, schoolId)
+      // Group by (normalized name, grade) — cross-school detection
       const groups = new Map();
       for (const entrant of entrants) {
-        const key = `${normalize(entrant.name)}|${entrant.grade}|${entrant.schoolId}`;
+        const key = `${normalize(entrant.name)}|${entrant.grade}`;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(entrant);
       }

@@ -42,6 +42,7 @@ describe('Auth routes', () => {
     vi.spyOn(prisma.user, 'delete');
     vi.spyOn(prisma.school, 'findFirst');
     vi.spyOn(prisma.school, 'create');
+    vi.spyOn(prisma.olympiad, 'count').mockResolvedValue(0);
     vi.spyOn(prisma, '$transaction').mockImplementation(async (fn) => {
       // Execute the transaction callback immediately with a mock tx object
       const mockTx = {
@@ -324,6 +325,24 @@ describe('Auth routes', () => {
       expect(res.status).toBe(200);
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(mockDeleteUser).toHaveBeenCalledWith('clerk-edu-1');
+    });
+
+    it('blocks deletion when the organiser still owns olympiads', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-org',
+        clerkUserId: 'clerk-org-1',
+        role: 'organiser',
+        entrant: null,
+        educator: null,
+      });
+      prisma.olympiad.count.mockResolvedValue(2);
+
+      const res = await request(app).delete('/api/auth/account');
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/transfer ownership/i);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(mockDeleteUser).not.toHaveBeenCalled();
     });
   });
 });

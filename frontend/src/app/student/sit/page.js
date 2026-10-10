@@ -4,7 +4,7 @@
 // Uses the student JWT session (email + password login) and starts the
 // sitting directly — no name dropdown needed.
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
@@ -33,6 +33,8 @@ function SitContent() {
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [serverBusy, setServerBusy] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const dirtyRef = useRef(false);
 
   // Require a student session
@@ -48,58 +50,56 @@ function SitContent() {
     return () => clearInterval(interval);
   }, []);
 
-  // Start the sitting directly for the signed-in student's entrant record.
+  // Start (or retry) the sitting for the signed-in student's entrant record.
+  // Extracted as a callback so the retry button can re-invoke it.
+  const startSitting = useCallback(async () => {
+    try {
+      const token = await getToken();
+
+      if (!user.entrantId) {
+        setError(
+          'Your account is not linked to a student record. Please contact your educator.'
+        );
+        setPhase('error');
+        setServerBusy(false);
+        return;
+      }
+
+      // Try to create (or resume) the sitting directly
+      const data = await createSitting(roundId, user.entrantId, token);
+      setSittingData(data);
+      setAnswers(data.sitting.answers || {});
+      setPhase('sitting');
+      setServerBusy(false);
+      setError('');
+    } catch (err) {
+      console.error('Sit page error:', err);
+      // If the JWT expired, clear the dead session and redirect to login.
+      if (err instanceof ApiError && err.status === 401) {
+        clearStudentSession();
+        router.replace('/login?expired=1');
+        return;
+      }
+      // Detect server-busy errors: 5xx responses or network failures
+      // (status 0) that exhausted retries in api.js.
+      const isBusy =
+        err instanceof ApiError &&
+        (err.status === 0 || err.status >= 500);
+      setServerBusy(isBusy);
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err?.message || 'Could not start the test. Please contact your educator.';
+      setError(message);
+      setPhase('error');
+    }
+  }, [getToken, user, roundId]);
+
+  // Auto-start the sitting when the component mounts with valid params.
   useEffect(() => {
     if (checking || !user || !roundId) return;
-
-    let cancelled = false;
-
-    async function start() {
-      try {
-        const token = await getToken();
-
-        if (!user.entrantId) {
-          if (!cancelled) {
-            setError(
-              'Your account is not linked to a student record. Please contact your educator.'
-            );
-            setPhase('error');
-          }
-          return;
-        }
-
-        // Try to create (or resume) the sitting directly
-        const data = await createSitting(roundId, user.entrantId, token);
-        if (!cancelled) {
-          setSittingData(data);
-          setAnswers(data.sitting.answers || {});
-          setPhase('sitting');
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Sit page error:', err);
-          // If the JWT expired, clear the dead session and redirect to login.
-          if (err instanceof ApiError && err.status === 401) {
-            clearStudentSession();
-            router.replace('/login?expired=1');
-            return;
-          }
-          const message =
-            err instanceof ApiError
-              ? err.message
-              : err?.message || 'Could not start the test. Please contact your educator.';
-          setError(message);
-          setPhase('error');
-        }
-      }
-    }
-
-    start();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [checking, user, roundId, getToken]);
+    startSitting();
+  }, [checking, user, roundId, startSitting]);
 
   const questions = useMemo(
     () => (sittingData ? sittingData.paper.questions.sort((a, b) => Number(a) - Number(b)) : []),
@@ -263,9 +263,35 @@ function SitContent() {
             color: 'var(--c-t-b42318)',
           }}
         >
-          {error}
+          {serverBusy ? (
+            <>
+              <p style={{ margin: 0 }}>{error}</p>
+              <p style={{ marginTop: '12px', marginBottom: 0 }}>
+                You can try again, or go back to the dashboard.
+              </p>
+            </>
+          ) : (
+            error
+          )}
         </div>
-        <p style={{ marginTop: '24px' }}>
+        <p style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          {serverBusy && (
+            <button
+              type="button"
+              className="button"
+              disabled={retrying}
+              onClick={async () => {
+                setRetrying(true);
+                setError('');
+                setPhase('loading');
+                await startSitting();
+                setRetrying(false);
+              }}
+              style={{ fontSize: '1rem' }}
+            >
+              {retrying ? 'Retrying…' : 'Retry'}
+            </button>
+          )}
           <Link href="/student" className="button">
             &larr; Back to dashboard
           </Link>

@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { requireRole } = require('../middleware/auth');
+const { isOlympiadOrganiser } = require('../lib/authorization');
 const { runAllSignals } = require('../cheating/signals');
 
 const router = express.Router();
@@ -12,13 +13,18 @@ router.get('/rounds/:id/signals', ...requireRole('organiser'), async (req, res) 
   try {
     const roundId = req.params.id;
 
-    // Load the round for its time window
+    // Load the round for its time window and olympiad membership check
     const round = await prisma.round.findUnique({
       where: { id: roundId },
-      select: { id: true, openTime: true, closeTime: true },
+      select: { id: true, openTime: true, closeTime: true, olympiadId: true },
     });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
+    }
+
+    // Check that the organiser is a member of this olympiad
+    if (!(await isOlympiadOrganiser(req.user.id, round.olympiadId))) {
+      return res.status(403).json({ error: 'Not authorised for this olympiad' });
     }
 
     // Load sittings with their timing data

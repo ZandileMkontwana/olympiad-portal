@@ -161,23 +161,6 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
               <span>PORTAL</span>
             </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-ink">{user.name || user.email}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleLogout}
-                className="text-xs font-semibold text-red-500 hover:underline"
-              >
-                Log out
-              </button>
-              <button
-                onClick={() => setShowDeleteDialog(true)}
-                className="text-xs font-semibold text-gray-400 hover:text-red-500 hover:underline"
-              >
-                Delete account
-              </button>
-            </div>
-          </div>
           {onClose && (
             <button
               type="button"
@@ -245,24 +228,40 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
           <div className="avatar">{userInitials}</div>
           <div>
             <strong>{name}</strong>
-            <span>
+            <span style={{ display: 'flex', gap: '8px' }}>
               {checking ? (
                 'Loading...'
               ) : (
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                    color: 'var(--c-t-b42318)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                  }}
-                >
-                  Log out
-                </button>
+                <>
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'var(--c-t-b42318)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Log out
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteDialog(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'var(--c-t-706391)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Delete account
+                  </button>
+                </>
               )}
             </span>
           </div>

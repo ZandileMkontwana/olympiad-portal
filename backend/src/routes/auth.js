@@ -136,6 +136,21 @@ router.delete('/auth/account', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Guard: organisers who own olympiads must transfer ownership before
+    // deleting their account. Nullifying organiserId would orphan the
+    // olympiads with no responsible organiser.
+    if (user.role === 'organiser') {
+      const ownedCount = await prisma.olympiad.count({
+        where: { organiserId: user.id },
+      });
+      if (ownedCount > 0) {
+        return res.status(409).json({
+          error:
+            'You still own olympiads. Transfer ownership to another organiser before deleting your account.',
+        });
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       // Student path: cascade through entrant data (same pattern as
       // DELETE /entrants/:id in entrants.js)

@@ -331,7 +331,7 @@ export function fetchDuplicates(token) {
 
 /**
  * Organiser-only: detects potential duplicate entrants across all schools.
- * Heuristic: same normalized name + same grade + same school = likely duplicate.
+ * Heuristic: same normalized name + same grade = likely duplicate (cross-school).
  * Wired to GET /api/entrants/duplicates/all (backend/src/routes/entrants.js).
  *
  * @param {string} token - Clerk JWT for the Authorization header

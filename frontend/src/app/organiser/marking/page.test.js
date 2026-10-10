@@ -24,10 +24,11 @@ vi.mock('@/lib/api', () => ({
   listMarkingQueue: vi.fn(),
   assignMarkingTask: vi.fn(),
   submitMarking: vi.fn(),
+  fetchSignals: vi.fn(),
   ApiError: class ApiError extends Error {},
 }));
 
-import { listMarkingQueue, assignMarkingTask, submitMarking } from '@/lib/api';
+import { listMarkingQueue, assignMarkingTask, submitMarking, fetchSignals } from '@/lib/api';
 import MarkingPage from './page';
 import { expectNoAxeViolations } from '@/test/axe';
 
@@ -167,5 +168,72 @@ describe('/organiser/marking page', () => {
 
     expect(screen.queryByText(/Marking: Jane Entrant/i)).not.toBeInTheDocument();
     expect(screen.getByText('Jane Entrant')).toBeInTheDocument();
+  });
+
+  it('displays signal badges when a task has cheating signals', async () => {
+    const taskWithSignals = {
+      ...sampleTask,
+      signals: [
+        { type: 'speed_anomaly', severity: 'high', entrantIds: ['entrant-1'] },
+        { type: 'identical_answers', severity: 'medium', entrantIds: ['entrant-1', 'entrant-2'] },
+      ],
+    };
+    listMarkingQueue.mockResolvedValue([taskWithSignals]);
+
+    render(<MarkingPage />);
+
+    // Wait for the task to load
+    await screen.findByText('Jane Entrant');
+
+    // Signal badges should be displayed
+    expect(screen.getByText('Speed')).toBeInTheDocument();
+    expect(screen.getByText('Identical')).toBeInTheDocument();
+  });
+
+  it('opens signal detail modal when a signal badge is clicked', async () => {
+    const user = userEvent.setup();
+    const taskWithSignals = {
+      ...sampleTask,
+      submission: {
+        ...sampleTask.submission,
+        entrantId: 'entrant-1',
+        roundId: 'round-1',
+      },
+      signals: [
+        {
+          type: 'speed_anomaly',
+          severity: 'high',
+          entrantIds: ['entrant-1'],
+          entrants: [{ id: 'entrant-1', name: 'Jane Entrant' }],
+          details: { durationMinutes: 15 },
+        },
+      ],
+    };
+    listMarkingQueue.mockResolvedValue([taskWithSignals]);
+    fetchSignals.mockResolvedValue({
+      flags: [
+        {
+          type: 'speed_anomaly',
+          severity: 'high',
+          entrantIds: ['entrant-1'],
+          entrants: [{ id: 'entrant-1', name: 'Jane Entrant' }],
+          details: { durationMinutes: 15 },
+        },
+      ],
+    });
+
+    render(<MarkingPage />);
+    await screen.findByText('Jane Entrant');
+
+    // Click the signal badge
+    const speedBadge = screen.getByText('Speed');
+    await user.click(speedBadge);
+
+    // Modal should open with signal details
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/signal details/i)).toBeInTheDocument();
+    // "Jane Entrant" appears both in the task list and in the modal
+    const entrantNameElements = screen.getAllByText(/Jane Entrant/i);
+    expect(entrantNameElements.length).toBeGreaterThanOrEqual(2);
   });
 });
