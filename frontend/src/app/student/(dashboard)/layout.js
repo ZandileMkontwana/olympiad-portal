@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import StudentSidebar from '@/components/StudentSidebar';
 import AppShell from '@/components/AppShell';
 import { getStudentSession } from '@/lib/studentSession';
@@ -14,10 +14,15 @@ function initialsFrom(name) {
 }
 
 export default function StudentLayout({ children }) {
-  const [initials] = useState(() => {
+  // Start with empty initials so server and client render match.
+  // Then read localStorage after mount to populate the avatar.
+  const [initials, setInitials] = useState('');
+  useEffect(() => {
     const session = getStudentSession();
-    return session?.user ? initialsFrom(session.user.name || session.user.email || '') : '';
-  });
+    setInitials(
+      session?.user ? initialsFrom(session.user.name || session.user.email || '') : ''
+    );
+  }, []);
   return (
     <AppShell
       section="Student overview"

@@ -55,12 +55,10 @@ export default function RootLayout({ children }) {
         suppressHydrationWarning
         className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} h-full antialiased`}
       >
-        <head>
+        <body className="min-h-full flex flex-col">
           <Script id="theme-init" strategy="beforeInteractive">
             {themeInitScript}
           </Script>
-        </head>
-        <body className="min-h-full flex flex-col">
           <ThemeProvider>
             <a href="#main-content" className="skip-link">
               Skip to main content
