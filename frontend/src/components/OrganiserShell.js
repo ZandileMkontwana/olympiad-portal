@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import '@/app/auth.css';
 import {
   Archive as ArchiveIcon,
@@ -25,10 +24,6 @@ import { TourHost, useTour } from '@/components/OnboardingTour';
 import { ORGANISER_TOUR } from '@/lib/tour';
 import { buildActivityStreamUrl, deleteAccount } from '@/lib/api';
 import { useAuth } from '@clerk/nextjs';
-
-const ClerkSignOutButton = dynamic(() => import('@clerk/nextjs').then((mod) => mod.SignOutButton), {
-  ssr: false,
-});
 
 const NAV_ITEMS = [
   { href: '/organiser', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
@@ -59,11 +54,13 @@ export default function OrganiserShell(props) {
 
 function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
   const { startTour } = useTour();
-  const { getToken } = useAuth();
+  const { getToken, signOut } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
   const deleteButtonRef = useRef(null);
   const deleteDialogRef = useRef(null);
   const deleteDialogWasOpen = useRef(false);
@@ -268,13 +265,14 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
           >
             <Settings2 size={14} aria-hidden="true" /> Settings
           </button>
-          {ClerkSignOutButton && (
-            <ClerkSignOutButton redirectUrl="/login">
-              <button type="button" className="organiser-logout">
-                Sign out
-              </button>
-            </ClerkSignOutButton>
-          )}
+          <button
+            type="button"
+            className="organiser-logout"
+            disabled={signingOut}
+            onClick={() => setShowSignOutConfirm(true)}
+          >
+            Sign out
+          </button>
           <button
             type="button"
             className="organiser-logout"
@@ -434,6 +432,49 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Sign out confirmation dialog */}
+      {showSignOutConfirm && !signingOut && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="organiser-signout-heading"
+            tabIndex={-1}
+            className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+          >
+            <h2 id="organiser-signout-heading" className="font-display text-xl font-semibold text-ink">Sign out?</h2>
+            <p className="mt-3 text-sm text-ink-soft">
+              Are you sure you want to sign out of your organiser account?
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowSignOutConfirm(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-ink-soft hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setSigningOut(true);
+                  await signOut({ redirectUrl: '/login' });
+                }}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-page signing out overlay */}
+      {signingOut && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white">
+          <div className="auth-spinner" />
+          <p className="mt-4 text-base font-medium text-ink">Signing out…</p>
         </div>
       )}
     </div>
