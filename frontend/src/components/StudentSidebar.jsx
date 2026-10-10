@@ -5,9 +5,12 @@
 // pages. The sit page is deliberately outside that layout: test-taking is a
 // focused, full-screen flow.
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
+import { deleteAccount } from '@/lib/api';
+import { clearStudentSession } from '@/lib/studentSession';
 
 function initials(name) {
   return (name || '')
@@ -30,11 +33,30 @@ const LINKS = [
 
 export default function StudentSidebar() {
   const pathname = usePathname() || '';
-  const { user, checking, signOut } = useStudentAuth();
+  const router = useRouter();
+  const { user, checking, signOut, getToken } = useStudentAuth();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   async function handleLogout() {
     if (!window.confirm('Log out of the Olympiad Portal?')) return;
     await signOut({ redirectUrl: '/login' });
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const token = await getToken();
+      await deleteAccount(token);
+      // Account deleted — clear local session and redirect to login
+      clearStudentSession();
+      router.replace('/login?deleted=1');
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete your account. Please try again.');
+      setDeleting(false);
+    }
   }
 
   return (
@@ -75,17 +97,60 @@ export default function StudentSidebar() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-ink">{user.name || user.email}</p>
-            <button
-              onClick={handleLogout}
-              className="text-xs font-semibold text-red-500 hover:underline"
-            >
-              Log out
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={handleLogout}
+                className="text-xs font-semibold text-red-500 hover:underline"
+              >
+                Log out
+              </button>
+              <button
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-xs font-semibold text-gray-400 hover:text-red-500 hover:underline"
+              >
+                Delete account
+              </button>
+            </div>
           </div>
         </div>
       ) : (
         <div className="border-t border-lavender/15 pt-4">
           <p className="text-xs text-ink-soft">{checking ? 'Loading account…' : 'Not signed in'}</p>
+        </div>
+      )}
+
+      {/* Delete account confirmation dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
+            <p className="mt-3 text-sm text-ink-soft">
+              This will permanently delete your account and all your data, including your test
+              history, results, and submissions. This cannot be undone.
+            </p>
+            {deleteError && (
+              <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{deleteError}</div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteDialog(false);
+                  setDeleteError('');
+                }}
+                disabled={deleting}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-ink-soft hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete my account'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </aside>

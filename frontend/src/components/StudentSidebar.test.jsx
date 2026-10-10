@@ -14,17 +14,21 @@ const authState = vi.hoisted(() => ({
 const pathState = vi.hoisted(() => ({ pathname: '/student' }));
 
 const mockSignOut = vi.fn();
+const mockGetToken = vi.fn().mockResolvedValue('test-token');
+const mockReplace = vi.fn();
 
 vi.mock('@/hooks/useStudentAuth', () => ({
   useStudentAuth: () => ({
     user: authState.user,
     checking: authState.checking,
     signOut: mockSignOut,
+    getToken: mockGetToken,
   }),
 }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathState.pathname,
+  useRouter: () => ({ replace: mockReplace }),
 }));
 
 vi.mock('next/link', () => ({
@@ -33,6 +37,14 @@ vi.mock('next/link', () => ({
       {children}
     </a>
   ),
+}));
+
+vi.mock('@/lib/api', () => ({
+  deleteAccount: vi.fn().mockResolvedValue({ message: 'Account deleted successfully' }),
+}));
+
+vi.mock('@/lib/studentSession', () => ({
+  clearStudentSession: vi.fn(),
 }));
 
 import StudentSidebar from './StudentSidebar';
@@ -123,5 +135,57 @@ describe('StudentSidebar', () => {
     render(<StudentSidebar />);
 
     expect(screen.getByText(/not signed in/i)).toBeInTheDocument();
+  });
+
+  it('shows a delete account button', () => {
+    render(<StudentSidebar />);
+
+    expect(screen.getByRole('button', { name: /delete account/i })).toBeInTheDocument();
+  });
+
+  it('opens the delete dialog when the delete button is clicked', () => {
+    render(<StudentSidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /delete my account/i })).toBeInTheDocument();
+  });
+
+  it('closes the delete dialog when cancel is clicked', () => {
+    render(<StudentSidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(screen.queryByText(/delete your account\?/i)).not.toBeInTheDocument();
+  });
+
+  it('deletes the account and redirects to login', async () => {
+    const { deleteAccount } = await import('@/lib/api');
+    const { clearStudentSession } = await import('@/lib/studentSession');
+
+    render(<StudentSidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+
+    await vi.waitFor(() => {
+      expect(deleteAccount).toHaveBeenCalledWith('test-token');
+    });
+    expect(clearStudentSession).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/login?deleted=1');
+  });
+
+  it('shows an error when account deletion fails', async () => {
+    const { deleteAccount } = await import('@/lib/api');
+    deleteAccount.mockRejectedValueOnce(new Error('Server error'));
+
+    render(<StudentSidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
+
+    await vi.waitFor(() => {
+      expect(screen.getByText(/server error/i)).toBeInTheDocument();
+    });
   });
 });

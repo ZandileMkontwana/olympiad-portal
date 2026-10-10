@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 // ── mocks ────────────────────────────────────────────────────────────────────
@@ -225,6 +225,47 @@ describe('Login page', () => {
       expect(screen.getByText(/Return to your/i)).toBeInTheDocument();
       expect(screen.getByText(/best thinking/i)).toBeInTheDocument();
       expect(screen.getByText(/A place to keep growing/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Query-param banners', () => {
+    const originalLocation = window.location;
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation,
+      });
+    });
+
+    function setLocationSearch(search) {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...originalLocation, search },
+      });
+    }
+
+    it('shows a "deleted" banner when ?deleted=1 is in the URL', () => {
+      setLocationSearch('?deleted=1');
+      render(<LoginPage />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(/account deleted/i);
+    });
+
+    it('shows a "session expired" banner when ?expired=1 is in the URL', () => {
+      setLocationSearch('?expired=1');
+      render(<LoginPage />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(/session expired/i);
+    });
+
+    it('hides the deleted banner when the user picks a role', () => {
+      setLocationSearch('?deleted=1');
+      render(<LoginPage />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(/account deleted/i);
+      fireEvent.click(screen.getByRole('button', { name: /educator/i }));
+      expect(screen.queryByText(/account deleted/i)).not.toBeInTheDocument();
     });
   });
 });

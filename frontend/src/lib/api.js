@@ -2,46 +2,130 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
+// Retry policy for transient failures (network errors and 5xx responses).
+// 4xx client errors are never retried — they indicate a permanent problem
+// (bad request, auth failure, etc.) that retrying won't fix.
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 500;
+
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, attempts = 1) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.attempts = attempts;
   }
 }
 
 /**
  * Shared JSON request helper — handles network failures, non-JSON error
  * bodies, and non-2xx responses the same way everywhere they're called.
+ * Retries up to MAX_RETRIES times on transient failures (network errors
+ * and 5xx responses) with exponential backoff.
  */
 async function requestJson(path, options = {}) {
-  let response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-  } catch (networkError) {
-    throw new ApiError('Could not reach the server. Is the backend running on :5000?', 0);
+  let lastError;
+  let attempts = 0;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    attempts = attempt + 1;
+    let response;
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+    } catch (networkError) {
+      // Network-level failure (DNS, connection refused, etc.)
+      const isLastAttempt = attempt >= MAX_RETRIES - 1;
+      const message = isLastAttempt
+        ? 'The server is currently busy. Please try again in a few moments.'
+        : 'Could not reach the server. Is the backend running on :5000?';
+      lastError = new ApiError(message, 0, attempts);
+      if (!isLastAttempt) {
+        await delay(RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
+        continue;
+      }
+      throw lastError;
+    }
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {
+      // Response wasn't JSON — fall through to response.ok check below.
+    }
+
+    if (!response.ok) {
+      const isServerBusy = response.status >= 500 && attempt >= MAX_RETRIES - 1;
+      const message = isServerBusy
+        ? 'The server is currently busy. Please try again in a few moments.'
+        : (data && data.error) || `Request failed with status ${response.status}`;
+      lastError = new ApiError(message, response.status, attempts);
+
+      // Retry on 5xx server errors — they're often transient (restarts,
+      // overloaded instances, bad gateway from a reverse proxy).
+      if (response.status >= 500 && attempt < MAX_RETRIES - 1) {
+        await delay(retryDelay(response, attempt));
+        continue;
+      }
+
+      throw lastError;
+    }
+
+    return data;
   }
 
-  let data = null;
-  try {
-    data = await response.json();
-  } catch {
-    // Response wasn't JSON — fall through to response.ok check below.
+  // Should be unreachable — every path either returns or throws inside the loop.
+  throw lastError;
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Returns the delay before the next retry attempt. If the server sent a
+ * Retry-After header (RFC 7231 §7.1.3), that value is used — capped at
+ * 30 seconds so a misbehaving server can't stall the client forever.
+ * Otherwise falls back to exponential backoff.
+ */
+function retryDelay(response, attempt) {
+  const MAX_DELAY_MS = 30_000;
+  const retryAfterMs = parseRetryAfter(response.headers?.get?.('Retry-After'));
+  if (retryAfterMs != null) {
+    return Math.min(retryAfterMs, MAX_DELAY_MS);
+  }
+  return RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+}
+
+/**
+ * Parses a Retry-After header value into milliseconds. Supports both
+ * formats from the spec: delay-seconds (e.g. "5") and HTTP-date
+ * (e.g. "Fri, 31 Dec 1999 23:59:59 GMT"). Returns null if the header
+ * is absent or unparseable.
+ */
+export function parseRetryAfter(value) {
+  if (value == null) return null;
+
+  // Plain integer = seconds to wait
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1000);
   }
 
-  if (!response.ok) {
-    const message = (data && data.error) || `Request failed with status ${response.status}`;
-    throw new ApiError(message, response.status);
+  // HTTP-date format — Date.parse returns NaN on invalid input
+  const dateMs = Date.parse(value);
+  if (!Number.isNaN(dateMs)) {
+    const delayMs = dateMs - Date.now();
+    return delayMs >= 0 ? delayMs : 0;
   }
 
-  return data;
+  return null;
 }
 
 /**
@@ -220,6 +304,34 @@ export function listSchoolEntrants(token) {
 }
 
 /**
+ * Detects potential duplicate entrants within the educator's school.
+ * Heuristic: same normalized name + same grade = likely duplicate.
+ * Wired to GET /api/entrants/duplicates (backend/src/routes/entrants.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{duplicates: Array<Array<{id: string, name: string, grade: string, email: string|null, createdAt: string}>>>}>}
+ */
+export function fetchDuplicates(token) {
+  return requestJson('/api/entrants/duplicates', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Organiser-only: detects potential duplicate entrants across all schools.
+ * Heuristic: same normalized name + same grade + same school = likely duplicate.
+ * Wired to GET /api/entrants/duplicates/all (backend/src/routes/entrants.js).
+ *
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{duplicates: Array<Array<{id: string, name: string, grade: string, email: string|null, schoolName: string, createdAt: string}>>>}>}
+ */
+export function fetchAllDuplicates(token) {
+  return requestJson('/api/entrants/duplicates/all', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
  * Registers a student at the signed-in educator's school: creates the
  * entrant record AND their student account, then emails them an
  * invitation to set a password. The educator must select which olympiad
@@ -304,6 +416,37 @@ export function setStudentPassword({ token, password }) {
 }
 
 /**
+ * Proactively refreshes the student's session token before it expires.
+ * Requires a valid (non-expired) JWT. Returns a new token with a fresh 7-day TTL.
+ * Wired to POST /api/students/refresh (backend/src/routes/studentAuth.js).
+ *
+ * @param {string} token - Current valid JWT
+ * @returns {Promise<{token: string, user: object}>}
+ */
+export function refreshSessionToken(token) {
+  return requestJson('/api/students/refresh', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Permanently deletes the signed-in user's account and all their data.
+ * This cannot be undone. The caller should clear local session state and
+ * redirect to login after a successful response.
+ * Wired to DELETE /api/auth/account (backend/src/routes/auth.js).
+ *
+ * @param {string} token - Auth token (student JWT or Clerk JWT)
+ * @returns {Promise<{message: string}>}
+ */
+export function deleteAccount(token) {
+  return requestJson('/api/auth/account', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
  * Registers one of the educator's own students to sit a round.
  * Wired to POST /api/rounds/:id/entrants (backend/src/routes/rounds.js).
  * Only accepted while the round is scheduled or open.
@@ -359,6 +502,28 @@ export function saveSittingAnswers(sittingId, answers, token) {
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ answers }),
   });
+}
+
+/**
+ * Fire-and-forget save for use in beforeunload handlers. Uses fetch with
+ * keepalive so the request survives page teardown. Returns nothing — the
+ * browser may kill the request, but that's fine; it's best-effort.
+ */
+export function flushSittingAnswers(sittingId, answers, token) {
+  if (!token) return;
+  try {
+    fetch(`${API_BASE_URL}/api/sittings/${sittingId}/answers`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ answers }),
+      keepalive: true,
+    });
+  } catch {
+    // Best-effort — swallow errors during page teardown.
+  }
 }
 
 /**
@@ -561,6 +726,32 @@ export function fetchMyResult(resultId, token) {
  */
 export function fetchSchoolDashboard(schoolId, token) {
   return requestJson(`/api/schools/${schoolId}/dashboard`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Fetches per-round analytics for a school: participation rates,
+ * average/highest scores, and submission counts per round.
+ * Wired to GET /api/schools/:id/analytics (backend/src/routes/schools.js).
+ *
+ * @param {string} schoolId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   school: {id: string, name: string},
+ *   totalEntrants: number,
+ *   rounds: Array<{
+ *     round: {id: string, name: string, olympiad: {id: string, name: string}},
+ *     registeredCount: number,
+ *     submissionCount: number,
+ *     participationRate: number,
+ *     averageScore: number|null,
+ *     highestScore: number|null,
+ *   }>,
+ * }>}
+ */
+export function fetchSchoolAnalytics(schoolId, token) {
+  return requestJson(`/api/schools/${schoolId}/analytics`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
@@ -871,6 +1062,31 @@ export function listAllOrganisers(token) {
  */
 export function fetchRoundReplay(roundId, token) {
   return requestJson(`/api/rounds/${roundId}/replay`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Runs cheating signal detection algorithms for a round.
+ * Returns flags sorted by severity (high → medium → low).
+ * Wired to GET /api/rounds/:id/signals (backend/src/routes/signals.js).
+ * Requires organiser role.
+ *
+ * @param {string} roundId
+ * @param {string} token - Clerk JWT for the Authorization header
+ * @returns {Promise<{
+ *   round: { id: string },
+ *   flags: Array<{
+ *     type: string,
+ *     severity: string,
+ *     entrantIds: string[],
+ *     entrants: Array<{id: string, name: string, grade: string}>,
+ *     details: object,
+ *   }>,
+ * }>}
+ */
+export function fetchSignals(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/signals`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }

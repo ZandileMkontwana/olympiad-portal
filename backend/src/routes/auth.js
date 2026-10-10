@@ -105,19 +105,100 @@ router.get('/auth/me', requireAuth, async (req, res) => {
 });
 
 // DELETE /auth/account
+// Self-service account deletion. Cascades through all related data in a
+// transaction so the user row can be removed without FK violations:
+//   - Students: entrant + their submissions, results, sittings, etc.
+//   - Educators: educator row + nullify marking-task assignments
+//   - Organisers: nullify olympiad ownership, delete co-organiser rows
+// After the DB transaction, the Clerk identity is deleted (best-effort).
 router.delete('/auth/account', requireAuth, async (req, res) => {
   try {
-    const user = await loadAuthUser(req);
+    const authUser = await loadAuthUser(req);
+
+    if (!authUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Load the full user with relations needed for cascade
+    const user = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      include: {
+        entrant: {
+          include: {
+            submissions: { select: { id: true } },
+          },
+        },
+        educator: true,
+      },
+    });
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    await prisma.user.delete({ where: { id: user.id } });
-    // Also delete from Clerk itself, so the account is fully gone, not just
-    // our copy. Educator-registered students have no Clerk account (null).
+    await prisma.$transaction(async (tx) => {
+      // Student path: cascade through entrant data (same pattern as
+      // DELETE /entrants/:id in entrants.js)
+      if (user.entrant) {
+        const submissionIds = user.entrant.submissions.map((s) => s.id);
+        if (submissionIds.length > 0) {
+          await tx.result.deleteMany({ where: { submissionId: { in: submissionIds } } });
+          await tx.markingTask.deleteMany({ where: { submissionId: { in: submissionIds } } });
+          await tx.remarkRequest.deleteMany({ where: { submissionId: { in: submissionIds } } });
+        }
+        await tx.submission.deleteMany({ where: { entrantId: user.entrant.id } });
+        await tx.sitting.deleteMany({ where: { entrantId: user.entrant.id } });
+        await tx.roundEntrant.deleteMany({ where: { entrantId: user.entrant.id } });
+        await tx.notificationLog.deleteMany({ where: { entrantId: user.entrant.id } });
+        await tx.entrant.delete({ where: { id: user.entrant.id } });
+      }
+
+      // Educator row (1:1 with user)
+      if (user.educator) {
+        await tx.educator.delete({ where: { id: user.educator.id } });
+      }
+
+      // Remark requests this user requested (required FK: requestedById)
+      await tx.remarkRequest.deleteMany({ where: { requestedById: user.id } });
+
+      // Nullify optional user references in marking tasks and remarks
+      await tx.markingTask.updateMany({
+        where: { assignedToId: user.id },
+        data: { assignedToId: null },
+      });
+      await tx.markingTask.updateMany({
+        where: { moderatedById: user.id },
+        data: { moderatedById: null },
+      });
+      await tx.remarkRequest.updateMany({
+        where: { assignedToId: user.id },
+        data: { assignedToId: null },
+      });
+      await tx.remarkRequest.updateMany({
+        where: { reviewedById: user.id },
+        data: { reviewedById: null },
+      });
+
+      // Olympiad ownership: nullify the organiser reference so the olympiad
+      // survives but is no longer tied to this account
+      await tx.olympiad.updateMany({
+        where: { organiserId: user.id },
+        data: { organiserId: null },
+      });
+      await tx.olympiadOrganiser.deleteMany({ where: { organiserId: user.id } });
+
+      // Finally, delete the user
+      await tx.user.delete({ where: { id: user.id } });
+    });
+
+    // External Clerk deletion — best-effort, outside the DB transaction so
+    // a Clerk API failure doesn't roll back the local deletion.
     if (user.clerkUserId) {
-      await clerkClient.users.deleteUser(user.clerkUserId);
+      try {
+        await clerkClient.users.deleteUser(user.clerkUserId);
+      } catch (clerkErr) {
+        console.error('Clerk deletion failed (account already removed locally):', clerkErr);
+      }
     }
 
     res.status(200).json({ message: 'Account deleted successfully' });

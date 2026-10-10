@@ -53,6 +53,7 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
+    vi.spyOn(prisma.entrant, 'findMany');
     vi.spyOn(prisma.notificationRule, 'findMany');
     vi.spyOn(prisma.notificationRule, 'upsert');
     vi.spyOn(prisma.notificationRule, 'deleteMany');
@@ -70,6 +71,8 @@ describe('Rounds routes', () => {
     // Default: no registrations anywhere (GET /olympiads enrichment counts
     // them) — schools have approved access (POST /rounds/:id/entrants gate).
     prisma.roundEntrant.findMany.mockResolvedValue([]);
+    // Default: no entrants for duplicate detection (standings endpoint)
+    prisma.entrant.findMany.mockResolvedValue([]);
     // Default: the Clerk user maps to an educator linked to school-1
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',

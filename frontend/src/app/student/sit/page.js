@@ -8,7 +8,14 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
-import { createSitting, saveSittingAnswers, submitSitting, ApiError } from '@/lib/api';
+import { clearStudentSession } from '@/lib/studentSession';
+import {
+  createSitting,
+  saveSittingAnswers,
+  flushSittingAnswers,
+  submitSitting,
+  ApiError,
+} from '@/lib/api';
 
 function SitContent() {
   const searchParams = useSearchParams();
@@ -71,6 +78,12 @@ function SitContent() {
       } catch (err) {
         if (!cancelled) {
           console.error('Sit page error:', err);
+          // If the JWT expired, clear the dead session and redirect to login.
+          if (err instanceof ApiError && err.status === 401) {
+            clearStudentSession();
+            router.replace('/login?expired=1');
+            return;
+          }
           const message =
             err instanceof ApiError
               ? err.message
@@ -115,14 +128,52 @@ function SitContent() {
         const token = await getToken();
         await saveSittingAnswers(sittingData.sitting.id, answers, token);
         setSaveState('saved');
-      } catch {
+      } catch (err) {
+        // If the JWT expired, clear the dead session and send the student
+        // back to login — they'll need to re-authenticate before they can
+        // continue. The sitting itself is safe on the server.
+        if (err instanceof ApiError && err.status === 401) {
+          clearStudentSession();
+          router.replace('/login?expired=1');
+          return;
+        }
         dirtyRef.current = true;
         setSaveState('error');
       }
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [answers, phase, sittingData, getToken]);
+  }, [answers, phase, sittingData, getToken, router]);
+
+  // Flush unsaved answers when the student closes or navigates away. Uses
+  // fetch with keepalive so the request survives page teardown. Also asks
+  // the browser to show its native "leave page?" confirmation.
+  useEffect(() => {
+    function handleBeforeUnload(e) {
+      if (!dirtyRef.current || !sittingData) return;
+
+      // Best-effort flush of the latest answers to the server.
+      // getToken is sync-in-practice (Promise.resolve of a value from state),
+      // but we can't await in a beforeunload handler — so read the token
+      // directly from localStorage instead.
+      try {
+        const raw = window.localStorage.getItem('studentSession');
+        const session = raw ? JSON.parse(raw) : null;
+        if (session?.token) {
+          flushSittingAnswers(sittingData.sitting.id, answers, session.token);
+        }
+      } catch {
+        // Best-effort — swallow errors during page teardown.
+      }
+
+      // Trigger the browser's native "Changes you made may not be saved"
+      // confirmation dialog.
+      e.preventDefault();
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [sittingData, answers]);
 
   function updateAnswer(questionId, value) {
     dirtyRef.current = true;
@@ -156,6 +207,12 @@ function SitContent() {
       setSubmitted(true);
     } catch (err) {
       dirtyRef.current = true;
+      // If the JWT expired, clear the dead session and redirect to login.
+      if (err instanceof ApiError && err.status === 401) {
+        clearStudentSession();
+        router.replace('/login?expired=1');
+        return;
+      }
       setError(err instanceof ApiError ? err.message : 'Could not submit the test.');
     } finally {
       setSubmitting(false);

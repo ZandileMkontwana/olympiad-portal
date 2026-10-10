@@ -18,6 +18,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [sessionExpired, setSessionExpired] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('expired') === '1';
+  });
+  const [accountDeleted, setAccountDeleted] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('deleted') === '1';
+  });
 
   // Redirect if there's already a stored student session
   useEffect(() => {
@@ -106,6 +114,21 @@ export default function LoginPage() {
             </span>
           </div>
           <p className="auth-form-context">Continue your learning journey</p>
+
+          {sessionExpired && (
+            <div className="auth-alert auth-alert-warning" role="alert" style={{ marginBottom: '16px' }}>
+              <strong>Session expired</strong>
+              Your session has expired. Please sign in again to continue.
+            </div>
+          )}
+
+          {accountDeleted && (
+            <div className="auth-alert auth-alert-success" role="alert" style={{ marginBottom: '16px' }}>
+              <strong>Account deleted</strong>
+              Your account has been successfully deleted.
+            </div>
+          )}
+
           <div className="auth-role-picker" aria-label="Choose your account type">
             <p className="auth-role-label">I&apos;m signing in as</p>
             <div className="auth-role-options" role="group">
@@ -116,6 +139,8 @@ export default function LoginPage() {
                 onClick={() => {
                   setRole('student');
                   setError(null);
+                  setSessionExpired(false);
+                  setAccountDeleted(false);
                 }}
               >
                 <span className="auth-role-icon">
@@ -135,6 +160,8 @@ export default function LoginPage() {
                 onClick={() => {
                   setRole('educator');
                   setError(null);
+                  setSessionExpired(false);
+                  setAccountDeleted(false);
                 }}
               >
                 <span className="auth-role-icon">
@@ -154,6 +181,8 @@ export default function LoginPage() {
                 onClick={() => {
                   setRole('organiser');
                   setError(null);
+                  setSessionExpired(false);
+                  setAccountDeleted(false);
                 }}
               >
                 <span className="auth-role-icon">

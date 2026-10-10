@@ -29,6 +29,8 @@ describe('Schools routes', () => {
     vi.spyOn(prisma.school, 'findUnique');
     vi.spyOn(prisma.school, 'findMany');
     vi.spyOn(prisma.entrant, 'findMany');
+    vi.spyOn(prisma.roundEntrant, 'findMany');
+    vi.spyOn(prisma.submission, 'findMany');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // Default: organiser role (can access any school)
     prisma.user.findUnique.mockResolvedValue({
@@ -365,6 +367,71 @@ describe('Schools routes', () => {
       expect(res.body.entrantCount).toBe(0);
       expect(res.body.totalSubmissions).toBe(0);
       expect(res.body.entrants).toEqual([]);
+    });
+  });
+
+  // ─── GET /api/schools/:id/analytics ────────────────────────────────────
+
+  describe('GET /api/schools/:id/analytics', () => {
+    it('returns 404 when school does not exist', async () => {
+      prisma.school.findUnique.mockResolvedValue(null);
+      const res = await request(app).get('/api/schools/nonexistent/analytics');
+      expect(res.status).toBe(404);
+    });
+
+    it('returns empty rounds when school has no entrants', async () => {
+      prisma.school.findUnique.mockResolvedValue({ id: 'school-1', name: 'Test School' });
+      prisma.entrant.findMany.mockResolvedValue([]);
+
+      const res = await request(app).get('/api/schools/school-1/analytics');
+      expect(res.status).toBe(200);
+      expect(res.body.totalEntrants).toBe(0);
+      expect(res.body.rounds).toEqual([]);
+    });
+
+    it('returns per-round analytics with participation and scores', async () => {
+      prisma.school.findUnique.mockResolvedValue({ id: 'school-1', name: 'Test School' });
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1' },
+        { id: 'entrant-2' },
+      ]);
+
+      prisma.roundEntrant.findMany.mockResolvedValue([
+        {
+          entrantId: 'entrant-1',
+          round: { id: 'round-1', name: 'Round 1', olympiad: { id: 'oly-1', name: 'Maths' } },
+        },
+        {
+          entrantId: 'entrant-2',
+          round: { id: 'round-1', name: 'Round 1', olympiad: { id: 'oly-1', name: 'Maths' } },
+        },
+      ]);
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrantId: 'entrant-1',
+          roundId: 'round-1',
+          round: { id: 'round-1', name: 'Round 1' },
+          result: { score: 8 },
+        },
+        {
+          entrantId: 'entrant-2',
+          roundId: 'round-1',
+          round: { id: 'round-1', name: 'Round 1' },
+          result: { score: 6 },
+        },
+      ]);
+
+      const res = await request(app).get('/api/schools/school-1/analytics');
+      expect(res.status).toBe(200);
+      expect(res.body.totalEntrants).toBe(2);
+      expect(res.body.rounds).toHaveLength(1);
+      expect(res.body.rounds[0].round.id).toBe('round-1');
+      expect(res.body.rounds[0].registeredCount).toBe(2);
+      expect(res.body.rounds[0].submissionCount).toBe(2);
+      expect(res.body.rounds[0].participationRate).toBe(100);
+      expect(res.body.rounds[0].averageScore).toBe(7);
+      expect(res.body.rounds[0].highestScore).toBe(8);
     });
   });
 });

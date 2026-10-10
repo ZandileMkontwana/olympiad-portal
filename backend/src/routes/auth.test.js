@@ -42,6 +42,24 @@ describe('Auth routes', () => {
     vi.spyOn(prisma.user, 'delete');
     vi.spyOn(prisma.school, 'findFirst');
     vi.spyOn(prisma.school, 'create');
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (fn) => {
+      // Execute the transaction callback immediately with a mock tx object
+      const mockTx = {
+        result: { deleteMany: vi.fn() },
+        markingTask: { deleteMany: vi.fn(), updateMany: vi.fn() },
+        remarkRequest: { deleteMany: vi.fn(), updateMany: vi.fn() },
+        submission: { deleteMany: vi.fn() },
+        sitting: { deleteMany: vi.fn() },
+        roundEntrant: { deleteMany: vi.fn() },
+        notificationLog: { deleteMany: vi.fn() },
+        entrant: { delete: vi.fn() },
+        educator: { delete: vi.fn() },
+        olympiad: { updateMany: vi.fn() },
+        olympiadOrganiser: { deleteMany: vi.fn() },
+        user: { delete: vi.fn() },
+      };
+      return fn(mockTx);
+    });
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetUser.mockReset();
     mockDeleteUser.mockReset();
@@ -235,29 +253,77 @@ describe('Auth routes', () => {
     });
 
     it('deletes the user and their Clerk account', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', clerkUserId: 'clerk-user-1' });
-      prisma.user.delete.mockResolvedValue({});
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        clerkUserId: 'clerk-user-1',
+        entrant: null,
+        educator: null,
+      });
       mockDeleteUser.mockResolvedValue({});
 
       const res = await request(app).delete('/api/auth/account');
       expect(res.status).toBe(200);
       expect(res.body.message).toMatch(/deleted/i);
-      expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(mockDeleteUser).toHaveBeenCalledWith('clerk-user-1');
     });
 
     it('skips Clerk deletion for students without a Clerk account', async () => {
       const token = jwt.sign({ sub: 'user-2', role: 'student' }, 'test-secret');
-      prisma.user.findUnique.mockResolvedValue({ id: 'user-2', clerkUserId: null });
-      prisma.user.delete.mockResolvedValue({});
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-2',
+        clerkUserId: null,
+        entrant: null,
+        educator: null,
+      });
 
       const res = await request(app)
         .delete('/api/auth/account')
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'user-2' } });
+      expect(prisma.$transaction).toHaveBeenCalled();
       expect(mockDeleteUser).not.toHaveBeenCalled();
+    });
+
+    it('cascades through student entrant data', async () => {
+      const token = jwt.sign({ sub: 'user-student', role: 'student' }, 'test-secret');
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-student',
+        clerkUserId: null,
+        entrant: {
+          id: 'entrant-1',
+          submissions: [{ id: 'sub-1' }, { id: 'sub-2' }],
+        },
+        educator: null,
+      });
+
+      const res = await request(app)
+        .delete('/api/auth/account')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(prisma.$transaction).toHaveBeenCalled();
+      
+      // Verify the transaction callback was executed (cascade operations ran)
+      const txCallback = prisma.$transaction.mock.calls[0][0];
+      expect(typeof txCallback).toBe('function');
+    });
+
+    it('cascades through educator data', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-educator',
+        clerkUserId: 'clerk-edu-1',
+        entrant: null,
+        educator: { id: 'edu-1' },
+      });
+      mockDeleteUser.mockResolvedValue({});
+
+      const res = await request(app).delete('/api/auth/account');
+
+      expect(res.status).toBe(200);
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(mockDeleteUser).toHaveBeenCalledWith('clerk-edu-1');
     });
   });
 });

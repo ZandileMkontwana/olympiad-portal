@@ -20,6 +20,8 @@ const authState = vi.hoisted(() => ({
   checking: false,
 }));
 
+const mockClearStudentSession = vi.hoisted(() => vi.fn());
+
 // Stable references for the student session — getToken MUST be stable across
 // renders, otherwise the auto-save useEffect (which depends on getToken) clears
 // and restarts its debounce timer on every render, causing timeouts.
@@ -37,12 +39,23 @@ vi.mock('@/hooks/useStudentAuth', () => ({
 vi.mock('@/lib/api', () => ({
   createSitting: vi.fn(),
   saveSittingAnswers: vi.fn(),
+  flushSittingAnswers: vi.fn(),
   submitSitting: vi.fn(),
-  ApiError: class ApiError extends Error {},
+  ApiError: class ApiError extends Error {
+    constructor(message, status) {
+      super(message);
+      this.status = status;
+    }
+  },
+}));
+
+// Mock @/lib/studentSession
+vi.mock('@/lib/studentSession', () => ({
+  clearStudentSession: mockClearStudentSession,
 }));
 
 import SitPage from './page';
-import { createSitting, saveSittingAnswers, submitSitting, ApiError } from '@/lib/api';
+import { createSitting, saveSittingAnswers, flushSittingAnswers, submitSitting, ApiError } from '@/lib/api';
 
 const sittingResponse = (answers) => ({
   sitting: {
@@ -271,5 +284,138 @@ describe('SitPage submit (Story A5)', () => {
     expect(screen.queryByText(/submission received/i)).toBeNull();
     // The form is still there so the student can retry
     expect(screen.getByLabelText(/answer for question q1/i)).toBeTruthy();
+  });
+});
+
+describe('SitPage JWT expiry handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    saveSittingAnswers.mockResolvedValue({});
+    submitSitting.mockResolvedValue({ submission: { id: 'sub-1' }, result: null });
+    authState.checking = false;
+    authState.user = {
+      id: 'user-1',
+      email: 'student@school.com',
+      role: 'student',
+      name: 'Thabo',
+      entrantId: 'entrant-1',
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('redirects to login and clears session when createSitting returns 401', async () => {
+    createSitting.mockRejectedValue(new ApiError('Not authenticated', 401));
+    render(<SitPage />);
+
+    await vi.waitFor(() => {
+      expect(mockClearStudentSession).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/login?expired=1');
+    });
+  });
+
+  it(
+    'redirects to login and clears session when auto-save returns 401',
+    async () => {
+      await renderAndStart(null);
+
+      // Type an answer to trigger auto-save
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/answer for question q1/i), {
+          target: { value: 'a' },
+        });
+      });
+
+      // Make the auto-save return 401
+      saveSittingAnswers.mockRejectedValueOnce(new ApiError('Not authenticated', 401));
+
+      // Wait for the debounce (1s) + auto-save to fire
+      await vi.waitFor(
+        () => {
+          expect(mockClearStudentSession).toHaveBeenCalled();
+          expect(mockReplace).toHaveBeenCalledWith('/login?expired=1');
+        },
+        { timeout: 4000 }
+      );
+    },
+    15000
+  );
+
+  it('redirects to login and clears session when submit returns 401', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    submitSitting.mockRejectedValue(new ApiError('Not authenticated', 401));
+
+    await renderAndStart({ q1: 'A' });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /submit test/i }));
+    });
+
+    expect(mockClearStudentSession).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/login?expired=1');
+  });
+});
+
+describe('SitPage beforeunload flush', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    saveSittingAnswers.mockResolvedValue({});
+    authState.checking = false;
+    authState.user = {
+      id: 'user-1',
+      email: 'student@school.com',
+      role: 'student',
+      name: 'Thabo',
+      entrantId: 'entrant-1',
+    };
+    // Mock localStorage for the beforeunload handler
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn((key) => {
+        if (key === 'studentSession') return JSON.stringify({ token: 'mock-token', user: {} });
+        return null;
+      }),
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it(
+    'flushes dirty answers on beforeunload',
+    async () => {
+      await renderAndStart(null);
+
+      // Type an answer to make the sitting dirty
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/answer for question q1/i), {
+          target: { value: 'a' },
+        });
+      });
+
+      // Simulate beforeunload
+      const event = new Event('beforeunload');
+      fireEvent(window, event);
+
+      expect(flushSittingAnswers).toHaveBeenCalledWith(
+        'sitting-1',
+        { q1: 'A' },
+        'mock-token'
+      );
+    },
+    15000
+  );
+
+  it('does not flush on beforeunload when there are no dirty answers', async () => {
+    await renderAndStart({ q1: 'A' });
+
+    // No answers changed — sitting is not dirty
+    const event = new Event('beforeunload');
+    fireEvent(window, event);
+
+    expect(flushSittingAnswers).not.toHaveBeenCalled();
   });
 });

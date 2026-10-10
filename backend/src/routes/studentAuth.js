@@ -131,4 +131,32 @@ router.post('/students/set-password', async (req, res) => {
   }
 });
 
+// POST /students/refresh
+// Proactive token refresh: accepts a valid (non-expired) JWT and returns a
+// new one with a fresh 7-day TTL. This lets the frontend refresh the token
+// before it expires, so students don't get logged out mid-sitting.
+// Requires authentication (the auth middleware verifies the JWT).
+router.post('/students/refresh', async (req, res) => {
+  try {
+    // req.auth is set by the auth middleware after verifying the JWT
+    if (!req.auth || !req.auth.sub) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.auth.sub },
+      include: { entrant: { include: { school: true } } },
+    });
+
+    if (!user || user.role !== 'student') {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    res.json({ token: signSessionToken(user), user: toSessionUser(user) });
+  } catch (err) {
+    console.error('Student token refresh failed:', err);
+    res.status(500).json({ error: 'Could not refresh session. Please try again.' });
+  }
+});
+
 module.exports = router;

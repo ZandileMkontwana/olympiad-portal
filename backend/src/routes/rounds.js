@@ -793,6 +793,26 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       },
     });
 
+    // Detect duplicates: fetch all entrants from relevant schools and group
+    // by (normalized name, grade). Entrants in groups of 2+ are flagged.
+    const entrantWhere = schoolId ? { schoolId } : {};
+    const allEntrants = await prisma.entrant.findMany({
+      where: entrantWhere,
+      select: { id: true, name: true, grade: true },
+    });
+
+    const normalize = (name) => name.toLowerCase().trim().replace(/\s+/g, ' ');
+    const groups = new Map();
+    for (const e of allEntrants) {
+      const key = `${normalize(e.name)}|${e.grade}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(e.id);
+    }
+    const duplicateIds = new Set();
+    for (const ids of groups.values()) {
+      if (ids.length > 1) ids.forEach((id) => duplicateIds.add(id));
+    }
+
     const ranked = submissions
       .map((s) => ({
         entrantId: s.entrant.id,
@@ -800,6 +820,7 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
         schoolName: s.entrant.school.name,
         score: s.result.score,
         submittedAt: s.submittedAt,
+        isDuplicate: duplicateIds.has(s.entrant.id),
       }))
       .sort((a, b) => b.score - a.score);
 
