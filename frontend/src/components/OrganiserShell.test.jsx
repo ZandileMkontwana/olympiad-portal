@@ -134,13 +134,17 @@ describe('OrganiserShell delete account', () => {
     vi.clearAllMocks();
   });
 
-  it('shows a delete account button in the sidebar', () => {
+  it('shows a delete account button in the settings modal', async () => {
     renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /delete account/i })).toBeInTheDocument();
   });
 
   it('opens the delete confirmation dialog when the button is clicked', async () => {
     renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
     expect(screen.getByText(/transfer ownership/i)).toBeInTheDocument();
@@ -148,6 +152,8 @@ describe('OrganiserShell delete account', () => {
 
   it('closes the dialog when cancel is clicked', async () => {
     renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
@@ -157,6 +163,8 @@ describe('OrganiserShell delete account', () => {
   it('calls deleteAccount and redirects on success', async () => {
     mockDeleteAccount.mockResolvedValueOnce({});
     renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
@@ -170,6 +178,8 @@ describe('OrganiserShell delete account', () => {
   it('shows error message when deletion fails with 409', async () => {
     mockDeleteAccount.mockRejectedValueOnce(new Error('You still own olympiads. Transfer ownership to another organiser before deleting your account.'));
     renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
@@ -182,6 +192,8 @@ describe('OrganiserShell delete account', () => {
   it('shows generic error message when deletion fails', async () => {
     mockDeleteAccount.mockRejectedValueOnce(new Error('Network error'));
     renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
@@ -194,6 +206,8 @@ describe('OrganiserShell delete account', () => {
   it('clears error message when dialog is closed', async () => {
     mockDeleteAccount.mockRejectedValueOnce(new Error('Network error'));
     renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
@@ -203,6 +217,9 @@ describe('OrganiserShell delete account', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    // Settings was closed when the delete dialog opened, so re-open it
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -210,6 +227,8 @@ describe('OrganiserShell delete account', () => {
 
   it('has correct ARIA attributes on the dialog', async () => {
     renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveAttribute('aria-modal', 'true');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import StudentSidebar from '@/components/StudentSidebar';
 import AppShell from '@/components/AppShell';
 import { getStudentSession } from '@/lib/studentSession';
@@ -13,16 +13,23 @@ function initialsFrom(name) {
   return parts[0].slice(0, 2).toUpperCase();
 }
 
+function getInitialsSnapshot() {
+  const session = getStudentSession();
+  return session?.user ? initialsFrom(session.user.name || session.user.email || '') : '';
+}
+
+// Server always returns empty — client reads localStorage after hydration.
+function getEmptySnapshot() {
+  return '';
+}
+
+// No-op subscribe — we don't need to re-render on storage changes.
+function subscribe() {
+  return () => {};
+}
+
 export default function StudentLayout({ children }) {
-  // Start with empty initials so server and client render match.
-  // Then read localStorage after mount to populate the avatar.
-  const [initials, setInitials] = useState('');
-  useEffect(() => {
-    const session = getStudentSession();
-    setInitials(
-      session?.user ? initialsFrom(session.user.name || session.user.email || '') : ''
-    );
-  }, []);
+  const initials = useSyncExternalStore(subscribe, getInitialsSnapshot, getEmptySnapshot);
   return (
     <AppShell
       section="Student overview"
