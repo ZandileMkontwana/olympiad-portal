@@ -140,11 +140,21 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
       if (event.key === 'Escape') setOpen(false);
     };
     document.addEventListener('keydown', onKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    // Prevent scroll by intercepting wheel/touchmove/key events
+    // (body.style.overflow='hidden' removes the scrollbar and shifts sticky sidebar)
+    const preventScroll = (e) => { e.preventDefault(); };
+    const preventScrollKey = (e) => {
+      const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+      if (scrollKeys.includes(e.key)) { e.preventDefault(); }
+    };
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    document.addEventListener('keydown', preventScrollKey);
     return () => {
       document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('wheel', preventScroll);
+      document.removeEventListener('touchmove', preventScroll);
+      document.removeEventListener('keydown', preventScrollKey);
     };
   }, [open]);
 
