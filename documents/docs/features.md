@@ -61,6 +61,31 @@ Every automatic scheduler action is logged. Organisers can replay a round's hist
 - **Audit log entries** — recorded for round opened, round closed, auto-advance processed, and notifications sent.
 - **Round replay** — aggregates the audit log into a timeline view, showing the sequence of events for a round.
 
+### Question Bank and Variants
+
+Papers can carry a structured question bank, managed from the organiser console per paper.
+
+- **Create and edit questions** — number, text, type (`multiple_choice`, `short_answer`, `essay`, `numeric`), marks, memo answer, MCQ options and marking rubric.
+- **Manage variants per question** — each question can have labelled variants with their own text, memo answer and options, so different entrants sit different versions of the same question.
+- **Per-entrant variant assignment** — at sitting start, each entrant is deterministically assigned one variant per question (a hash of entrant and question IDs), giving an even distribution without coordination. The same entrant always receives the same variant for a question.
+- **Difficulty badges** — each question shows its computed difficulty (see [Question Difficulty Tracking](#question-difficulty-tracking) below).
+
+### Analytics Dashboards
+
+Once a round closes, its data feeds analytics dashboards on both sides of the portal.
+
+- **Round analytics (organiser)** — on the closed-round page: participation (entrants, completed submissions, completion rate), score statistics (average, median, min, max) with a distribution histogram, per-question performance, and a per-school breakdown.
+- **School analytics (educator)** — on the educator round view: the same participation, score-distribution and question metrics scoped to the educator's own school.
+- **Charts** — participation, score distribution and question performance render as charts on both dashboards.
+
+### Real-Time Activity Feed
+
+The organiser dashboard shows portal activity as it happens, streamed over Server-Sent Events.
+
+- **Live events** — round openings/closings/auto-advances, submissions, marking completions and access decisions broadcast to every connected organiser as they occur.
+- **Catch-up history** — a recent-events buffer replays on every (re)connect, so a dropped connection loses only the seconds it was down.
+- **Status awareness** — the feed shows Connecting/Live/Reconnecting status and reconnects automatically.
+
 ---
 
 ## Educator Features
@@ -112,10 +137,10 @@ Students authenticate separately from educators/organisers, using a claim-code s
 
 Students can sit tests online with a timed, resilient session.
 
-- **Start a sitting** — creates a timed session with an expiry (typically the round's close time or a fixed duration).
+- **Start a sitting** — creates a timed session with an expiry (typically the round's close time or a fixed duration). If the paper carries question variants, the sitting receives its deterministic per-entrant variant assignment.
 - **Autosave** — answers are periodically saved to the server while the student works, so progress is not lost.
 - **Resume on disconnect** — if the browser closes or the network drops, the student can resume the sitting from where they left off (as long as the session hasn't expired).
-- **Submit** — at the end, the student submits their answers. The submission is automarked against the memo (for MCQ questions) and a `Result` is created with the score.
+- **Submit** — at the end, the student submits their answers. The submission is automarked against the memo (for MCQ questions — using the assigned variant's memo where one exists) and a `Result` is created with the score.
 - **Exactly-once semantics** — concurrent or retried submissions are handled idempotently; only one submission per sitting is counted.
 
 ### Student Dashboard
@@ -175,7 +200,21 @@ Emails are sent via SendGrid for round lifecycle events.
 | Student invitation to set password | Invited student |
 | Submission receipt | Submitting educator |
 
-All notifications are logged to `NotificationLog` for audit. Failures are logged but never block the calling operation.
+All notifications are logged to `NotificationLog` for audit. Failures are logged but never block the calling operation. Every email renders the portal's branded HTML layout with a named "Olympiad Portal" sender, and timestamps display in SAST regardless of the server clock.
+
+### Question Difficulty Tracking
+
+Each question carries a difficulty score — the success rate: marks earned divided by marks possible across the round's submissions, respecting each entrant's assigned variant memo.
+
+- **Automatic recalculation** — when a round closes (scheduler) and when results are released, difficulty is recomputed from the round's submissions.
+- **Surfaced everywhere it matters** — the organiser questions API and management UI show difficulty badges, and the analytics dashboards include difficulty alongside per-question performance.
+
+### Theming and Accessibility
+
+- **Dark mode** — a CSS-variable palette drives every colour; the toggle is a real button with `aria-pressed` state, the preference persists and syncs across open tabs, and `prefers-color-scheme` supplies the default for first visits.
+- **Responsive layout** — every page is verified at 320, 768 and 1024 px, with collapsible sidebars and mobile layouts for the organiser console.
+- **Accessibility** — WCAG 2.1 AA across the portal; Lighthouse accessibility scores 100 on all 21 pages in both light and dark mode, with keyboard navigation, skip link and screen-reader checks.
+- **Onboarding tour** — first-time educators and organisers get a guided tour of their dashboard; the dismissed state persists per account.
 
 ### Certificate Generation
 

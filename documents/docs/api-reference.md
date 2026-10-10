@@ -14,6 +14,8 @@ There is no `POST /api/auth/login` or `POST /api/auth/register` endpoint. Regist
 
 Organiser accounts are created via the seed script (`node prisma/seed.js`), not self-registration.
 
+**Students do not use Clerk** — educator-registered students sign in with email and password and receive a JWT ([`POST /api/students/login`](#post-apistudentslogin)); the same applies to consuming an invitation ([`POST /api/students/set-password`](#post-apistudentsset-password)). Student endpoints are listed under the [Student](#student) section.
+
 
 
 ### POST /api/educators/complete-profile
@@ -160,6 +162,123 @@ No auth required at the API level (the archive page itself requires sign-in). Re
 Both `fileUrl` (paper) and `memoUrl` (memo) are direct Supabase Storage download links.
 
 **Errors:** `500` DB error.
+
+---
+
+## Question Bank & Variants
+
+A paper can carry a structured question bank: questions with optional per-question variants. All endpoints require the caller to be an **organiser of the paper's olympiad**. Question `type` is one of `multiple_choice`, `short_answer`, `essay`, `numeric`; `options` holds MCQ options as JSON (`[{"label": "A", "text": "..."}]`) and `rubric` a marking rubric as JSON.
+
+A question's `number` is unique within its paper; a variant's `label` is unique within its question. A variant can override the parent question's `text`, `memoAnswer` and `options` — when a sitting starts, each entrant is deterministically assigned one variant per question, and automarking prefers the assigned variant's `memoAnswer`.
+
+### GET /api/papers/:paperId/questions
+
+Requires auth, organiser of the paper's olympiad. Lists the paper's questions ordered by `number`, each with its `variants` array.
+
+**Response (200):** array of question objects with nested `variants`.
+
+**Errors:** `403` not an organiser of this olympiad, `404` paper or user not found.
+
+---
+
+### POST /api/papers/:paperId/questions
+
+Requires auth, role `organiser` and membership of the paper's olympiad. Creates a question.
+
+**Body:**
+```json
+{
+  "number": 1,
+  "text": "What is 2 + 2?",
+  "type": "multiple_choice",
+  "marks": 5,
+  "memoAnswer": "B",
+  "options": [{ "label": "A", "text": "3" }, { "label": "B", "text": "4" }],
+  "rubric": null
+}
+```
+All fields except `memoAnswer`, `options` and `rubric` are required.
+
+**Response (201):** the created question with its (empty) `variants` array.
+
+**Errors:** `400` validation (missing fields, unknown `type`, negative `marks`, non-positive `number`), `403` not an organiser of this olympiad, `404` paper not found, `409` question number already exists for this paper.
+
+---
+
+### GET /api/questions/:id
+
+Requires auth, organiser of the question's olympiad. Returns one question with its `variants` and parent `paper`.
+
+**Errors:** `403`, `404`.
+
+---
+
+### PUT /api/questions/:id
+
+Requires auth, role `organiser` and olympiad membership. Updates any subset of `number`, `text`, `type`, `marks`, `memoAnswer`, `options`, `rubric`; only the provided fields change.
+
+**Response (200):** the updated question with `variants`.
+
+**Errors:** `400` validation, `403`, `404`, `409` the new `number` already exists on this paper.
+
+---
+
+### DELETE /api/questions/:id
+
+Requires auth, role `organiser` and olympiad membership. Deletes the question **and all of its variants**.
+
+**Response:** `204` no content.
+
+**Errors:** `403`, `404`.
+
+---
+
+### GET /api/questions/:id/variants
+
+Requires auth, organiser of the question's olympiad. Lists the question's variants ordered by `label`.
+
+**Errors:** `403`, `404`.
+
+---
+
+### POST /api/questions/:id/variants
+
+Requires auth, role `organiser` and olympiad membership. Creates a variant.
+
+**Body:**
+```json
+{
+  "label": "Variant A",
+  "text": "What is 3 + 3?",
+  "memoAnswer": "C",
+  "options": null
+}
+```
+Only `label` is required; other fields default to `null` (meaning "use the parent question's value").
+
+**Response (201):** the created variant.
+
+**Errors:** `400` missing `label`, `403`, `404`, `409` variant label already exists for this question.
+
+---
+
+### PUT /api/variants/:id
+
+Requires auth, role `organiser` and olympiad membership. Updates any subset of `label`, `text`, `memoAnswer`, `options`.
+
+**Response (200):** the updated variant.
+
+**Errors:** `400`, `403`, `404`, `409` label conflict.
+
+---
+
+### DELETE /api/variants/:id
+
+Requires auth, role `organiser` and olympiad membership. Deletes the variant.
+
+**Response:** `204` no content.
+
+**Errors:** `403`, `404`.
 
 ---
 
@@ -538,16 +657,24 @@ Requires auth. Starts an online sitting for an entrant in an open round. One sit
     "entrantId": "string",
     "roundId": "string",
     "answers": { "1": "B" },
+    "variantChoices": { "questionId": "variantId" },
     "startedAt": "ISO date",
     "expiresAt": "ISO date",
     "completedAt": null
   },
   "round": { "id": "string", "name": "Round 1", "closeTime": "ISO date" },
-  "paper": { "fileUrl": "string", "questions": ["1", "2", "3"] }
+  "paper": {
+    "fileUrl": "string",
+    "questions": [
+      { "id": "string", "number": 1, "text": "What is 2 + 2?", "type": "multiple_choice", "marks": 5, "options": [{ "label": "A", "text": "..." }] }
+    ]
+  }
 }
 ```
 
-`expiresAt` mirrors the round's `closeTime` — the sitting ends when the round closes. Once past `expiresAt` the sitting can no longer be resumed or saved to. `questions` lists the question IDs taken from the paper's memo answer key (only the IDs, never the answers). `answers` carries the student's previously auto-saved answers when resuming.
+`expiresAt` mirrors the round's `closeTime` — the sitting ends when the round closes. Once past `expiresAt` the sitting can no longer be resumed or saved to. `answers` carries the student's previously auto-saved answers when resuming.
+
+When the paper carries question variants, `variantChoices` maps each question ID to the variant assigned to this entrant (deterministic per entrant and question), and each entry in `paper.questions` renders the assigned variant's `text` and `options` where one exists. Memo answers and rubrics are never sent to the student. Papers without variants return questions from the base question list, and legacy sittings created before variants carry no `variantChoices`.
 
 **Errors:** `400` if `entrantId` is missing, `403` if the round is not `open`, the entrant is not registered for the round, the sitting was already completed, or the sitting has expired, `404` if the round or its paper does not exist.
 
@@ -667,6 +794,53 @@ Requires auth. Returns aggregated dashboard statistics for a school: entrant cou
 ---
 
 ## Student
+
+Students do not sign in through Clerk — educator-registered students authenticate with email and password via the endpoints below and receive a JWT that is sent as a Bearer header on all `/api/students/me/...` requests.
+
+### POST /api/students/login
+
+Public. Email + password sign-in for students. Returns a JWT session token (valid for 7 days) and the current-user object in the same shape as `GET /api/auth/me`.
+
+**Body:**
+```json
+{ "email": "alice@student.com", "password": "string" }
+```
+
+**Response (200):**
+```json
+{
+  "token": "string",
+  "user": {
+    "id": "string",
+    "email": "alice@student.com",
+    "role": "student",
+    "name": "Alice Nkosi",
+    "school": { "id": "string", "name": "Parktown High" },
+    "entrantId": "string"
+  }
+}
+```
+
+`school` and `entrantId` are `null` if the account has no linked entrant record.
+
+**Errors:** `400` email or password missing, `401` invalid email or password (deliberately vague — the response never reveals whether the email exists), `403` account not activated yet (invited but no password set — the student should look for their invitation email).
+
+---
+
+### POST /api/students/set-password
+
+Public. Consumes the invitation token from a student's invitation email, stores the chosen password (bcrypt-hashed) and returns a session token so the student is signed in immediately. Also migrates legacy Clerk-linked student accounts to email login by clearing `clerkUserId`.
+
+**Body:**
+```json
+{ "token": "string", "password": "string" }
+```
+
+**Response (200):** same shape as [`POST /api/students/login`](#post-apistudentslogin).
+
+**Errors:** `400` token or password missing, password shorter than 8 characters, invitation token not valid, or invitation link expired.
+
+---
 
 ### GET /api/students/me/sittings
 
@@ -789,6 +963,118 @@ Requires auth. Per-school aggregated standings for a round, ranked by total scor
 ```
 
 **Errors:** `403` not authorized, `404` round not found.
+
+---
+
+## Analytics
+
+Round-level analytics powering the organiser and educator dashboards. Metrics are computed from submissions and their results — a submission only counts toward "completed" once its result exists.
+
+### GET /api/analytics/rounds/:roundId
+
+Requires auth, role `organiser` (of the round's olympiad). Returns full analytics for a round: participation, score statistics and distribution, per-question performance and a per-school breakdown.
+
+**Response (200):**
+```json
+{
+  "round": { "id": "string", "name": "Round 1", "maxScore": 60 },
+  "participation": {
+    "totalEntrants": 45,
+    "completedSubmissions": 38,
+    "completionRate": 0.84
+  },
+  "scores": {
+    "average": 62.4,
+    "median": 65,
+    "min": 12,
+    "max": 98,
+    "distribution": [
+      { "range": "0-6", "percentage": 0, "count": 1 }
+    ]
+  },
+  "timing": {
+    "averageCompletionMinutes": 0,
+    "minCompletionMinutes": 0,
+    "maxCompletionMinutes": 0
+  },
+  "questions": [
+    {
+      "id": "string",
+      "number": 1,
+      "text": "string (first 100 characters…)",
+      "maxMarks": 10,
+      "averageScore": 62.4,
+      "difficulty": 0.71
+    }
+  ],
+  "schools": [
+    {
+      "id": "string",
+      "name": "Parktown High",
+      "entrants": 12,
+      "completed": 10,
+      "totalScore": 620,
+      "averageScore": 62,
+      "completionRate": 0.83
+    }
+  ]
+}
+```
+
+Notes:
+
+- `distribution` is a 10-bin histogram spanning 0 to the paper's total marks.
+- `difficulty` is the question's stored success rate (0.0–1.0); `null` when there is no data yet. It is recalculated at round close and on results release.
+- Per-question `averageScore` currently uses the overall result score as a proxy — per-question breakdown scores are not parsed yet.
+- Timing metrics are placeholders (always `0`): submissions don't record a linked sitting start time, so completion duration can't be computed reliably.
+
+**Errors:** `403` not an organiser of this olympiad, `404` round not found or user not found.
+
+---
+
+### GET /api/analytics/rounds/:roundId/schools/:schoolId
+
+Requires auth. Organisers (of the round's olympiad) can view any school; educators are restricted to their own school. Returns the same analytics shape as the round endpoint, scoped to one school — without `timing` and `schools`, plus a `school` block.
+
+**Response (200):** as above, with:
+```json
+"school": { "id": "string", "name": "Parktown High" }
+```
+
+**Errors:** `403` educator requesting a school other than their own, `404` round not found or user not found.
+
+---
+
+## Activity Stream
+
+A real-time feed of portal activity for the organiser dashboard, delivered over Server-Sent Events (SSE). Route handlers and the round scheduler broadcast events through an in-process pub/sub bus; every connected organiser receives them live.
+
+### GET /api/activity/stream
+
+Requires auth, role `organiser`. Opens a persistent `text/event-stream` connection. Because `EventSource` cannot set `Authorization` headers, the session token is passed as a query parameter — `GET /api/activity/stream?token=<token>` — and app-level middleware promotes it to a Bearer header before the standard auth chain runs.
+
+**Stream protocol:**
+
+- On connect the server sends `retry: 5000` (how long `EventSource` waits before reconnecting), then a named `history` event carrying up to 30 recent events, newest first — a dropped connection never loses more than the seconds it was down.
+- Every new event is broadcast as an unnamed `data` frame.
+- A `: ping` comment heartbeat is written every 25 seconds to keep idle connections alive through proxies.
+
+**Event shape:**
+```json
+{
+  "id": "string",
+  "type": "sitting_submitted",
+  "message": "Alice Nkosi submitted for Round 1",
+  "olympiadId": "string | null",
+  "roundId": "string | null",
+  "schoolId": "string | null",
+  "createdAt": "ISO date"
+}
+```
+
+Known event types: `round_opened`, `round_closed`, `auto_advanced`, `sitting_submitted`, `submission_received`, `marking_completed`, `results_released`, `access_request_decided`.
+
+**Errors:** `403` not an organiser.
 
 ---
 

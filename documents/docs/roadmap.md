@@ -57,8 +57,22 @@ The focus of Sprint 3 was completing the intermediate-tier features carried over
 
 ## Sprint 4 — Advanced Tier
 
-- Question banks with per-entrant variants and difficulty scoring
-- Merged online/offline submission handling, duplicate-entrant detection
+The focus of Sprint 4 was the remaining advanced-tier items plus six standout features chosen for demo impact, each delivered end-to-end with tests and documentation, and validated by a full QA sweep against the deployed production stack.
+
+**Delivered:**
+- Question banks with per-entrant variants — deterministic assignment at sitting start, variant-aware automarking
+- Question difficulty tracking — success-rate scoring recalculated at round close and results release
+- Analytics dashboards for organisers (round-level) and educators (school-level), with participation, score-distribution and question-performance charts
+- Real-time activity feed on the organiser dashboard via Server-Sent Events, with catch-up history
+- Branded transactional emails — all six sends render the portal identity, timestamps pinned to SAST
+- Dark mode with persisted preference, cross-tab sync and system default
+- WCAG 2.1 AA accessibility compliance — Lighthouse 100 on all 21 pages in both themes
+- Responsive layout verified at 320/768/1024 px across every page
+- First-user onboarding tour for educators and organisers
+- External API with API-key access to round results
+- Production demo data seeding for testing and demos
+- Load-test re-run: boundary tests green at concurrency 50, and the first full-size run against the deployed backend (565 requests, zero errors, exactly-once verified)
+- Full QA sweep of the deployed stack (automated suites, lint, production API UAT, deployed student journey, browser pass) — no product defects
 
 ## Why this order
 

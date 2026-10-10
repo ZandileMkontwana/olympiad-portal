@@ -2,6 +2,44 @@
 
 All notable changes to the Olympiad Portal are documented in this file.
 
+## [Sprint 4] — 2026-10-10
+
+### Added
+
+- **Real-time activity feed (US-4.1)** — Server-Sent Events stream for the organiser dashboard: an in-memory event bus with a 50-event history buffer ([`activityBus.js`](backend/src/lib/activityBus.js)), `GET /api/activity/stream` with catch-up history and heartbeat frames ([`activity.js`](backend/src/routes/activity.js)), and a pre-Clerk middleware promoting `?token=` to a Bearer header so `EventSource` requests pass the standard auth chain. Broadcasts wired into the scheduler (round transitions), submissions, sittings, marking and access decisions; live feed component with Connecting/Live/Reconnecting status and newest-first history.
+- **Question bank and per-entrant variants** — `Question` and `QuestionVariant` models with CRUD routes ([`questions.js`](backend/src/routes/questions.js)) and an organiser question-management UI per paper. Variants are assigned to entrants deterministically at sitting start via a hash of entrant + question IDs ([`variantAssignment.js`](backend/src/lib/variantAssignment.js)), stored on the sitting, and never exposed with memo answers to students.
+- **Question difficulty tracking** — `Question.difficulty` stores the success rate (marks earned / marks possible, variant-aware), recalculated automatically when a round closes and when results are released ([`difficulty.js`](backend/src/lib/difficulty.js)); surfaced in the organiser questions API and UI with a difficulty badge.
+- **Analytics dashboards** — `GET /api/analytics/rounds/:roundId` (organiser) and `GET /api/analytics/rounds/:roundId/schools/:schoolId` (own-school educator) with participation, score distribution and per-question metrics ([`analytics.js`](backend/src/routes/analytics.js)); chart components (participation, score distribution, question performance) on the organiser closed-round page and the educator round view.
+- **Branded transactional emails (US-4.2)** — all six sends render a shared branded HTML layout with a named "Olympiad Portal" sender and CTA buttons ([`emailTemplates.js`](backend/src/lib/emailTemplates.js)); timestamps render in SAST regardless of server clock.
+- **Production demo data seeding (US-4.3)** — [`seed-production.js`](backend/prisma/seed-production.js) populates six schools, educators, students, two olympiads with rounds across all states, submissions with bell-curve scores, results, marking tasks and audit logs; idempotent on re-run.
+- **Responsive layout** — all pages verified and fixed at 320/768/1024 px, including collapsible sidebars and mobile organiser layout.
+- **Accessibility compliance** — WCAG 2.1 AA across the portal; Lighthouse accessibility 100 on all 21 pages, in light and dark mode.
+- **Dark mode** — CSS-variable palette with a real toggle (`aria-pressed`), persisted preference with cross-tab sync, `prefers-color-scheme` default, and theme-aware logo/charts.
+- **First-user onboarding tour** — guided tour for first-time educators and organisers, dismissed-state persisted.
+- **External API with API keys** — public results endpoints gated by API keys with a self-service key management flow ([`external.js`](backend/src/routes/external.js), [`apiKeys.js`](backend/src/routes/apiKeys.js)).
+
+### Changed
+
+- **Variant-aware sittings and automarking** — a sitting stores its assigned variant choices; the student sees only the assigned variants (memos and rubrics stripped), and submission automarking prefers the assigned variant's memo answer over the base question's.
+- **Production backend repointed** — the frontend now calls the Blueprint-managed Render service `olympiad-portal-backend.onrender.com` after the retired `olympiad-portal` service began failing; the deployed bundle was verified chunk-by-chunk.
+- **Documentation refreshed** — load-testing results (Sprint 4 re-run and the first full-size deployed run), QA sweep report, and testing coverage numbers brought current.
+
+### Fixed
+
+- **`requireRole` swallowed pool exhaustion** — the auth middleware returned a hard 500 "Authorization check failed" on Prisma `P2024`/`P2028`; it now maps busy errors to the #202 contract (`503` + `Retry-After`), matching the routes ([`auth.js`](backend/src/middleware/auth.js)). Found by the concurrency-50 load-test re-run.
+- **Route-scoped wildcard CORS** — two leftover `app.use('/api/...', cors())` registrations overwrote the global credentialed CORS with `*`, which browsers reject; removed so the credentialed preflight contract holds on every route.
+- **Load-test harness defects** — boundary-script setups now batch fixture creation (no more setup pool exhaustion), a pre-run sweep clears stale `LOADTEST-` rows, the bare test apps mount the production error handler, and `--cleanup` deletes notification/audit rows in FK order.
+- **UX polish** — duplicate sidebars removed, search and notifications made functional, calendar button and modal added to the organiser shell, theme init moved to `next/script`.
+- **Analytics loading bugs** (#276, #281) and stale frontend mocks after the sitting-route variant integration.
+
+### Testing
+
+- Backend: 636 tests across 31 files — all passing — 86.28% statements, 77.49% branches, 91.36% functions, 86.51% lines.
+- Frontend: 400 tests across 32 files — all passing — 90.83% statements, 87.4% branches, 88.88% functions, 93.72% lines.
+- Total: 1,036 tests passing, above both suites' coverage thresholds.
+- Load tests: both boundary scripts pass all scenarios at concurrency 50; the main harness completed the first full-size deployed run — 565 requests, 0 errors, all exactly-once checks passing.
+- QA sweep (6 October): 54 files / 905 tests at sweep time, production API UAT, deployed student journey and browser pass — no product defects.
+
 ## [Sprint 3] — 2026-09-29
 
 ### Added

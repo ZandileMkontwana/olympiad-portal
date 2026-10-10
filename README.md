@@ -1,9 +1,9 @@
 ---
 sidebar_position: 1
 ---
-![Backend Coverage](https://img.shields.io/badge/backend%20coverage-98.4%25-brightgreen)
-![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-100%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-108%20passing-brightgreen)
+![Backend Coverage](https://img.shields.io/badge/backend%20coverage-86.3%25-green)
+![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-90.8%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1036%20passing-brightgreen)
 
 ## Live deployments
 
@@ -15,12 +15,14 @@ sidebar_position: 1
 
 ## Code Coverage
 
+As of Sprint 4 close (10 October 2026) — backend: 636 tests across 31 files, frontend: 400 tests across 32 files, all passing. Details in [Testing & Code Coverage](./documents/docs/testing.md).
+
 | Metric | Backend | Frontend |
 |--------|---------|----------|
-| Statements | 98.43% | 98.76% |
-| Branches | 95.65% | 93.93% |
-| Functions | 95.83% | 100% |
-| Lines | 98.41% | 100% |
+| Statements | 86.28% | 90.83% |
+| Branches | 77.49% | 87.4% |
+| Functions | 91.36% | 88.88% |
+| Lines | 86.51% | 93.72% |
 
 Run coverage locally:
 ```bash
@@ -31,7 +33,7 @@ cd backend && npx vitest run --coverage
 cd frontend && npx vitest run --coverage
 ```
 
-# Getting Started — Backend
+## Getting Started — Backend
 
 ## Prerequisites
 - **Node.js 20 (LTS)** — newer versions (22+) have caused compatibility issues with our dependencies. Use [nvm-windows](https://github.com/coreybutler/nvm-windows) to manage versions if needed:
@@ -55,10 +57,22 @@ npm i
 ```
 
 **3. Set up your environment variables**
-Create a `.env` file in `backend/` (never commit this — it's gitignored):
+Create a `.env` file in `backend/` (never commit this — it's gitignored). The easiest option is to ask a teammate for the shared `.env`; otherwise these three are required just to start the server (`lib/supabase.js` builds its Storage client at boot — without them the server crashes with `supabaseUrl is required`):
 ```
-DATABASE_URL="<ask a teammate for the shared Supabase connection string>"
+DATABASE_URL="<shared Supabase connection string>"
+SUPABASE_URL="<Supabase project URL, e.g. https://xxxx.supabase.co>"
+SUPABASE_SERVICE_ROLE_KEY="<from the Supabase dashboard>"
 ```
+Add the rest as you need each feature:
+
+| Variable | Used for |
+|---|---|
+| `CLERK_SECRET_KEY` / `CLERK_PUBLISHABLE_KEY` | educator/organiser login (Clerk) |
+| `JWT_SECRET` | student accounts and invitation links |
+| `SENDGRID_API_KEY` / `SENDGRID_FROM_EMAIL` | notification emails |
+| `SUPABASE_BUCKET_NAME` | paper upload bucket (Supabase Storage) |
+| `FRONTEND_URL` | links inside emails + backend CORS allowlist |
+| `DISABLE_SCHEDULER` | `true` keeps the round scheduler off (recommended locally) |
 
 **4. Generate the Prisma client**
 ```
@@ -74,6 +88,7 @@ You should see:
 Backend running on :5000
 Round scheduler started — ticking every 30s
 ```
+(or `Round scheduler disabled by DISABLE_SCHEDULER` if you set that variable — recommended for local work, see Common issues)
 
 ## Verifying it works
 Test an endpoint:
@@ -93,63 +108,61 @@ npx prisma generate
 - **`Can't reach database server`** — usually campus Wi-Fi blocking the connection port. Try a mobile hotspot.
 - **`spawn prisma-client ENOENT` or similar Prisma errors** — make sure you're on Prisma 5.x (`npm ls prisma`), not 7.x; the project isn't compatible with Prisma 7's config format yet.
 - **Server won't pick up code changes** — Node doesn't hot-reload; stop the server (Ctrl+C) and restart with `node src/index.js` after any edit.
+- **Prisma `P2024` errors / APIs suddenly returning 500s** — on a freshly seeded database the scheduler's notification emails can exhaust the shared Supabase pooler's small connection limit. Set `DISABLE_SCHEDULER=true` in `backend/.env` for local work; the deployed backend keeps the scheduler enabled.
 
 ## Project structure
 ```
 backend/
 ├── prisma/
-│   └── schema.prisma       # database models
+│   └── schema.prisma        # database models
 ├── src/
-│   ├── index.js            # app entry point
-│   ├── lib/
-│   │   └── prisma.js       # shared Prisma client
-│   ├── scheduler.js        # round lifecycle scheduler
+│   ├── index.js             # app entry point (Express, CORS, Clerk middleware)
+│   ├── scheduler.js         # round lifecycle scheduler (30s tick)
 │   ├── middleware/
-│   │   └── auth.js         # auth guards
-│   └── routes/
-│       ├── rounds.js       # olympiad/round/entrant endpoints
-│       ├── papers.js       # paper upload/download
-│       ├── submissions.js  # result submissions
-│       └── auth.js         # register/login/etc.
+│   │   ├── auth.js          # Clerk session + role guards
+│   │   └── apiKeyAuth.js    # external API-key auth
+│   ├── lib/                 # prisma.js (client), email.js (SendGrid),
+│   │                        # supabase.js (file storage), activityBus.js (SSE),
+│   │                        # certificates, difficulty, timezone, …
+│   └── routes/              # route modules mounted under /api
+│       ├── rounds.js        # olympiads, rounds, entrants
+│       ├── questions.js     # question bank and variants
+│       ├── papers.js        # paper upload/download (Supabase Storage)
+│       ├── sittings.js      # online sittings and automarking
+│       ├── submissions.js   # result submissions and receipts
+│       ├── marking.js       # marking and moderation
+│       └── remark.js        # remark/appeal workflow
 ```
+
+…plus `auth`, `studentAuth`, `students`, `schools`, `certificates`, `analytics`, `activity`, `apiKeys`, `external` and `olympiadOrganisers` — see the [API Reference](./documents/docs/api-reference.md) for the full endpoint list.
 
 ## Documentation
 
 Full project documentation (getting started, API reference, database schema, sprint records) is deployed at <https://olympiad-portal-docs.netlify.app> and lives in [`documents/docs/`](./documents/docs/).
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+## Getting Started — Frontend
 
-## Getting Started - Frontend
+The frontend is a Next.js (App Router) app that expects the backend on <http://localhost:5000> — start the backend first (see above), then in a second terminal, from the repo root:
 
-First, run the development server:
-
+**1. Install dependencies**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd frontend
+npm i
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**2. Set up your environment variables**
+Create a `.env.local` file in `frontend/` (gitignored):
+```
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=<from the Clerk dashboard>
+CLERK_SECRET_KEY=<from the Clerk dashboard>
+NEXT_PUBLIC_API_BASE_URL=http://localhost:5000
+```
+(`lib/api.js` falls back to `http://localhost:5000` if the last one is unset, but several pages read it directly, so keep it set.)
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+**3. Run the dev server**
+```bash
+npm run dev
+```
+Open <http://localhost:3000>.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Frontend tests: `cd frontend && npx vitest run` — the vitest config sets `fileParallelism: false` because parallel jsdom workers are unreliable on slow/OneDrive-synced filesystems, so run it as-is.
