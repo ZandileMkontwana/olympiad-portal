@@ -135,6 +135,38 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
     }
   }, [showDeleteDialog]);
 
+  // Scroll lock + Escape for the sign out confirmation dialog.
+  useEffect(() => {
+    if (!showSignOutConfirm || signingOut) return;
+    const preventScroll = (e) => {
+      e.preventDefault();
+    };
+    const preventScrollKey = (e) => {
+      const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+      if (scrollKeys.includes(e.key)) {
+        e.preventDefault();
+      }
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowSignOutConfirm(false);
+      }
+    };
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    document.addEventListener('keydown', preventScrollKey);
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('wheel', preventScroll);
+      document.removeEventListener('touchmove', preventScroll);
+      document.removeEventListener('keydown', preventScrollKey);
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showSignOutConfirm, signingOut]);
+
   if (checking) {
     return (
       <aside className="sidebar">
@@ -318,22 +350,24 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
 
       {/* Sign out confirmation dialog */}
       {showSignOutConfirm && !signingOut && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="student-signout-heading"
             tabIndex={-1}
-            className="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+            className="mx-4 w-full max-w-sm rounded-xl p-6 shadow-xl"
+            style={{ background: 'var(--c-bg-ffffff, #fff)' }}
           >
-            <h2 id="student-signout-heading" className="font-display text-xl font-semibold text-ink">Sign out?</h2>
-            <p className="mt-3 text-sm text-ink-soft">
+            <h2 id="student-signout-heading" className="font-display text-xl font-semibold" style={{ color: 'var(--ink, #241f38)' }}>Sign out?</h2>
+            <p className="mt-3 text-sm" style={{ color: 'var(--ink-soft, #6c628c)' }}>
               Are you sure you want to sign out?
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowSignOutConfirm(false)}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-ink-soft hover:bg-gray-100"
+                className="rounded-lg px-4 py-2 text-sm font-medium"
+                style={{ color: 'var(--ink-soft, #6c628c)' }}
               >
                 Cancel
               </button>
@@ -342,7 +376,8 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
                   setSigningOut(true);
                   await signOut({ redirectUrl: '/login' });
                 }}
-                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-white"
+                style={{ background: 'var(--violet, #6c4fd8)' }}
               >
                 Sign out
               </button>
@@ -361,22 +396,23 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
 
       {/* Delete account confirmation dialog */}
       {showDeleteDialog && (
-        <div className="fixed inset-0 z-[1001] flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[1001] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div
             ref={deleteDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="student-delete-heading"
             tabIndex={-1}
-            className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+            className="mx-4 w-full max-w-md rounded-xl p-6 shadow-xl"
+            style={{ background: 'var(--c-bg-ffffff, #fff)' }}
           >
-            <h2 id="student-delete-heading" className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
-            <p className="mt-3 text-sm text-ink-soft">
+            <h2 id="student-delete-heading" className="font-display text-xl font-semibold" style={{ color: 'var(--ink, #241f38)' }}>Delete your account?</h2>
+            <p className="mt-3 text-sm" style={{ color: 'var(--ink-soft, #6c628c)' }}>
               This will permanently delete your account and all your data, including your test
               history, results, and submissions. This cannot be undone.
             </p>
             {deleteError && (
-              <div role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{deleteError}</div>
+              <div role="alert" className="mt-3 rounded-lg p-3 text-sm" style={{ background: '#fef2f2', color: '#b91c1c' }}>{deleteError}</div>
             )}
             <div className="mt-6 flex justify-end gap-3">
               <button
@@ -385,16 +421,18 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
                   setDeleteError('');
                 }}
                 disabled={deleting}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-ink-soft hover:bg-gray-100 disabled:opacity-50"
+                className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                style={{ color: 'var(--ink-soft, #6c628c)' }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleting}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                style={{ background: '#dc2626' }}
               >
-                {deleting ? 'Deleting…' : 'Delete my account'}
+                {deleting ? 'Deleting\u2026' : 'Delete my account'}
               </button>
             </div>
           </div>
