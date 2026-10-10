@@ -168,13 +168,10 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
       document.addEventListener('wheel', preventScroll, { passive: false });
       document.addEventListener('touchmove', preventScroll, { passive: false });
       document.addEventListener('keydown', preventScrollKey);
-      const previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
       return () => {
         document.removeEventListener('wheel', preventScroll);
         document.removeEventListener('touchmove', preventScroll);
         document.removeEventListener('keydown', preventScrollKey);
-        document.body.style.overflow = previousOverflow;
       };
     } else if (deleteDialogWasOpen.current) {
       deleteDialogWasOpen.current = false;
@@ -205,14 +202,11 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
     document.addEventListener('touchmove', preventScroll, { passive: false });
     document.addEventListener('keydown', preventScrollKey);
     document.addEventListener('keydown', onKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('wheel', preventScroll);
       document.removeEventListener('touchmove', preventScroll);
       document.removeEventListener('keydown', preventScrollKey);
       document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
     };
   }, [showSignOutConfirm, signingOut]);
 

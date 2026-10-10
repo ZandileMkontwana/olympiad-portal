@@ -59,10 +59,6 @@ export default function Modal({ title, onClose, children }) {
     document.addEventListener('touchmove', preventScroll, { passive: false });
     document.addEventListener('keydown', preventScrollKey);
 
-    // Also lock body overflow as a fallback.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
@@ -92,7 +88,6 @@ export default function Modal({ title, onClose, children }) {
       document.removeEventListener('touchmove', preventScroll);
       document.removeEventListener('keydown', preventScrollKey);
       document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
   }, [onClose]);
