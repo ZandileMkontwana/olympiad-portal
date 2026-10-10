@@ -11,8 +11,6 @@ import {
   Trophy,
   BookOpen,
   Settings2,
-  CircleHelp,
-  ArrowRight,
   GraduationCap,
   MoreHorizontal,
   X,
@@ -270,26 +268,17 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
             <Settings2 />
             <span>Settings</span>
           </button>
-          <button
-            className="nav-item"
-            disabled={signingOut}
-            onClick={() => setShowSignOutConfirm(true)}
-          >
-            <span style={{ color: 'var(--c-t-b42318)' }}>
-              {signingOut ? 'Signing out…' : 'Sign out'}
-            </span>
-          </button>
         </nav>
-        <div className="sidebar-help">
-          <div className="help-icon">
-            <CircleHelp />
-          </div>
-          <div>
-            <strong>Need a hand?</strong>
-            <span>Visit the help centre</span>
-          </div>
-          <ArrowRight />
-        </div>
+        <button
+          className="nav-item"
+          disabled={signingOut}
+          onClick={() => setShowSignOutConfirm(true)}
+          style={{ margin: '0 8px' }}
+        >
+          <span style={{ color: 'var(--c-t-b42318)' }}>
+            {signingOut ? 'Signing out\u2026' : 'Sign out'}
+          </span>
+        </button>
         <div className="sidebar-profile">
           <div className="avatar">{userInitials}</div>
           <div>

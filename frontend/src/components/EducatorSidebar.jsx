@@ -13,8 +13,6 @@ import {
   Users,
   FileText,
   Settings2,
-  CircleHelp,
-  ArrowRight,
   GraduationCap,
   MoreHorizontal,
   X,
@@ -261,30 +259,19 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
             <Settings2 />
             {!collapsed && <span>Settings</span>}
           </button>
-          {!collapsed && (
+        </nav>
+        {!collapsed && (
+          <>
             <button
               className="nav-item"
               disabled={signingOut}
               onClick={() => setShowSignOutConfirm(true)}
+              style={{ margin: '0 8px' }}
             >
               <span style={{ color: 'var(--c-t-b42318)' }}>
-                {signingOut ? 'Signing out…' : 'Sign out'}
+                {signingOut ? 'Signing out\u2026' : 'Sign out'}
               </span>
             </button>
-          )}
-        </nav>
-        {!collapsed && (
-          <>
-            <div className="sidebar-help">
-              <div className="help-icon">
-                <CircleHelp />
-              </div>
-              <div>
-                <strong>Need a hand?</strong>
-                <span>Visit the help centre</span>
-              </div>
-              <ArrowRight />
-            </div>
             <div className="sidebar-profile">
               <div className="avatar">{userInitials}</div>
               <div>
