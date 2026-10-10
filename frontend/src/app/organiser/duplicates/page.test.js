@@ -80,24 +80,27 @@ describe('DuplicatesReviewPage', () => {
 
   it('renders duplicate groups when duplicates are found', async () => {
     const mockDuplicates = [
-      [
-        {
-          id: 'entrant-1',
-          name: 'Alice Smith',
-          email: 'alice@school1.com',
-          grade: '10',
-          schoolName: 'School One',
-          createdAt: '2026-01-01T00:00:00.000Z',
-        },
-        {
-          id: 'entrant-2',
-          name: 'Alice Smith',
-          email: 'alice@school2.com',
-          grade: '10',
-          schoolName: 'School Two',
-          createdAt: '2026-01-02T00:00:00.000Z',
-        },
-      ],
+      {
+        confidence: 'low',
+        entrants: [
+          {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            email: 'alice@school1.com',
+            grade: '10',
+            schoolName: 'School One',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'entrant-2',
+            name: 'Alice Smith',
+            email: 'alice@school2.com',
+            grade: '10',
+            schoolName: 'School Two',
+            createdAt: '2026-01-02T00:00:00.000Z',
+          },
+        ],
+      },
     ];
     fetchAllDuplicates.mockResolvedValue({ duplicates: mockDuplicates });
     render(<DuplicatesReviewPage />);
@@ -116,42 +119,48 @@ describe('DuplicatesReviewPage', () => {
 
   it('shows the correct count for multiple groups', async () => {
     const mockDuplicates = [
-      [
-        {
-          id: 'entrant-1',
-          name: 'Alice Smith',
-          email: 'alice@school1.com',
-          grade: '10',
-          schoolName: 'School One',
-          createdAt: '2026-01-01T00:00:00.000Z',
-        },
-        {
-          id: 'entrant-2',
-          name: 'Alice Smith',
-          email: 'alice@school2.com',
-          grade: '10',
-          schoolName: 'School Two',
-          createdAt: '2026-01-02T00:00:00.000Z',
-        },
-      ],
-      [
-        {
-          id: 'entrant-3',
-          name: 'Bob Jones',
-          email: 'bob@school1.com',
-          grade: '11',
-          schoolName: 'School One',
-          createdAt: '2026-01-03T00:00:00.000Z',
-        },
-        {
-          id: 'entrant-4',
-          name: 'Bob Jones',
-          email: 'bob@school3.com',
-          grade: '11',
-          schoolName: 'School Three',
-          createdAt: '2026-01-04T00:00:00.000Z',
-        },
-      ],
+      {
+        confidence: 'low',
+        entrants: [
+          {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            email: 'alice@school1.com',
+            grade: '10',
+            schoolName: 'School One',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'entrant-2',
+            name: 'Alice Smith',
+            email: 'alice@school2.com',
+            grade: '10',
+            schoolName: 'School Two',
+            createdAt: '2026-01-02T00:00:00.000Z',
+          },
+        ],
+      },
+      {
+        confidence: 'low',
+        entrants: [
+          {
+            id: 'entrant-3',
+            name: 'Bob Jones',
+            email: 'bob@school1.com',
+            grade: '11',
+            schoolName: 'School One',
+            createdAt: '2026-01-03T00:00:00.000Z',
+          },
+          {
+            id: 'entrant-4',
+            name: 'Bob Jones',
+            email: 'bob@school3.com',
+            grade: '11',
+            schoolName: 'School Three',
+            createdAt: '2026-01-04T00:00:00.000Z',
+          },
+        ],
+      },
     ];
     fetchAllDuplicates.mockResolvedValue({ duplicates: mockDuplicates });
     render(<DuplicatesReviewPage />);
@@ -163,32 +172,35 @@ describe('DuplicatesReviewPage', () => {
 
   it('shows account count badge for each group', async () => {
     const mockDuplicates = [
-      [
-        {
-          id: 'entrant-1',
-          name: 'Alice Smith',
-          email: 'alice@school1.com',
-          grade: '10',
-          schoolName: 'School One',
-          createdAt: '2026-01-01T00:00:00.000Z',
-        },
-        {
-          id: 'entrant-2',
-          name: 'Alice Smith',
-          email: 'alice@school2.com',
-          grade: '10',
-          schoolName: 'School Two',
-          createdAt: '2026-01-02T00:00:00.000Z',
-        },
-        {
-          id: 'entrant-3',
-          name: 'Alice Smith',
-          email: 'alice@school3.com',
-          grade: '10',
-          schoolName: 'School Three',
-          createdAt: '2026-01-03T00:00:00.000Z',
-        },
-      ],
+      {
+        confidence: 'low',
+        entrants: [
+          {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            email: 'alice@school1.com',
+            grade: '10',
+            schoolName: 'School One',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'entrant-2',
+            name: 'Alice Smith',
+            email: 'alice@school2.com',
+            grade: '10',
+            schoolName: 'School Two',
+            createdAt: '2026-01-02T00:00:00.000Z',
+          },
+          {
+            id: 'entrant-3',
+            name: 'Alice Smith',
+            email: 'alice@school3.com',
+            grade: '10',
+            schoolName: 'School Three',
+            createdAt: '2026-01-03T00:00:00.000Z',
+          },
+        ],
+      },
     ];
     fetchAllDuplicates.mockResolvedValue({ duplicates: mockDuplicates });
     render(<DuplicatesReviewPage />);
@@ -200,16 +212,19 @@ describe('DuplicatesReviewPage', () => {
 
   it('shows entrant ID prefix for each account', async () => {
     const mockDuplicates = [
-      [
-        {
-          id: 'entrant-12345678',
-          name: 'Alice Smith',
-          email: 'alice@school1.com',
-          grade: '10',
-          schoolName: 'School One',
-          createdAt: '2026-01-01T00:00:00.000Z',
-        },
-      ],
+      {
+        confidence: 'low',
+        entrants: [
+          {
+            id: 'entrant-12345678',
+            name: 'Alice Smith',
+            email: 'alice@school1.com',
+            grade: '10',
+            schoolName: 'School One',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
     ];
     fetchAllDuplicates.mockResolvedValue({ duplicates: mockDuplicates });
     render(<DuplicatesReviewPage />);
@@ -222,22 +237,89 @@ describe('DuplicatesReviewPage', () => {
 
   it('handles entrants without email', async () => {
     const mockDuplicates = [
-      [
-        {
-          id: 'entrant-1',
-          name: 'Alice Smith',
-          email: null,
-          grade: '10',
-          schoolName: 'School One',
-          createdAt: '2026-01-01T00:00:00.000Z',
-        },
-      ],
+      {
+        confidence: 'low',
+        entrants: [
+          {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            email: null,
+            grade: '10',
+            schoolName: 'School One',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
     ];
     fetchAllDuplicates.mockResolvedValue({ duplicates: mockDuplicates });
     render(<DuplicatesReviewPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/no email/i)).toBeTruthy();
+    });
+  });
+
+  it('shows "High confidence" badge for same-school duplicates', async () => {
+    const mockDuplicates = [
+      {
+        confidence: 'high',
+        entrants: [
+          {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            email: 'alice@school1.com',
+            grade: '10',
+            schoolName: 'School One',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'entrant-2',
+            name: 'Alice Smith',
+            email: 'alice2@school1.com',
+            grade: '10',
+            schoolName: 'School One',
+            createdAt: '2026-01-02T00:00:00.000Z',
+          },
+        ],
+      },
+    ];
+    fetchAllDuplicates.mockResolvedValue({ duplicates: mockDuplicates });
+    render(<DuplicatesReviewPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/high confidence/i)).toBeTruthy();
+    });
+  });
+
+  it('shows "Low confidence" badge for cross-school duplicates', async () => {
+    const mockDuplicates = [
+      {
+        confidence: 'low',
+        entrants: [
+          {
+            id: 'entrant-1',
+            name: 'Bob Jones',
+            email: 'bob@school1.com',
+            grade: '11',
+            schoolName: 'School One',
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'entrant-2',
+            name: 'Bob Jones',
+            email: 'bob@school2.com',
+            grade: '11',
+            schoolName: 'School Two',
+            createdAt: '2026-01-02T00:00:00.000Z',
+          },
+        ],
+      },
+    ];
+    fetchAllDuplicates.mockResolvedValue({ duplicates: mockDuplicates });
+    render(<DuplicatesReviewPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/low confidence/i)).toBeTruthy();
     });
   });
 });

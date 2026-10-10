@@ -742,14 +742,15 @@ describe('Entrants routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.duplicates).toHaveLength(1);
-      expect(res.body.duplicates[0]).toHaveLength(2);
-      expect(res.body.duplicates[0][0]).toMatchObject({
+      expect(res.body.duplicates[0].confidence).toBe('high');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2);
+      expect(res.body.duplicates[0].entrants[0]).toMatchObject({
         id: 'entrant-1',
         name: 'Alice Smith',
         grade: '10',
         email: 'alice1@school.com',
       });
-      expect(res.body.duplicates[0][1]).toMatchObject({
+      expect(res.body.duplicates[0].entrants[1]).toMatchObject({
         id: 'entrant-2',
         name: 'Alice Smith',
         grade: '10',
@@ -768,7 +769,8 @@ describe('Entrants routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.duplicates).toHaveLength(1);
-      expect(res.body.duplicates[0]).toHaveLength(3);
+      expect(res.body.duplicates[0].confidence).toBe('high');
+      expect(res.body.duplicates[0].entrants).toHaveLength(3);
     });
 
     it('treats different grades as non-duplicates', async () => {
@@ -796,8 +798,10 @@ describe('Entrants routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.duplicates).toHaveLength(2);
-      expect(res.body.duplicates[0]).toHaveLength(2); // Alice group
-      expect(res.body.duplicates[1]).toHaveLength(3); // Bob group
+      expect(res.body.duplicates[0].confidence).toBe('high');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2); // Alice group
+      expect(res.body.duplicates[1].confidence).toBe('high');
+      expect(res.body.duplicates[1].entrants).toHaveLength(3); // Bob group
     });
 
     it('returns 403 when the account has no educator profile', async () => {
@@ -894,15 +898,16 @@ describe('Entrants routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.duplicates).toHaveLength(1);
-      expect(res.body.duplicates[0]).toHaveLength(2);
-      expect(res.body.duplicates[0][0]).toMatchObject({
+      expect(res.body.duplicates[0].confidence).toBe('low');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2);
+      expect(res.body.duplicates[0].entrants[0]).toMatchObject({
         id: 'entrant-1',
         name: 'Alice Smith',
         grade: '10',
         email: 'alice@school1.com',
         schoolName: 'School One',
       });
-      expect(res.body.duplicates[0][1]).toMatchObject({
+      expect(res.body.duplicates[0].entrants[1]).toMatchObject({
         id: 'entrant-2',
         name: 'Alice Smith',
         grade: '10',
@@ -922,7 +927,8 @@ describe('Entrants routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.duplicates).toHaveLength(1);
-      expect(res.body.duplicates[0]).toHaveLength(3);
+      expect(res.body.duplicates[0].confidence).toBe('low');
+      expect(res.body.duplicates[0].entrants).toHaveLength(3);
     });
 
     it('treats different grades as non-duplicates', async () => {
@@ -950,8 +956,24 @@ describe('Entrants routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.duplicates).toHaveLength(2);
-      expect(res.body.duplicates[0]).toHaveLength(2); // Alice group
-      expect(res.body.duplicates[1]).toHaveLength(3); // Bob group
+      expect(res.body.duplicates[0].confidence).toBe('low');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2); // Alice group
+      expect(res.body.duplicates[1].confidence).toBe('low');
+      expect(res.body.duplicates[1].entrants).toHaveLength(3); // Bob group
+    });
+
+    it('marks same-school duplicates as high confidence', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', schoolId: 'school-1', user: null, school: { name: 'School One' }, createdAt: new Date() },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '10', schoolId: 'school-1', user: null, school: { name: 'School One' }, createdAt: new Date() },
+      ]);
+
+      const res = await request(organiserApp).get('/api/entrants/duplicates/all');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toHaveLength(1);
+      expect(res.body.duplicates[0].confidence).toBe('high');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2);
     });
 
     it('returns 500 on unexpected error', async () => {

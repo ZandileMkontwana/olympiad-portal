@@ -360,18 +360,20 @@ router.get('/entrants/duplicates', ...requireRole('educator'), async (req, res) 
       groups.get(key).push(entrant);
     }
 
-    // Return groups with more than one entrant
+    // Return groups with more than one entrant.
+    // Confidence is always "high" here because all entrants share one school.
     const duplicates = Array.from(groups.values())
       .filter((group) => group.length > 1)
-      .map((group) =>
-        group.map((e) => ({
+      .map((group) => ({
+        confidence: 'high',
+        entrants: group.map((e) => ({
           id: e.id,
           name: e.name,
           grade: e.grade,
           email: e.user?.email || null,
           createdAt: e.createdAt,
-        }))
-      );
+        })),
+      }));
 
     res.json({ duplicates });
   } catch (err) {
@@ -403,19 +405,27 @@ router.get(
         groups.get(key).push(entrant);
       }
 
-      // Return groups with more than one entrant
+      // Return groups with more than one entrant.
+      // Confidence: "high" when all entrants share the same school (likely the
+      // same student registered twice), "low" when they span multiple schools
+      // (could be unrelated students who share a common name).
       const duplicates = Array.from(groups.values())
         .filter((group) => group.length > 1)
-        .map((group) =>
-          group.map((e) => ({
-            id: e.id,
-            name: e.name,
-            grade: e.grade,
-            email: e.user?.email || null,
-            schoolName: e.school.name,
-            createdAt: e.createdAt,
-          }))
-        );
+        .map((group) => {
+          const schoolIds = new Set(group.map((e) => e.schoolId));
+          const confidence = schoolIds.size === 1 ? 'high' : 'low';
+          return {
+            confidence,
+            entrants: group.map((e) => ({
+              id: e.id,
+              name: e.name,
+              grade: e.grade,
+              email: e.user?.email || null,
+              schoolName: e.school.name,
+              createdAt: e.createdAt,
+            })),
+          };
+        });
 
       res.json({ duplicates });
     } catch (err) {

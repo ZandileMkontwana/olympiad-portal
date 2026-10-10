@@ -322,7 +322,7 @@ export function listSchoolEntrants(token) {
  * Wired to GET /api/entrants/duplicates (backend/src/routes/entrants.js).
  *
  * @param {string} token - Clerk JWT for the Authorization header
- * @returns {Promise<{duplicates: Array<Array<{id: string, name: string, grade: string, email: string|null, createdAt: string}>>>}>}
+ * @returns {Promise<{duplicates: Array<{confidence: string, entrants: Array<{id: string, name: string, grade: string, email: string|null, createdAt: string}>}>>}>}
  */
 export function fetchDuplicates(token) {
   return requestJson('/api/entrants/duplicates', {
@@ -336,7 +336,7 @@ export function fetchDuplicates(token) {
  * Wired to GET /api/entrants/duplicates/all (backend/src/routes/entrants.js).
  *
  * @param {string} token - Clerk JWT for the Authorization header
- * @returns {Promise<{duplicates: Array<Array<{id: string, name: string, grade: string, email: string|null, schoolName: string, createdAt: string}>>>}>}
+ * @returns {Promise<{duplicates: Array<{confidence: string, entrants: Array<{id: string, name: string, grade: string, email: string|null, schoolName: string, createdAt: string}>}>>}>}
  */
 export function fetchAllDuplicates(token) {
   return requestJson('/api/entrants/duplicates/all', {

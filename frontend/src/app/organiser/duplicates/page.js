@@ -7,8 +7,16 @@ import OrganiserShell from '@/components/OrganiserShell';
 import { fetchAllDuplicates, ApiError } from '@/lib/api';
 
 function DuplicateGroup({ group }) {
+  const isHigh = group.confidence === 'high';
+  const borderClass = isHigh ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50';
+  const iconClass = isHigh ? 'text-red-600' : 'text-amber-600';
+  const badgeClass = isHigh
+    ? 'bg-red-200 text-red-900'
+    : 'bg-amber-200 text-amber-900';
+  const confidenceLabel = isHigh ? 'High confidence' : 'Low confidence';
+
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+    <div className={`rounded-lg border p-4 ${borderClass}`}>
       <div className="mb-3 flex items-center gap-2">
         <svg
           width="20"
@@ -19,22 +27,25 @@ function DuplicateGroup({ group }) {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="text-amber-600"
+          className={iconClass}
           aria-hidden="true"
         >
           <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           <line x1="12" y1="9" x2="12" y2="13" />
           <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
-        <p className="font-semibold text-amber-900">
-          {group[0].name} — Grade {group[0].grade}
+        <p className={`font-semibold ${isHigh ? 'text-red-900' : 'text-amber-900'}`}>
+          {group.entrants[0].name} — Grade {group.entrants[0].grade}
         </p>
-        <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-900">
-          {group.length} accounts
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass}`}>
+          {group.entrants.length} accounts
+        </span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badgeClass}`}>
+          {confidenceLabel}
         </span>
       </div>
       <ul className="space-y-2">
-        {group.map((entrant) => (
+        {group.entrants.map((entrant) => (
           <li
             key={entrant.id}
             className="flex items-center justify-between rounded-md bg-white p-3 text-sm"
