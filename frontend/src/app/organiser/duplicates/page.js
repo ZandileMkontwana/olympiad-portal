@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import OrganiserShell from '@/components/OrganiserShell';
 import { fetchAllDuplicates, ApiError } from '@/lib/api';
 
 function DuplicateGroup({ group }) {
@@ -103,16 +102,14 @@ export default function DuplicatesReviewPage() {
 
   if (checking) {
     return (
-      <OrganiserShell>
-        <p className="text-sm text-ink-soft">Checking access…</p>
-      </OrganiserShell>
+      <p className="text-sm text-ink-soft">Checking access…</p>
     );
   }
 
   if (!user) return null;
 
   return (
-    <OrganiserShell>
+    <>
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
         Duplicate Accounts
       </h1>
@@ -154,6 +151,6 @@ export default function DuplicatesReviewPage() {
           ))}
         </div>
       )}
-    </OrganiserShell>
+    </>
   );
 }

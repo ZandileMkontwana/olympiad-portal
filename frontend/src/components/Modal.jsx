@@ -24,6 +24,27 @@ export default function Modal({ title, onClose, children }) {
     const dialog = dialogRef.current;
     dialog?.querySelector(FOCUSABLE)?.focus();
 
+    // Prevent scroll by intercepting wheel, touchmove, and scroll events.
+    // This approach doesn't change any layout properties, so the sidebar
+    // won't jump.
+    const preventScroll = (e) => {
+      // Allow scroll inside the modal panel itself.
+      if (dialog && dialog.contains(e.target)) return;
+      e.preventDefault();
+    };
+    const preventScrollKey = (e) => {
+      const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+      if (scrollKeys.includes(e.key) && !dialog?.contains(e.target)) {
+        e.preventDefault();
+      }
+    };
+
+    // Use passive: false so preventDefault works.
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    document.addEventListener('keydown', preventScrollKey);
+
+    // Also lock body overflow as a fallback.
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
@@ -52,6 +73,9 @@ export default function Modal({ title, onClose, children }) {
     document.addEventListener('keydown', onKeyDown);
 
     return () => {
+      document.removeEventListener('wheel', preventScroll);
+      document.removeEventListener('touchmove', preventScroll);
+      document.removeEventListener('keydown', preventScrollKey);
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();

@@ -151,12 +151,34 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
   }, [open]);
 
   // Focus the dialog when it opens; return focus to trigger on close.
+  // Also prevent scroll by intercepting wheel/touchmove events.
   useEffect(() => {
     if (showDeleteDialog) {
       deleteDialogWasOpen.current = true;
       requestAnimationFrame(() => {
         deleteDialogRef.current?.focus();
       });
+      const preventScroll = (e) => {
+        if (deleteDialogRef.current && deleteDialogRef.current.contains(e.target)) return;
+        e.preventDefault();
+      };
+      const preventScrollKey = (e) => {
+        const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+        if (scrollKeys.includes(e.key) && !(deleteDialogRef.current && deleteDialogRef.current.contains(e.target))) {
+          e.preventDefault();
+        }
+      };
+      document.addEventListener('wheel', preventScroll, { passive: false });
+      document.addEventListener('touchmove', preventScroll, { passive: false });
+      document.addEventListener('keydown', preventScrollKey);
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.removeEventListener('wheel', preventScroll);
+        document.removeEventListener('touchmove', preventScroll);
+        document.removeEventListener('keydown', preventScrollKey);
+        document.body.style.overflow = previousOverflow;
+      };
     } else if (deleteDialogWasOpen.current) {
       deleteDialogWasOpen.current = false;
       deleteButtonRef.current?.focus();
