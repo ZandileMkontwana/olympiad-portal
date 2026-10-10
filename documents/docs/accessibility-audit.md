@@ -80,7 +80,7 @@ Already good: images use `alt=""` with `aria-hidden` when decorative; most auth 
 - axe-core runs in the test suite (`src/test/axe.js`) with WCAG 2.0/2.1 A and AA plus best-practice rules. It is applied to the landing page, login, student result, marking queue, standings, both sidebars (closed and open) and the dialog. All pass. A negative test confirmed the setup does fail on an unlabeled input.
 - Full suite: 299 tests pass; ESLint reports 0 errors.
 - Contrast: `npm run a11y:contrast` reports no failures.
-- **Lighthouse: all 21 pages scored 100.** The `label-content-name-mismatch` warnings are minor and do not affect the score. Manual screen-reader pass still pending (see Section 5).**
+- **Lighthouse: all 21 pages scored 100.** The `label-content-name-mismatch` warnings are minor and do not affect the score. The manual screen-reader pass is complete — every flow in Section 5 passes.
 
 ### Lighthouse results (fill in after `npm run a11y:lighthouse`) — #323 / #331
 
