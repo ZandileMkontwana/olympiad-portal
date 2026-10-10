@@ -374,9 +374,9 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
 
       {/* Full-page signing out overlay */}
       {signingOut && (
-        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white">
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center" style={{ background: 'var(--c-bg-ffffff, #fff)' }}>
           <div className="auth-spinner" />
-          <p className="mt-4 text-base font-medium text-ink">Signing out…</p>
+          <p className="mt-4 text-base font-medium" style={{ color: 'var(--ink, #241f38)' }}>Signing out…</p>
         </div>
       )}
 
@@ -397,7 +397,7 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
               This will permanently delete your account and all associated data. This cannot be undone.
             </p>
             {deleteError && (
-              <p role="alert" className="mt-3 rounded-md p-3 text-sm" style={{ background: '#fef2f2', color: '#b91c1c' }}>
+              <p role="alert" className="mt-3 rounded-md p-3 text-sm" style={{ background: 'var(--c-bg-fef2f2, #fef2f2)', color: 'var(--c-t-b91c1c, #b91c1c)' }}>
                 {deleteError}
               </p>
             )}

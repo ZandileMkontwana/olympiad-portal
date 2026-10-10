@@ -300,7 +300,7 @@ function SubmissionTableContent() {
   if (loading) {
     return (
       <div className="round-page">
-        <p>Loading...</p>
+        <p style={{ color: 'var(--c-t-6d667c)', fontSize: '14px' }}>Loading...</p>
       </div>
     );
   }
@@ -559,7 +559,7 @@ function SubmissionTableContent() {
 
 export default function SubmissionTablePage() {
   return (
-    <Suspense fallback={<div className="round-page">Loading...</div>}>
+    <Suspense fallback={<div className="round-page"><p style={{ color: 'var(--c-t-6d667c)', fontSize: '14px' }}>Loading...</p></div>}>
       <SubmissionTableContent />
     </Suspense>
   );

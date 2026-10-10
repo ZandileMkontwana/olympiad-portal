@@ -365,7 +365,7 @@ function RoundViewContent() {
   if (loading) {
     return (
       <div className="round-page">
-        <p>Loading round...</p>
+        <p style={{ color: 'var(--c-t-6d667c)', fontSize: '14px' }}>Loading round...</p>
       </div>
     );
   }
@@ -426,10 +426,6 @@ function RoundViewContent() {
         <h2>Round Details</h2>
 
         <p className="description">This round is currently {round.state}.</p>
-
-        <Link href={`/rounds/${roundId}/standings`} className="button">
-          View Standings
-        </Link>
 
         {round.state === 'open' && (
           <>
@@ -691,7 +687,8 @@ function RoundViewContent() {
               rows={3}
               required
               aria-describedby={remarkStatus === 'error' ? 'remark-error' : undefined}
-              className="block rounded-md border border-lavender/30 bg-white px-3 py-2 text-sm"
+              className="block rounded-md border border-lavender/30 px-3 py-2 text-sm"
+              style={{ background: 'var(--t-surface, #fff)', color: 'var(--ink, #241f38)' }}
             />
             {remarkStatus === 'error' && (
               <p
@@ -727,7 +724,7 @@ function RoundViewContent() {
 }
 export default function RoundViewPage() {
   return (
-    <Suspense fallback={<div className="round-page">Loading round...</div>}>
+    <Suspense fallback={<div className="round-page"><p style={{ color: 'var(--c-t-6d667c)', fontSize: '14px' }}>Loading round...</p></div>}>
       <RoundViewContent />
     </Suspense>
   );

@@ -52,13 +52,23 @@ export default function AppShell({ renderSidebar, section, initials = '', childr
     };
     document.addEventListener('keydown', onKeyDown);
 
-    // Don't let the page behind the drawer scroll.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    // Don't let the page behind the drawer scroll — use event interception
+    // instead of body overflow hidden, which removes the scrollbar and causes
+    // a layout reflow that breaks sticky sidebar positioning.
+    const preventScroll = (e) => { e.preventDefault(); };
+    const preventScrollKey = (e) => {
+      const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+      if (scrollKeys.includes(e.key)) { e.preventDefault(); }
+    };
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    document.addEventListener('keydown', preventScrollKey);
 
     return () => {
       document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('wheel', preventScroll);
+      document.removeEventListener('touchmove', preventScroll);
+      document.removeEventListener('keydown', preventScrollKey);
     };
   }, [open]);
 

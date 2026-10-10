@@ -515,9 +515,9 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
 
       {/* Full-page signing out overlay */}
       {signingOut && (
-        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white">
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center" style={{ background: 'var(--c-bg-ffffff, #fff)' }}>
           <div className="auth-spinner" />
-          <p className="mt-4 text-base font-medium text-ink">Signing out…</p>
+          <p className="mt-4 text-base font-medium" style={{ color: 'var(--ink, #241f38)' }}>Signing out…</p>
         </div>
       )}
     </div>
