@@ -496,9 +496,11 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
                 Cancel
               </button>
               <button
-                onClick={async () => {
+                onClick={() => {
                   setSigningOut(true);
-                  await signOut({ redirectUrl: '/login' });
+                  setTimeout(() => {
+                    signOut({ redirectUrl: '/login' });
+                  }, 80);
                 }}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-white"
                 style={{ background: 'var(--violet, #6c4fd8)' }}

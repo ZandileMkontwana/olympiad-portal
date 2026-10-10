@@ -353,9 +353,12 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
                 Cancel
               </button>
               <button
-                onClick={async () => {
+                onClick={() => {
                   setSigningOut(true);
-                  await signOut({ redirectUrl: '/login' });
+                  // Give React a frame to paint the overlay before redirecting.
+                  setTimeout(() => {
+                    signOut({ redirectUrl: '/login' });
+                  }, 80);
                 }}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-white"
                 style={{ background: 'var(--violet, #6c4fd8)' }}
