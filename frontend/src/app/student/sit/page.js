@@ -98,6 +98,8 @@ function SitContent() {
   // Auto-start the sitting when the component mounts with valid params.
   useEffect(() => {
     if (checking || !user || !roundId) return;
+    // startSitting sets state only after await (safe — no synchronous setState in render)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     startSitting();
   }, [checking, user, roundId, startSitting]);
 

@@ -67,6 +67,19 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
   const deleteDialogRef = useRef(null);
   const deleteDialogWasOpen = useRef(false);
 
+  // Focus the dialog when it opens; return focus to trigger on close.
+  useEffect(() => {
+    if (showDeleteDialog) {
+      deleteDialogWasOpen.current = true;
+      requestAnimationFrame(() => {
+        deleteDialogRef.current?.focus();
+      });
+    } else if (deleteDialogWasOpen.current) {
+      deleteDialogWasOpen.current = false;
+      deleteButtonRef.current?.focus();
+    }
+  }, [showDeleteDialog]);
+
   if (!clerkUser) {
     return (
       <aside className="sidebar">
@@ -102,19 +115,6 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
     if (!window.confirm('Are you sure you want to log out?')) return;
     await signOut({ redirectUrl: '/login' });
   }
-
-  // Focus the dialog when it opens; return focus to trigger on close.
-  useEffect(() => {
-    if (showDeleteDialog) {
-      deleteDialogWasOpen.current = true;
-      requestAnimationFrame(() => {
-        deleteDialogRef.current?.focus();
-      });
-    } else if (deleteDialogWasOpen.current) {
-      deleteDialogWasOpen.current = false;
-      deleteButtonRef.current?.focus();
-    }
-  }, [showDeleteDialog]);
 
   async function handleDeleteAccount() {
     setDeleting(true);
