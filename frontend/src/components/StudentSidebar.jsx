@@ -343,7 +343,7 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
           >
             <h2 id="student-signout-heading" className="font-display text-xl font-semibold" style={{ color: 'var(--ink, #241f38)' }}>Sign out?</h2>
             <p className="mt-3 text-sm" style={{ color: 'var(--ink-soft, #6c628c)' }}>
-              Are you sure you want to sign out?
+              Are you sure you want to sign out of your student account?
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
