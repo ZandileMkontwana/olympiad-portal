@@ -498,8 +498,8 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
               <button
                 onClick={() => {
                   setSigningOut(true);
-                  setTimeout(async () => {
-                    await signOut();
+                  setTimeout(() => {
+                    signOut();
                     window.location.href = '/login';
                   }, 80);
                 }}

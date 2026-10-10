@@ -355,10 +355,10 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
               <button
                 onClick={() => {
                   setSigningOut(true);
-                  // Give React a frame to paint the overlay, then hard-redirect
-                  // so the dashboard never flashes before the login page.
-                  setTimeout(async () => {
-                    await signOut();
+                  // Fire signOut in background and immediately hard-redirect.
+                  // The browser navigates away before any intermediate page renders.
+                  setTimeout(() => {
+                    signOut();
                     window.location.href = '/login';
                   }, 80);
                 }}

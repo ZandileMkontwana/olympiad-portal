@@ -356,8 +356,8 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
               <button
                 onClick={() => {
                   setSigningOut(true);
-                  setTimeout(async () => {
-                    await signOut();
+                  setTimeout(() => {
+                    signOut();
                     window.location.href = '/login';
                   }, 80);
                 }}
