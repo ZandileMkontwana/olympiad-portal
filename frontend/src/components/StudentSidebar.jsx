@@ -1,14 +1,22 @@
 'use client';
 
-// Shared student sidebar — rendered once by the student (dashboard) layout so
-// it stays mounted while students move between their dashboard and result
-// pages. The sit page is deliberately outside that layout: test-taking is a
-// focused, full-screen flow.
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Modal from '@/components/Modal';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
+import {
+  LayoutDashboard,
+  ClipboardCheck,
+  Trophy,
+  BookOpen,
+  Settings2,
+  CircleHelp,
+  ArrowRight,
+  GraduationCap,
+  MoreHorizontal,
+  X,
+} from 'lucide-react';
 import { deleteAccount } from '@/lib/api';
 import { clearStudentSession } from '@/lib/studentSession';
 
@@ -21,23 +29,59 @@ function initials(name) {
     .join('');
 }
 
-const LINKS = [
+const WORKSPACE_LINKS = [
   {
     href: '/student',
-    icon: '🏠',
+    icon: LayoutDashboard,
     label: 'Dashboard',
-    // Result pages live under /student/result but belong to the dashboard too.
-    match: (p) => p === '/student' || p.startsWith('/student/result'),
+    match: (p, hash) => (p === '/student' && !hash) || p.startsWith('/student/result'),
+  },
+  {
+    href: '/student#tests',
+    icon: ClipboardCheck,
+    label: 'My tests',
+    hash: 'tests',
+    match: (p, hash) => p === '/student' && hash === 'tests',
+  },
+  {
+    href: '/student#results',
+    icon: Trophy,
+    label: 'Results',
+    hash: 'results',
+    match: (p, hash) => p === '/student' && hash === 'results',
   },
 ];
 
-export default function StudentSidebar() {
+export default function StudentSidebar({ open = false, onClose } = {}) {
   const pathname = usePathname() || '';
   const router = useRouter();
   const { user, checking, signOut, getToken } = useStudentAuth();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [hash, setHash] = useState(typeof window !== 'undefined' ? window.location.hash.slice(1) : '');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showResources, setShowResources] = useState(false);
+
+  useEffect(() => {
+    function onHashChange() {
+      setHash(window.location.hash.slice(1));
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  function handleNavClick(e, linkHash) {
+    if (!linkHash) return;
+    e.preventDefault();
+    const el = document.getElementById(linkHash);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.history.replaceState(null, '', `#${linkHash}`);
+      setHash(linkHash);
+    }
+    onClose?.();
+  }
 
   async function handleLogout() {
     if (!window.confirm('Log out of the Olympiad Portal?')) return;
@@ -59,41 +103,63 @@ export default function StudentSidebar() {
     }
   }
 
+  if (checking) {
+    return (
+      <aside className="sidebar">
+        <div className="sidebar-top">
+          <div className="brand">
+            <div className="brand-mark">
+              <GraduationCap />
+            </div>
+            <div>
+              <strong>Olympiad</strong>
+              <span>PORTAL</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--c-t-706391)', fontSize: '13px' }}>
+          Loading account...
+        </div>
+      </aside>
+    );
+  }
+
+  if (!user) {
+    return (
+      <aside className="sidebar">
+        <div className="sidebar-top">
+          <div className="brand">
+            <div className="brand-mark">
+              <GraduationCap />
+            </div>
+            <div>
+              <strong>Olympiad</strong>
+              <span>PORTAL</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--c-t-706391)', fontSize: '13px' }}>
+          Not signed in
+        </div>
+      </aside>
+    );
+  }
+
+  const name = user.name || user.email || 'Student';
+  const userInitials = initials(name);
+
   return (
-    <aside className="fixed left-0 top-0 flex h-screen w-60 flex-shrink-0 flex-col border-r border-lavender/15 bg-surface px-4 py-6">
-      <div className="flex items-center gap-2.5 px-2 pb-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-lavender to-lavender-deep font-display text-lg font-bold text-white">
-          O
-        </div>
-        <div>
-          <p className="font-display text-sm font-semibold text-ink">Olympiad Portal</p>
-          <p className="text-xs text-ink-soft">Student</p>
-        </div>
-      </div>
-
-      <nav className="flex flex-1 flex-col gap-1">
-        {LINKS.map((l) => {
-          const active = l.match(pathname);
-          return (
-            <Link
-              key={l.label}
-              href={l.href}
-              aria-current={active ? 'page' : undefined}
-              className={`flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-left text-sm font-semibold transition-colors ${
-                active ? 'bg-lavender/10 text-lavender-deep' : 'text-ink-soft hover:bg-lavender/5'
-              }`}
-            >
-              <span className="text-base">{l.icon}</span>
-              {l.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {user ? (
-        <div className="flex items-center gap-2.5 border-t border-lavender/15 pt-4">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-lavender to-lavender-deep text-xs font-bold text-white">
-            {initials(user.name || user.email)}
+    <>
+      <aside id="app-sidebar" className={`sidebar${open ? ' sidebar-open' : ''}`}>
+        <div className="sidebar-top">
+          <div className="brand">
+            <div className="brand-mark">
+              <GraduationCap />
+            </div>
+            <div>
+              <strong>Olympiad</strong>
+              <span>PORTAL</span>
+            </div>
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-ink">{user.name || user.email}</p>
@@ -112,11 +178,122 @@ export default function StudentSidebar() {
               </button>
             </div>
           </div>
+          {onClose && (
+            <button
+              type="button"
+              className="icon-button mobile-close"
+              onClick={onClose}
+              aria-label="Close menu"
+            >
+              <X aria-hidden="true" />
+            </button>
+          )}
         </div>
-      ) : (
-        <div className="border-t border-lavender/15 pt-4">
-          <p className="text-xs text-ink-soft">{checking ? 'Loading account…' : 'Not signed in'}</p>
+        <nav className="side-nav" aria-label="Main navigation">
+          <p className="nav-label">Workspace</p>
+          {WORKSPACE_LINKS.map(({ href, icon: Icon, label, match, hash: linkHash }) => {
+            const active = match(pathname, hash);
+            return (
+              <Link
+                key={label}
+                href={href}
+                className={`nav-item${active ? ' nav-selected' : ''}`}
+                aria-current={active ? 'page' : undefined}
+                onClick={(e) => {
+                  if (linkHash) {
+                    handleNavClick(e, linkHash);
+                  } else {
+                    onClose?.();
+                  }
+                }}
+              >
+                <Icon /> <span>{label}</span>
+              </Link>
+            );
+          })}
+          <button
+            className="nav-item"
+            onClick={() => {
+              setShowResources(true);
+            }}
+          >
+            <BookOpen />
+            <span>Resources</span>
+          </button>
+          <p className="nav-label nav-label-spaced">Manage</p>
+          <button
+            className="nav-item"
+            onClick={() => {
+              setShowSettings(true);
+            }}
+          >
+            <Settings2 />
+            <span>Settings</span>
+          </button>
+        </nav>
+        <div className="sidebar-help">
+          <div className="help-icon">
+            <CircleHelp />
+          </div>
+          <div>
+            <strong>Need a hand?</strong>
+            <span>Visit the help centre</span>
+          </div>
+          <ArrowRight />
         </div>
+        <div className="sidebar-profile">
+          <div className="avatar">{userInitials}</div>
+          <div>
+            <strong>{name}</strong>
+            <span>
+              {checking ? (
+                'Loading...'
+              ) : (
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    color: 'var(--c-t-b42318)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}
+                >
+                  Log out
+                </button>
+              )}
+            </span>
+          </div>
+          <MoreHorizontal className="profile-more" />
+        </div>
+      </aside>
+
+      {showSettings && (
+        <Modal title="Settings" onClose={() => setShowSettings(false)}>
+          <div className="modal-stack">
+            <section className="modal-card" aria-labelledby="settings-profile">
+              <h3 id="settings-profile">Profile</h3>
+              <p>Name: {name}</p>
+              <p>Email: {user?.email || 'N/A'}</p>
+            </section>
+            <section className="modal-card" aria-labelledby="settings-prefs">
+              <h3 id="settings-prefs">Preferences</h3>
+              <p>Notification settings and preferences will be available here.</p>
+            </section>
+          </div>
+        </Modal>
+      )}
+
+      {showResources && (
+        <Modal title="Resources" onClose={() => setShowResources(false)}>
+          <p className="modal-intro">Study materials and resources will be available here.</p>
+          <div className="modal-empty">
+            <BookOpen size={48} aria-hidden="true" />
+            <p>No resources available yet</p>
+          </div>
+        </Modal>
       )}
 
       {/* Delete account confirmation dialog */}
@@ -153,6 +330,6 @@ export default function StudentSidebar() {
           </div>
         </div>
       )}
-    </aside>
+    </>
   );
 }

@@ -1,15 +1,27 @@
 const prisma = require('./prisma');
 
 /**
- * Checks whether a user is an organiser of a specific olympiad
- * (via the OlympiadOrganiser join table).
+ * Checks whether a user is an organiser of a specific olympiad.
+ *
+ * The OlympiadOrganiser join table is the primary source of truth. The
+ * olympiad creator (Olympiad.organiserId) is also accepted: new olympiads
+ * backfill a join row for the creator, but olympiads created before that
+ * backfill (or whose row was lost) would otherwise lock their own creator
+ * out even though GET /olympiads still lists the olympiad for them.
  */
 async function isOlympiadOrganiser(userId, olympiadId) {
   if (!userId || !olympiadId) return false;
+
   const row = await prisma.olympiadOrganiser.findUnique({
     where: { olympiadId_organiserId: { olympiadId, organiserId: userId } },
   });
-  return Boolean(row);
+  if (row) return true;
+
+  const olympiad = await prisma.olympiad.findUnique({
+    where: { id: olympiadId },
+    select: { organiserId: true },
+  });
+  return Boolean(olympiad && olympiad.organiserId === userId);
 }
 
 /**
@@ -68,9 +80,9 @@ async function requireOlympiadAccess(req, res, round, user) {
   }
 
   // Organisers must be members of THIS specific olympiad (not just any).
-  // The OlympiadOrganiser join table is the single source of truth for
-  // organiser access — the creator is backfilled there so all checks go
-  // through one path.
+  // isOlympiadOrganiser checks the OlympiadOrganiser join table first and
+  // falls back to the olympiad creator, so a creator whose join row is
+  // missing (e.g. legacy data) is not locked out of their own olympiad.
   if (u.role === 'organiser') {
     const isMember = await isOlympiadOrganiser(u.id, round.olympiadId);
     if (!isMember) {

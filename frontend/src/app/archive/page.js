@@ -49,13 +49,15 @@ export default function ArchivePage() {
           background: 'var(--background)',
         }}
       >
-        <p style={{ color: '#8b7fa8' }}>Loading...</p>
+        <p style={{ color: 'var(--c-t-706391)' }}>Loading...</p>
       </div>
     );
   }
 
   return (
     <main
+      id="main-content"
+      tabIndex={-1}
       style={{
         maxWidth: '1000px',
         margin: '0 auto',
@@ -86,7 +88,7 @@ export default function ArchivePage() {
             borderRadius: '8px',
             border: '1px solid rgba(139,92,246,0.25)',
             textDecoration: 'none',
-            color: '#6d3fd1',
+            color: 'var(--c-t-6d3fd1)',
             fontSize: '0.85em',
             fontWeight: 600,
           }}

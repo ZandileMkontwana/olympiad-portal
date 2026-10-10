@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const activityBus = require('../lib/activityBus');
 const { requireRole, requireAuth, loadAuthUser, loadOptionalUser } = require('../middleware/auth');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 const {
@@ -16,6 +17,7 @@ const {
 } = require('../lib/email');
 const { requireOlympiadAccess, isOlympiadOrganiser } = require('../lib/authorization');
 const { toUTCDate } = require('../lib/timezone');
+const { updateQuestionDifficulty } = require('../lib/difficulty');
 
 const router = express.Router();
 
@@ -93,7 +95,29 @@ router.get('/olympiads', async (req, res) => {
     // with the educator's school's access state and the number of distinct
     // entrants per school, so the dashboard can show an info card for
     // olympiads the school isn't part of yet.
-    if (!user || user.role !== 'educator') {
+    if (!user) {
+      // Clean up response for public API — remove internal fields
+      const publicOlympiads = olympiads.map((o) => ({
+        id: o.id,
+        name: o.name,
+        timezone: o.timezone,
+        description: o.description,
+        grades: o.grades,
+        startDate: o.startDate,
+        endDate: o.endDate,
+        rounds: o.rounds.map((r) => ({
+          id: r.id,
+          name: r.name,
+          openTime: r.openTime,
+          closeTime: r.closeTime,
+          state: r.state,
+          qualifyingThreshold: r.qualifyingThreshold,
+        })),
+      }));
+      return res.json(publicOlympiads);
+    }
+
+    if (user.role !== 'educator') {
       return res.json(olympiads);
     }
 
@@ -348,7 +372,13 @@ router.get('/olympiads/access-requests', ...requireRole('organiser'), async (req
 // POST /olympiads/access-requests/:id/approve and /decline
 // The organiser's decision on a school's access request.
 async function decideAccessRequest(req, res, status) {
-  const existing = await prisma.schoolOlympiad.findUnique({ where: { id: req.params.id } });
+  const existing = await prisma.schoolOlympiad.findUnique({
+    where: { id: req.params.id },
+    include: {
+      school: { select: { name: true } },
+      olympiad: { select: { name: true } },
+    },
+  });
   if (!existing) {
     return res.status(404).json({ error: 'Access request not found' });
   }
@@ -362,6 +392,18 @@ async function decideAccessRequest(req, res, status) {
     where: { id: req.params.id },
     data: { status, decidedAt: new Date() },
   });
+
+  // Live activity feed (US-4.1): a school's access request was decided.
+  activityBus.broadcast({
+    type: 'access_request_decided',
+    message:
+      status === 'approved'
+        ? `${existing.school.name} was granted access to ${existing.olympiad.name}`
+        : `${existing.school.name}'s request for ${existing.olympiad.name} was declined`,
+    olympiadId: existing.olympiadId,
+    schoolId: existing.schoolId,
+  });
+
   res.json({ id: updated.id, status: updated.status });
 }
 
@@ -762,7 +804,19 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       schoolId = educator?.schoolId ?? null;
     }
 
-    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: {
+        paper: {
+          include: {
+            questions: {
+              include: { variants: true },
+              orderBy: { number: 'asc' },
+            },
+          },
+        },
+      },
+    });
     if (!round) {
       return res.status(404).json({ error: 'Round not found' });
     }
@@ -813,6 +867,43 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
       if (ids.length > 1) ids.forEach((id) => duplicateIds.add(id));
     }
 
+    // Submission has no Prisma relation to Sitting — each entrant's variant
+    // assignment lives on the sitting for the same roundId+entrantId, so it
+    // is fetched separately and keyed by entrantId for the summary below.
+    const sittings = await prisma.sitting.findMany({
+      where: { roundId },
+      select: { entrantId: true, variantChoices: true },
+    });
+    const variantChoicesByEntrant = new Map(sittings.map((s) => [s.entrantId, s.variantChoices]));
+
+    // Only questions with more than one variant produce meaningful "variant
+    // info" — a single-variant question still gets an assignment recorded
+    // (see lib/variantAssignment.js), but there's nothing to distinguish, so
+    // it's left out of the summary rather than cluttering every row (#263).
+    const variantMetaByQuestionId = new Map();
+    for (const question of round.paper?.questions || []) {
+      if (question.variants.length > 1) {
+        variantMetaByQuestionId.set(question.id, {
+          questionNumber: question.number,
+          labelsById: new Map(question.variants.map((v) => [v.id, v.label])),
+        });
+      }
+    }
+
+    function summarizeVariants(variantChoices) {
+      if (!variantChoices) return [];
+      const summary = [];
+      for (const [questionId, variantId] of Object.entries(variantChoices)) {
+        const meta = variantMetaByQuestionId.get(questionId);
+        if (!meta) continue; // question has 0 or 1 variants — nothing to show
+        summary.push({
+          questionNumber: meta.questionNumber,
+          variantLabel: meta.labelsById.get(variantId) || 'Unknown variant',
+        });
+      }
+      return summary.sort((a, b) => a.questionNumber - b.questionNumber);
+    }
+
     const ranked = submissions
       .map((s) => ({
         entrantId: s.entrant.id,
@@ -821,6 +912,7 @@ router.get('/rounds/:id/standings', requireAuth, async (req, res) => {
         score: s.result.score,
         submittedAt: s.submittedAt,
         isDuplicate: duplicateIds.has(s.entrant.id),
+        variants: summarizeVariants(variantChoicesByEntrant.get(s.entrant.id)),
       }))
       .sort((a, b) => b.score - a.score);
 
@@ -928,105 +1020,132 @@ router.get('/rounds/:id/standings/schools', requireAuth, async (req, res) => {
 });
 
 // POST /rounds/:id/release-results
-router.post('/rounds/:id/release-results', requireAuth, ...requireRole('organiser'), async (req, res) => {
-  try {
-    const user = await loadAuthUser(req);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+router.post(
+  '/rounds/:id/release-results',
+  requireAuth,
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const user = await loadAuthUser(req);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
 
-    const round = await prisma.round.findUnique({
-      where: { id: req.params.id },
-      include: { olympiad: true },
-    });
-    if (!round) {
-      return res.status(404).json({ error: 'Round not found' });
-    }
-
-    const check = await requireOlympiadAccess(req, res, round, user);
-    if (!check) return;
-
-    if (round.state !== 'closed') {
-      return res.status(403).json({
-        error: `Results can only be released for closed rounds (currently '${round.state}')`,
+      const round = await prisma.round.findUnique({
+        where: { id: req.params.id },
+        include: { olympiad: true },
       });
-    }
+      if (!round) {
+        return res.status(404).json({ error: 'Round not found' });
+      }
 
-    const now = new Date();
-    const updated = await prisma.result.updateMany({
-      where: {
-        releasedAt: null,
-        submission: { roundId: round.id },
-      },
-      data: { releasedAt: now },
-    });
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
 
-    // Flipping the round to 'released' is the only path past 'closed' in the
-    // state machine — without it, certificates and released-round paper
-    // downloads stay locked forever even though results carry releasedAt.
-    // The state filter keeps the closed -> released transition atomic: if a
-    // concurrent request already moved the round on, nothing is written.
-    // Legacy closed rounds with pre-existing releasedAt stamps still
-    // converge — they remain 'closed', so the filter matches them.
-    const flipped = await prisma.round.updateMany({
-      where: { id: round.id, state: 'closed' },
-      data: { state: 'released' },
-    });
-    if (flipped.count === 0) {
-      return res.status(409).json({
-        error: 'Round state changed while releasing results - it is no longer closed',
+      if (round.state !== 'closed') {
+        return res.status(403).json({
+          error: `Results can only be released for closed rounds (currently '${round.state}')`,
+        });
+      }
+
+      const now = new Date();
+      const updated = await prisma.result.updateMany({
+        where: {
+          releasedAt: null,
+          submission: { roundId: round.id },
+        },
+        data: { releasedAt: now },
       });
-    }
 
-    res.json({ releasedCount: updated.count, releasedAt: now });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not release results' });
+      // Flipping the round to 'released' is the only path past 'closed' in the
+      // state machine — without it, certificates and released-round paper
+      // downloads stay locked forever even though results carry releasedAt.
+      // The state filter keeps the closed -> released transition atomic: if a
+      // concurrent request already moved the round on, nothing is written.
+      // Legacy closed rounds with pre-existing releasedAt stamps still
+      // converge — they remain 'closed', so the filter matches them.
+      const flipped = await prisma.round.updateMany({
+        where: { id: round.id, state: 'closed' },
+        data: { state: 'released' },
+      });
+      if (flipped.count === 0) {
+        return res.status(409).json({
+          error: 'Round state changed while releasing results - it is no longer closed',
+        });
+      }
+
+      // Calculate and update question difficulty based on this round's submissions
+      try {
+        const difficultyCount = await updateQuestionDifficulty(round.id);
+        console.log(`Updated difficulty for ${difficultyCount} questions from round ${round.id}`);
+      } catch (diffErr) {
+        // Log but don't fail the release if difficulty calculation fails
+        console.error('Failed to calculate difficulty:', diffErr);
+      }
+
+      // Live activity feed (US-4.1): results went out for this round.
+      activityBus.broadcast({
+        type: 'results_released',
+        message: `Results released for ${round.name}`,
+        roundId: round.id,
+        olympiadId: round.olympiadId,
+      });
+
+      res.json({ releasedCount: updated.count, releasedAt: now });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not release results' });
+    }
   }
-});
+);
 
 // POST /rounds/:id/unrelease-results
-router.post('/rounds/:id/unrelease-results', requireAuth, ...requireRole('organiser'), async (req, res) => {
-  try {
-    const user = await loadAuthUser(req);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+router.post(
+  '/rounds/:id/unrelease-results',
+  requireAuth,
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const user = await loadAuthUser(req);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
 
-    const round = await prisma.round.findUnique({
-      where: { id: req.params.id },
-      include: { olympiad: true },
-    });
-    if (!round) {
-      return res.status(404).json({ error: 'Round not found' });
-    }
-
-    const check = await requireOlympiadAccess(req, res, round, user);
-    if (!check) return;
-
-    const updated = await prisma.result.updateMany({
-      where: {
-        releasedAt: { not: null },
-        submission: { roundId: round.id },
-      },
-      data: { releasedAt: null },
-    });
-
-    // A released round drops back to 'closed' once its results are hidden
-    // again. Rounds in any other state are left untouched.
-    if (round.state === 'released') {
-      await prisma.round.update({
-        where: { id: round.id },
-        data: { state: 'closed' },
+      const round = await prisma.round.findUnique({
+        where: { id: req.params.id },
+        include: { olympiad: true },
       });
-    }
+      if (!round) {
+        return res.status(404).json({ error: 'Round not found' });
+      }
 
-    res.json({ unreleasedCount: updated.count });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not unrelease results' });
+      const check = await requireOlympiadAccess(req, res, round, user);
+      if (!check) return;
+
+      const updated = await prisma.result.updateMany({
+        where: {
+          releasedAt: { not: null },
+          submission: { roundId: round.id },
+        },
+        data: { releasedAt: null },
+      });
+
+      // A released round drops back to 'closed' once its results are hidden
+      // again. Rounds in any other state are left untouched.
+      if (round.state === 'released') {
+        await prisma.round.update({
+          where: { id: round.id },
+          data: { state: 'closed' },
+        });
+      }
+
+      res.json({ unreleasedCount: updated.count });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not unrelease results' });
+    }
   }
-});
+);
 
 // GET /rounds/:id/notifications
 router.get('/rounds/:id/notifications', ...requireRole('organiser'), async (req, res) => {
@@ -1405,9 +1524,10 @@ router.get('/rounds/:id/replay', requireAuth, async (req, res) => {
       },
       timeline,
       isEmpty: timeline.length === 0,
-      message: timeline.length === 0
-        ? 'No automatic actions have been recorded for this round yet.'
-        : undefined,
+      message:
+        timeline.length === 0
+          ? 'No automatic actions have been recorded for this round yet.'
+          : undefined,
     });
   } catch (err) {
     console.error(err);

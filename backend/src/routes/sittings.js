@@ -1,10 +1,12 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const activityBus = require('../lib/activityBus');
 const { requireAuth } = require('../middleware/auth');
 const { hasQualifiedForRound, prerequisiteFailureMessage } = require('../lib/qualification');
 const { getDbNow } = require('../lib/dbTime');
 const { TRANSACTION_OPTIONS } = require('../lib/transactionOptions');
 const { isDbBusyError, respondDbBusy } = require('../lib/dbErrors');
+const { assignVariantsForPaper } = require('../lib/variantAssignment');
 
 const router = express.Router();
 
@@ -24,7 +26,14 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
     const round = await prisma.round.findUnique({
       where: { id: roundId },
       include: {
-        paper: true,
+        paper: {
+          include: {
+            questions: {
+              include: { variants: true },
+              orderBy: { number: 'asc' },
+            },
+          },
+        },
         prerequisiteRound: { select: { id: true, name: true } },
       },
     });
@@ -78,11 +87,36 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
 
       // Upsert instead of findUnique + create to avoid a P2002 race when
       // React Strict Mode or a double-click fires two requests in parallel.
-      return tx.sitting.upsert({
+      const sitting = await tx.sitting.upsert({
         where: { roundId_entrantId: { roundId, entrantId } },
         create: { roundId, entrantId, expiresAt: freshRound.closeTime },
         update: {},
       });
+
+      // Assign variants if this is a new sitting (variantChoices not yet set)
+      // and the paper has questions with variants
+      if (!sitting.variantChoices && round.paper.questions.length > 0) {
+        const variantAssignments = assignVariantsForPaper(entrantId, round.paper.questions);
+
+        // Convert Map to plain object for JSON storage
+        const variantChoices = {};
+        for (const [questionId, variant] of variantAssignments.entries()) {
+          if (variant) {
+            variantChoices[questionId] = variant.id;
+          }
+        }
+
+        // Only update if there are variant choices to store
+        if (Object.keys(variantChoices).length > 0) {
+          const updatedSitting = await tx.sitting.update({
+            where: { id: sitting.id },
+            data: { variantChoices },
+          });
+          return updatedSitting;
+        }
+      }
+
+      return sitting;
     }, TRANSACTION_OPTIONS);
 
     if (sitting.completedAt) {
@@ -97,9 +131,24 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Test expired - it can no longer be resumed' });
     }
 
-    // Question IDs come from the memo answer key — send ONLY the keys,
-    // never the answers, so students can't read the answer key.
-    const questions = round.paper.memoAnswers ? Object.keys(round.paper.memoAnswers) : [];
+    // Build the question list with only the assigned variants
+    // If no variantChoices are stored (legacy sitting), use the base questions
+    const questions = round.paper.questions.map((question) => {
+      const assignedVariantId = sitting.variantChoices?.[question.id];
+      const assignedVariant = assignedVariantId
+        ? question.variants.find((v) => v.id === assignedVariantId)
+        : null;
+
+      return {
+        id: question.id,
+        number: question.number,
+        text: assignedVariant?.text || question.text,
+        type: question.type,
+        marks: question.marks,
+        options: assignedVariant?.options || question.options,
+        // Never send memoAnswer or rubric to the student
+      };
+    });
 
     res.json({
       sitting: {
@@ -107,6 +156,7 @@ router.post('/rounds/:id/sittings', requireAuth, async (req, res) => {
         entrantId: sitting.entrantId,
         roundId: sitting.roundId,
         answers: sitting.answers,
+        variantChoices: sitting.variantChoices,
         startedAt: sitting.startedAt,
         expiresAt: sitting.expiresAt,
         completedAt: sitting.completedAt,
@@ -200,7 +250,20 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
   try {
     const sitting = await prisma.sitting.findUnique({
       where: { id: req.params.id },
-      include: { round: { include: { paper: true } } },
+      include: {
+        round: {
+          include: {
+            paper: {
+              include: {
+                questions: {
+                  include: { variants: true },
+                },
+              },
+            },
+          },
+        },
+        entrant: { select: { name: true, schoolId: true } },
+      },
     });
 
     if (!sitting) {
@@ -224,21 +287,34 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
 
     const answers = sitting.answers || {};
 
-    // Automark immediately if the round's paper has a memo answer key
+    // Automark immediately if the round's paper has questions with memo answers
     let resultData = null;
 
-    if (sitting.round.paper && sitting.round.paper.memoAnswers) {
-      const memo = sitting.round.paper.memoAnswers;
-      const totalQuestions = Object.keys(memo).length;
-      let correctCount = 0;
+    if (sitting.round.paper && sitting.round.paper.questions.length > 0) {
+      const questions = sitting.round.paper.questions;
+      const variantChoices = sitting.variantChoices || {};
+      let totalMarks = 0;
+      let earnedMarks = 0;
 
-      for (const questionId in memo) {
-        if (answers[questionId] === memo[questionId]) {
-          correctCount++;
+      for (const question of questions) {
+        totalMarks += question.marks;
+
+        // Determine which memo answer to use based on variant assignment
+        const assignedVariantId = variantChoices[question.id];
+        const assignedVariant = assignedVariantId
+          ? question.variants.find((v) => v.id === assignedVariantId)
+          : null;
+
+        // Use variant-specific memo answer if available, otherwise use base question memo
+        const correctAnswer = assignedVariant?.memoAnswer || question.memoAnswer;
+
+        // Mark this question
+        if (correctAnswer && answers[question.id] === correctAnswer) {
+          earnedMarks += question.marks;
         }
       }
 
-      const score = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+      const score = totalMarks > 0 ? (earnedMarks / totalMarks) * 100 : 0;
       resultData = { create: { score } };
     }
 
@@ -272,31 +348,31 @@ router.post('/sittings/:id/submit', requireAuth, async (req, res) => {
         return created;
       }, TRANSACTION_OPTIONS);
     } catch (err) {
+      // Let P2002 idempotency errors bubble up to the outer catch,
+      // which handles the guarded updateMany + winner lookup.
       if (
-        err.code === 'P2002' &&
-        err.meta &&
-        err.meta.target &&
-        err.meta.target.includes('idempotencyKey')
+        err.code !== 'P2002' ||
+        !err.meta ||
+        !err.meta.target ||
+        !err.meta.target.includes('idempotencyKey')
       ) {
-        const existing = await prisma.submission.findUnique({
-          where: { idempotencyKey: `sitting:${sitting.id}` },
-          include: { result: true },
-        });
-        if (!existing) {
-          return res.status(500).json({ error: 'Failed to retrieve submission after conflict' });
-        }
-        // The loser of the race also attempts to mark completion, but with
-        // a status guard so it doesn't overwrite the winner's timestamp.
-        await prisma.sitting.updateMany({
-          where: { id: sitting.id, completedAt: null },
-          data: { completedAt: new Date() },
-        });
-        return res.status(200).json({ submission: existing, result: existing.result });
+        throw err;
       }
+      // P2002 on idempotencyKey — fall through to the outer catch
+      // handler below by re-throwing.
       throw err;
     }
 
     res.status(201).json({ submission, result: submission.result });
+
+    // Live activity feed (US-4.1): an online sitting was submitted.
+    activityBus.broadcast({
+      type: 'sitting_submitted',
+      message: `${sitting.entrant.name} submitted for ${sitting.round.name}`,
+      roundId: sitting.roundId,
+      olympiadId: sitting.round.olympiadId,
+      schoolId: sitting.entrant.schoolId,
+    });
   } catch (err) {
     if (isDbBusyError(err)) {
       return respondDbBusy(req, res, err);

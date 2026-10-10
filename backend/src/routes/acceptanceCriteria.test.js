@@ -53,7 +53,9 @@ describe('#171 – Multi-olympiad support', () => {
     vi.spyOn(prisma.schoolOlympiad, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findMany');
-    vi.spyOn(prisma.olympiad, 'findUnique');
+    // No creator match by default — the isOlympiadOrganiser fallback finds
+    // nothing, so AC2's non-member denial stays 403.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.olympiad, 'findMany');
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -69,9 +71,7 @@ describe('#171 – Multi-olympiad support', () => {
       email: 'org@test.com',
       name: 'Organiser',
     });
-    prisma.olympiadOrganiser.findMany.mockResolvedValue([
-      { olympiadId: 'oly-a' },
-    ]);
+    prisma.olympiadOrganiser.findMany.mockResolvedValue([{ olympiadId: 'oly-a' }]);
     prisma.olympiad.findMany.mockResolvedValue([
       { id: 'oly-a', name: 'Olympiad A', organiserId: 'org-1' },
     ]);
@@ -324,6 +324,9 @@ describe('#181 – Audit log', () => {
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.schoolOlympiad, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    // isOlympiadOrganiser falls back to the olympiad creator — default to
+    // "no creator match" so the non-member denial tests below stay 403.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -350,9 +353,27 @@ describe('#181 – Audit log', () => {
       olympiad: { id: 'oly-1', name: 'Test Olympiad', timezone: 'UTC' },
     });
     prisma.auditLog.findMany.mockResolvedValue([
-      { id: 'log-1', action: 'round_opened', timestamp: new Date('2026-06-15T08:00:00Z'), roundId: 'r1', payload: {} },
-      { id: 'log-2', action: 'round_closed', timestamp: new Date('2026-06-15T12:00:00Z'), roundId: 'r1', payload: {} },
-      { id: 'log-3', action: 'notification_sent', timestamp: new Date('2026-06-15T13:00:00Z'), roundId: 'r1', payload: {} },
+      {
+        id: 'log-1',
+        action: 'round_opened',
+        timestamp: new Date('2026-06-15T08:00:00Z'),
+        roundId: 'r1',
+        payload: {},
+      },
+      {
+        id: 'log-2',
+        action: 'round_closed',
+        timestamp: new Date('2026-06-15T12:00:00Z'),
+        roundId: 'r1',
+        payload: {},
+      },
+      {
+        id: 'log-3',
+        action: 'notification_sent',
+        timestamp: new Date('2026-06-15T13:00:00Z'),
+        roundId: 'r1',
+        payload: {},
+      },
     ]);
 
     app = createRoundsApp('organiser', 'org-1');
@@ -390,8 +411,20 @@ describe('#181 – Audit log', () => {
     const logs = [
       { id: 'l1', action: 'round_opened', timestamp: new Date(), roundId: 'r1', payload: {} },
       { id: 'l2', action: 'round_closed', timestamp: new Date(), roundId: 'r1', payload: {} },
-      { id: 'l3', action: 'auto_advanced', timestamp: new Date(), roundId: 'r1', payload: { entrantId: 'e1', entrantName: 'Alice', nextRoundId: 'r2' } },
-      { id: 'l4', action: 'notification_sent', timestamp: new Date(), roundId: 'r1', payload: { triggerType: 'before_open', recipientEmail: 'edu@test.com' } },
+      {
+        id: 'l3',
+        action: 'auto_advanced',
+        timestamp: new Date(),
+        roundId: 'r1',
+        payload: { entrantId: 'e1', entrantName: 'Alice', nextRoundId: 'r2' },
+      },
+      {
+        id: 'l4',
+        action: 'notification_sent',
+        timestamp: new Date(),
+        roundId: 'r1',
+        payload: { triggerType: 'before_open', recipientEmail: 'edu@test.com' },
+      },
     ];
     prisma.auditLog.findMany.mockResolvedValue(logs);
 
@@ -480,6 +513,9 @@ describe('#186 – Round replay', () => {
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.schoolOlympiad, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
+    // isOlympiadOrganiser falls back to the olympiad creator — default to
+    // "no creator match" so the non-member denial tests below stay 403.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -509,8 +545,20 @@ describe('#186 – Round replay', () => {
       olympiad: { id: 'oly-1', name: 'Wits Maths Olympiad', timezone: 'UTC' },
     });
     prisma.auditLog.findMany.mockResolvedValue([
-      { id: 'l1', action: 'round_opened', timestamp: new Date('2026-06-15T08:00:00Z'), roundId: 'r1', payload: {} },
-      { id: 'l2', action: 'round_closed', timestamp: new Date('2026-06-15T12:00:00Z'), roundId: 'r1', payload: {} },
+      {
+        id: 'l1',
+        action: 'round_opened',
+        timestamp: new Date('2026-06-15T08:00:00Z'),
+        roundId: 'r1',
+        payload: {},
+      },
+      {
+        id: 'l2',
+        action: 'round_closed',
+        timestamp: new Date('2026-06-15T12:00:00Z'),
+        roundId: 'r1',
+        payload: {},
+      },
     ]);
 
     app = createRoundsApp('organiser', 'org-1');
@@ -548,10 +596,34 @@ describe('#186 – Round replay', () => {
       olympiad: { id: 'oly-1', name: 'Test', timezone: 'UTC' },
     });
     prisma.auditLog.findMany.mockResolvedValue([
-      { id: 'l1', action: 'round_opened', timestamp: new Date('2026-06-15T08:00:00Z'), roundId: 'r1', payload: {} },
-      { id: 'l2', action: 'round_closed', timestamp: new Date('2026-06-15T12:00:00Z'), roundId: 'r1', payload: {} },
-      { id: 'l3', action: 'auto_advanced', timestamp: new Date('2026-06-15T12:30:00Z'), roundId: 'r1', payload: { entrantName: 'Alice', nextRoundId: 'r2' } },
-      { id: 'l4', action: 'notification_sent', timestamp: new Date('2026-06-15T07:00:00Z'), roundId: 'r1', payload: { triggerType: 'before_open', recipientEmail: 'edu@test.com' } },
+      {
+        id: 'l1',
+        action: 'round_opened',
+        timestamp: new Date('2026-06-15T08:00:00Z'),
+        roundId: 'r1',
+        payload: {},
+      },
+      {
+        id: 'l2',
+        action: 'round_closed',
+        timestamp: new Date('2026-06-15T12:00:00Z'),
+        roundId: 'r1',
+        payload: {},
+      },
+      {
+        id: 'l3',
+        action: 'auto_advanced',
+        timestamp: new Date('2026-06-15T12:30:00Z'),
+        roundId: 'r1',
+        payload: { entrantName: 'Alice', nextRoundId: 'r2' },
+      },
+      {
+        id: 'l4',
+        action: 'notification_sent',
+        timestamp: new Date('2026-06-15T07:00:00Z'),
+        roundId: 'r1',
+        payload: { triggerType: 'before_open', recipientEmail: 'edu@test.com' },
+      },
     ]);
 
     app = createRoundsApp('organiser', 'org-1');
@@ -671,7 +743,8 @@ describe('#242 – Co-organiser access', () => {
     vi.spyOn(prisma.round, 'findUnique');
     vi.spyOn(prisma.round, 'findMany');
     vi.spyOn(prisma.roundEntrant, 'findMany');
-    vi.spyOn(prisma.olympiad, 'findUnique');
+    // The fallback creator lookup must not rescue AC4's removed co-organiser.
+    vi.spyOn(prisma.olympiad, 'findUnique').mockResolvedValue(null);
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findMany');
     vi.spyOn(prisma.olympiadOrganiser, 'create');
@@ -903,9 +976,7 @@ describe('#242 – Co-organiser access', () => {
     prisma.olympiad.findUnique.mockResolvedValue({ id: 'oly-a', organiserId: 'org-1' });
 
     organisersApp = createOrganisersApp();
-    const res = await request(organisersApp).delete(
-      '/api/olympiads/oly-a/organisers/co-org-2'
-    );
+    const res = await request(organisersApp).delete('/api/olympiads/oly-a/organisers/co-org-2');
 
     expect(res.status).toBe(403);
     expect(res.body.error).toMatch(/creator/i);

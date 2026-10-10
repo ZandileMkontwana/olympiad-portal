@@ -230,7 +230,10 @@ describe('Marking routes', () => {
       prisma.markingTask.findUnique.mockResolvedValue({
         id: 'task-1',
         status: 'assigned',
-        submission: { round: { olympiadId: 'oly-1' } },
+        submission: {
+          round: { olympiadId: 'oly-1' },
+          entrant: { name: 'Test Entrant' },
+        },
       });
       prisma.markingTask.update.mockResolvedValue({
         id: 'task-1',

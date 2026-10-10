@@ -32,6 +32,7 @@ vi.mock('@/lib/api', () => ({
 
 import StudentResultPage from './page';
 import { fetchMyResult } from '@/lib/api';
+import { expectNoAxeViolations } from '@/test/axe';
 
 function question(overrides = {}) {
   return {
@@ -76,6 +77,21 @@ describe('StudentResultPage', () => {
     await waitFor(() =>
       expect(fetchMyResult).toHaveBeenCalledWith('result-1', 'mock-token')
     );
+  });
+
+  it('has no axe accessibility violations', async () => {
+    fetchMyResult.mockResolvedValue(
+      resultData({
+        score: 80,
+        questions: [
+          question({ questionId: 'q1' }),
+          question({ questionId: 'q2', correctAnswer: 'B', studentAnswer: 'C', isCorrect: false }),
+        ],
+      })
+    );
+    const { container } = render(<StudentResultPage />);
+    await screen.findByText('80%');
+    await expectNoAxeViolations(container);
   });
 
   it('renders the score, round name and question review', async () => {

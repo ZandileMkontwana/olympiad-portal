@@ -5,6 +5,11 @@ import userEvent from '@testing-library/user-event';
 const mockUseRequireRole = vi.fn();
 const mockGetToken = vi.fn();
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/organiser/test',
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
+
 vi.mock('@/hooks/useRequireRole', () => ({
   useRequireRole: () => mockUseRequireRole(),
 }));

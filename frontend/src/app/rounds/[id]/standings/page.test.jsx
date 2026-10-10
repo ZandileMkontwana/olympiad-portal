@@ -26,6 +26,7 @@ vi.mock('@/lib/api', () => ({
 
 import { fetchStandings, getSchoolStandings } from '@/lib/api';
 import StandingsPage from './page';
+import { expectNoAxeViolations } from '@/test/axe';
 
 describe('StandingsPage', () => {
   beforeEach(() => {
@@ -49,6 +50,22 @@ describe('StandingsPage', () => {
       expect(await screen.findByText(/no scored submissions yet/i)).toBeInTheDocument();
     });
 
+    it('has no axe accessibility violations', async () => {
+      fetchStandings.mockResolvedValue([
+        {
+          rank: 1,
+          entrantId: 'entrant-1',
+          entrantName: 'Thabo',
+          schoolName: 'Wits High School',
+          score: 20,
+          submittedAt: '2026-09-12T20:56:55.855Z',
+        },
+      ]);
+      const { container } = render(<StandingsPage />);
+      await screen.findByText('Thabo');
+      await expectNoAxeViolations(container);
+    });
+
     it('renders the ranked table when standings are returned', async () => {
       fetchStandings.mockResolvedValue([
         {
@@ -66,6 +83,59 @@ describe('StandingsPage', () => {
       expect(await screen.findByText('Thabo')).toBeInTheDocument();
       expect(screen.getByText('Wits High School')).toBeInTheDocument();
       expect(screen.getByText('20.00')).toBeInTheDocument();
+    });
+
+    it('does not show a Variants column when no entrant has variant info (#263)', async () => {
+      fetchStandings.mockResolvedValue([
+        {
+          rank: 1,
+          entrantId: 'entrant-1',
+          entrantName: 'Thabo',
+          schoolName: 'Wits High School',
+          score: 20,
+          submittedAt: '2026-09-12T20:56:55.855Z',
+          variants: [],
+        },
+      ]);
+
+      render(<StandingsPage />);
+
+      await screen.findByText('Thabo');
+      expect(screen.queryByText('Variants')).not.toBeInTheDocument();
+    });
+
+    it('shows a Variants column with each entrant\'s assigned variants when present (#263)', async () => {
+      fetchStandings.mockResolvedValue([
+        {
+          rank: 1,
+          entrantId: 'entrant-1',
+          entrantName: 'Thabo',
+          schoolName: 'Wits High School',
+          score: 20,
+          submittedAt: '2026-09-12T20:56:55.855Z',
+          variants: [
+            { questionNumber: 1, variantLabel: 'Variant B' },
+            { questionNumber: 3, variantLabel: 'Variant A' },
+          ],
+        },
+        {
+          rank: 2,
+          entrantId: 'entrant-2',
+          entrantName: 'Naledi',
+          schoolName: "St Mary's",
+          score: 15,
+          submittedAt: '2026-09-12T21:00:00.000Z',
+          variants: [],
+        },
+      ]);
+
+      render(<StandingsPage />);
+
+      await screen.findByText('Thabo');
+      expect(screen.getByText('Variants')).toBeInTheDocument();
+      expect(screen.getByText('Q1: Variant B, Q3: Variant A')).toBeInTheDocument();
+      // Naledi has no resolved variants — shown as an em dash, not blank.
+      expect(screen.getByText('—')).toBeInTheDocument();
     });
 
     it('shows an error message when the fetch fails', async () => {

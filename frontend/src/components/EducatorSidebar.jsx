@@ -1,13 +1,23 @@
 'use client';
 
-// Shared educator sidebar — rendered once by the /educator layout so it stays
-// mounted while educators move between the olympiads board, school dashboard,
-// archive, round detail and submission pages (only the main content swaps).
-// The shell owns the collapsed state; the sidebar collapses to an icon rail.
-
+import { useState } from 'react';
+import Modal from '@/components/Modal';
+import { useTour } from '@/components/OnboardingTour';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useClerk, useUser } from '@clerk/nextjs';
+import {
+  LayoutDashboard,
+  Trophy,
+  Users,
+  FileText,
+  Settings2,
+  CircleHelp,
+  ArrowRight,
+  GraduationCap,
+  MoreHorizontal,
+  X,
+} from 'lucide-react';
 
 function initials(name) {
   return (name || '')
@@ -18,35 +28,66 @@ function initials(name) {
     .join('');
 }
 
-const LINKS = [
+const WORKSPACE_LINKS = [
   {
     href: '/educator',
-    icon: '🏆',
+    icon: Trophy,
     label: 'Olympiads',
-    // Round detail + result submission belong to the Olympiads section too.
     match: (p) =>
       p === '/educator' || p.startsWith('/educator/round_view') || p.startsWith('/educator/submit'),
   },
   {
     href: '/educator/school',
-    icon: '🏫',
+    icon: Users,
     label: 'School Dashboard',
+    tour: 'educator-nav-school',
     match: (p) => p.startsWith('/educator/school'),
   },
   {
     href: '/educator/archive',
-    icon: '📂',
+    icon: FileText,
     label: 'Archive',
     match: (p) => p.startsWith('/educator/archive'),
   },
 ];
 
-export default function EducatorSidebar({ collapsed = false, onToggle }) {
+export default function EducatorSidebar({ collapsed = false, onToggle, open = false, onClose }) {
   const pathname = usePathname() || '';
   const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
+  const { startTour } = useTour();
+  const [showSettings, setShowSettings] = useState(false);
 
-  const name = clerkUser?.fullName || clerkUser?.primaryEmailAddress?.emailAddress || '';
+  if (!clerkUser) {
+    return (
+      <aside className="sidebar">
+        <div className="sidebar-top">
+          <div className="brand">
+            <div className="brand-mark">
+              <GraduationCap />
+            </div>
+            <div>
+              <strong>Olympiad</strong>
+              <span>PORTAL</span>
+            </div>
+          </div>
+        </div>
+        <div
+          style={{
+            padding: '20px',
+            textAlign: 'center',
+            color: 'var(--c-t-706391)',
+            fontSize: '13px',
+          }}
+        >
+          Loading account...
+        </div>
+      </aside>
+    );
+  }
+
+  const name = clerkUser.fullName || clerkUser.primaryEmailAddress?.emailAddress || 'Educator';
+  const userInitials = initials(name);
 
   async function handleLogout() {
     if (!window.confirm('Are you sure you want to log out?')) return;
@@ -54,227 +95,149 @@ export default function EducatorSidebar({ collapsed = false, onToggle }) {
   }
 
   return (
-    <aside
-      style={{
-        width: collapsed ? '72px' : '240px',
-        flexShrink: 0,
-        height: '100vh',
-        background: 'white',
-        borderRight: '1px solid rgba(139,92,246,0.1)',
-        padding: collapsed ? '24px 10px' : '24px 18px',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        overflowX: 'hidden',
-        overflowY: 'auto',
-        zIndex: 10,
-        transition: 'width 0.2s ease, padding 0.2s ease',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: collapsed ? 'column' : 'row',
-          alignItems: 'center',
-          gap: '10px',
-          padding: collapsed ? '0 0 24px' : '0 6px 24px',
-        }}
+    <>
+      <aside
+        id="app-sidebar"
+        className={`sidebar${open ? ' sidebar-open' : ''}`}
+        style={collapsed ? { width: '60px' } : undefined}
       >
-        <div
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #8b5cf6, #6d3fd1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 800,
-            flexShrink: 0,
-          }}
-        >
-          O
-        </div>
-        {!collapsed && (
-          <div>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9em', color: '#2d2640' }}>
-              Olympiad Portal
-            </p>
-            <p style={{ margin: 0, fontSize: '0.7em', color: '#a89fc9' }}>Educator</p>
-          </div>
-        )}
-        {onToggle && (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            style={{
-              marginLeft: collapsed ? 0 : 'auto',
-              border: '1px solid rgba(139,92,246,0.25)',
-              background: 'transparent',
-              borderRadius: '8px',
-              padding: '4px 9px',
-              cursor: 'pointer',
-              fontSize: '0.85em',
-              color: '#6b6480',
-              lineHeight: 1,
-              flexShrink: 0,
-            }}
-          >
-            {collapsed ? '»' : '«'}
-          </button>
-        )}
-      </div>
-
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-        {LINKS.map((l) => {
-          const active = l.match(pathname);
-          return (
-            <Link
-              key={l.label}
-              href={l.href}
-              title={l.label}
-              aria-current={active ? 'page' : undefined}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                gap: collapsed ? 0 : '12px',
-                padding: collapsed ? '11px 0' : '11px 14px',
-                borderRadius: '10px',
-                textDecoration: 'none',
-                fontSize: '0.88em',
-                fontWeight: 600,
-                color: active ? '#6d3fd1' : '#6b6480',
-                background: active ? 'rgba(139,92,246,0.1)' : 'transparent',
-              }}
-            >
-              <span style={{ fontSize: '1.1em' }}>{l.icon}</span>
-              {!collapsed && l.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {clerkUser ? (
-        collapsed ? (
-          <div
-            style={{
-              borderTop: '1px solid rgba(139,92,246,0.1)',
-              paddingTop: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '10px',
-            }}
-          >
-            <div
-              title={name}
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '0.8em',
-                flexShrink: 0,
-              }}
-            >
-              {initials(name)}
+        <div className="sidebar-top">
+          <div className="brand">
+            <div className="brand-mark">
+              <GraduationCap />
             </div>
+            {!collapsed && (
+              <div>
+                <strong>Olympiad</strong>
+                <span>PORTAL</span>
+              </div>
+            )}
+          </div>
+          {onClose && (
             <button
               type="button"
-              onClick={handleLogout}
-              aria-label="Log out"
-              title="Log out"
-              style={{
-                border: 'none',
-                background: 'none',
-                padding: '2px 4px',
-                cursor: 'pointer',
-                fontSize: '0.9em',
-                color: '#e0615f',
-                fontWeight: 700,
-                lineHeight: 1,
-              }}
+              className="icon-button mobile-close"
+              onClick={onClose}
+              aria-label="Close menu"
             >
-              ⏻
+              <X aria-hidden="true" />
             </button>
-          </div>
-        ) : (
-          <div
-            style={{
-              borderTop: '1px solid rgba(139,92,246,0.1)',
-              paddingTop: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-            }}
-          >
-            <div
+          )}
+          {onToggle && (
+            <button
+              onClick={onToggle}
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '0.8em',
-                flexShrink: 0,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                color: 'var(--c-t-706391)',
               }}
             >
-              {initials(name)}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: '0.8em',
-                  fontWeight: 600,
-                  color: '#2d2640',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
+              {collapsed ? '→' : '←'}
+            </button>
+          )}
+        </div>
+        <nav className="side-nav" aria-label="Main navigation">
+          {!collapsed && <p className="nav-label">Workspace</p>}
+          {WORKSPACE_LINKS.map(({ href, icon: Icon, label, match, tour }) => {
+            const active = match(pathname);
+            return (
+              <Link
+                key={label}
+                href={href}
+                className={`nav-item${active ? ' nav-selected' : ''}`}
+                aria-current={active ? 'page' : undefined}
+                title={collapsed ? label : undefined}
+                data-tour={tour}
+                onClick={onClose}
               >
-                {name}
-              </p>
+                <Icon /> {!collapsed && <span>{label}</span>}
+              </Link>
+            );
+          })}
+          {!collapsed && <p className="nav-label nav-label-spaced">Manage</p>}
+          <button
+            className="nav-item"
+            onClick={() => {
+              setShowSettings(true);
+            }}
+            title={collapsed ? 'Settings' : undefined}
+          >
+            <Settings2 />
+            {!collapsed && <span>Settings</span>}
+          </button>
+        </nav>
+        {!collapsed && (
+          <>
+            <div className="sidebar-help">
+              <div className="help-icon">
+                <CircleHelp />
+              </div>
+              <div>
+                <strong>Need a hand?</strong>
+                <span>Visit the help centre</span>
+              </div>
+              <ArrowRight />
+            </div>
+            <div className="sidebar-profile">
+              <div className="avatar">{userInitials}</div>
+              <div>
+                <strong>{name}</strong>
+                <span>
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'var(--c-t-b42318)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Log out
+                  </button>
+                </span>
+              </div>
+              <MoreHorizontal className="profile-more" />
+            </div>
+          </>
+        )}
+      </aside>
+
+      {showSettings && (
+        <Modal title="Settings" onClose={() => setShowSettings(false)}>
+          <div className="modal-stack">
+            <section className="modal-card" aria-labelledby="settings-profile">
+              <h3 id="settings-profile">Profile</h3>
+              <p>Name: {name}</p>
+              <p>Email: {clerkUser?.primaryEmailAddress?.emailAddress || 'N/A'}</p>
+            </section>
+            <section className="modal-card" aria-labelledby="settings-prefs">
+              <h3 id="settings-prefs">Preferences</h3>
+              <p>Notification settings and preferences will be available here.</p>
+            </section>
+            <section className="modal-card" aria-labelledby="settings-tour">
+              <h3 id="settings-tour">Onboarding</h3>
+              <p>Take the short guided tour of the portal again.</p>
               <button
                 type="button"
-                onClick={handleLogout}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  fontSize: '0.75em',
-                  color: '#e0615f',
-                  fontWeight: 600,
+                className="modal-action"
+                onClick={() => {
+                  setShowSettings(false);
+                  startTour();
                 }}
               >
-                Log out
+                Replay tour
               </button>
-            </div>
+            </section>
           </div>
-        )
-      ) : (
-        !collapsed && (
-          <p style={{ margin: 0, fontSize: '0.75em', color: '#a89fc9' }}>Loading account…</p>
-        )
+        </Modal>
       )}
-    </aside>
+    </>
   );
 }

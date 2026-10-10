@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import * as XLSX from 'xlsx';
+import TableScroll from '@/components/TableScroll';
 
 function SubmissionTableContent() {
   const searchParams = useSearchParams();
@@ -48,9 +49,7 @@ function SubmissionTableContent() {
     async function fetchData() {
       try {
         const token = await getToken();
-        const authHeaders = token
-          ? { Authorization: `Bearer ${token}` }
-          : {};
+        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
         const [roundRes, entrantsRes, paperRes, submissionsRes] = await Promise.all([
           fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/rounds/${roundId}`, {
@@ -309,7 +308,9 @@ function SubmissionTableContent() {
   if (error) {
     return (
       <div className="round-page">
-        <div className="message">{error}</div>
+        <div className="message" role="alert">
+          {error}
+        </div>
       </div>
     );
   }
@@ -406,7 +407,7 @@ function SubmissionTableContent() {
                 type="file"
                 accept=".xlsx,.csv"
                 onChange={handleFileUpload}
-                style={{ display: 'none' }}
+                className="sr-only"
               />
             </label>
 
@@ -420,76 +421,87 @@ function SubmissionTableContent() {
             </button>
           </div>
 
-          {uploadError && <p className="message">{uploadError}</p>}
+          {uploadError && (
+            <p className="message" role="alert">
+              {uploadError}
+            </p>
+          )}
 
-          <table className="card" style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '8px 16px', textAlign: 'left' }}>Entrant</th>
-                {questions.map((q) => (
-                  <th key={q} style={{ padding: '8px 16px', textAlign: 'center' }}>
-                    Q{q}
-                  </th>
-                ))}
-                <th style={{ padding: '8px 16px' }}>Score</th>
-                <th style={{ padding: '8px 16px' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {entrants.map((entrant) => {
-                const status = rowStatus[entrant.id] || { state: 'idle' };
-                const liveScore = computeLiveScore(entrant.id);
-                const displayScore = status.state === 'success' ? status.score : liveScore;
-                const isFailed = status.state === 'error';
+          <TableScroll label="Entrant answers">
+            <table className="card" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: '8px 16px', textAlign: 'left' }}>Entrant</th>
+                  {questions.map((q) => (
+                    <th key={q} style={{ padding: '8px 16px', textAlign: 'center' }}>
+                      Q{q}
+                    </th>
+                  ))}
+                  <th style={{ padding: '8px 16px' }}>Score</th>
+                  <th style={{ padding: '8px 16px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {entrants.map((entrant) => {
+                  const status = rowStatus[entrant.id] || { state: 'idle' };
+                  const liveScore = computeLiveScore(entrant.id);
+                  const displayScore = status.state === 'success' ? status.score : liveScore;
+                  const isFailed = status.state === 'error';
 
-                return (
-                  <tr
-                    key={entrant.id}
-                    style={isFailed ? { backgroundColor: '#fef2f2' } : undefined}
-                  >
-                    <td style={{ padding: '8px 16px' }}>{entrant.name}</td>
-                    {questions.map((q) => (
-                      <td key={q} style={{ padding: '8px 16px', textAlign: 'center' }}>
-                        <input
-                          type="text"
-                          maxLength={1}
-                          placeholder="—"
-                          value={(answers[entrant.id] && answers[entrant.id][q]) || ''}
-                          onChange={(e) => updateAnswer(entrant.id, q, e.target.value)}
-                          style={{ width: '36px', textAlign: 'center' }}
-                          disabled={status.state === 'submitting'}
-                        />
+                  return (
+                    <tr
+                      key={entrant.id}
+                      style={isFailed ? { backgroundColor: 'var(--c-bg-fef2f2)' } : undefined}
+                    >
+                      <td style={{ padding: '8px 16px' }}>{entrant.name}</td>
+                      {questions.map((q) => (
+                        <td key={q} style={{ padding: '8px 16px', textAlign: 'center' }}>
+                          <input
+                            aria-label={`Answer for ${entrant.name}, question ${q}`}
+                            type="text"
+                            maxLength={1}
+                            placeholder="—"
+                            value={(answers[entrant.id] && answers[entrant.id][q]) || ''}
+                            onChange={(e) => updateAnswer(entrant.id, q, e.target.value)}
+                            style={{ width: '36px', textAlign: 'center' }}
+                            disabled={status.state === 'submitting'}
+                          />
+                        </td>
+                      ))}
+                      <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                        {displayScore !== null ? `${displayScore.toFixed(1)}%` : '—'}
+                        {status.state === 'idle' && liveScore !== null && (
+                          <span style={{ fontSize: '0.75em', opacity: 0.6 }}> (preview)</span>
+                        )}
+                        {status.state === 'success' && (
+                          <span style={{ fontSize: '0.75em', opacity: 0.6 }}> ✓ saved</span>
+                        )}
                       </td>
-                    ))}
-                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>
-                      {displayScore !== null ? `${displayScore.toFixed(1)}%` : '—'}
-                      {status.state === 'idle' && liveScore !== null && (
-                        <span style={{ fontSize: '0.75em', opacity: 0.6 }}> (preview)</span>
-                      )}
-                      {status.state === 'success' && (
-                        <span style={{ fontSize: '0.75em', opacity: 0.6 }}> ✓ saved</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '8px 16px' }}>
-                      <button
-                        type="button"
-                        onClick={() => submitRow(entrant.id)}
-                        disabled={status.state === 'submitting'}
-                        className="button"
-                      >
-                        {status.state === 'submitting'
-                          ? '…'
-                          : status.state === 'success'
-                            ? 'Resubmit'
-                            : 'Submit'}
-                      </button>
-                      {status.state === 'error' && <p className="message">{status.message}</p>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <td style={{ padding: '8px 16px' }}>
+                        <button
+                          type="button"
+                          onClick={() => submitRow(entrant.id)}
+                          disabled={status.state === 'submitting'}
+                          className="button"
+                        >
+                          {status.state === 'submitting'
+                            ? '…'
+                            : status.state === 'success'
+                              ? 'Resubmit'
+                              : 'Submit'}
+                        </button>
+                        {status.state === 'error' && (
+                          <p className="message" role="alert">
+                            {status.message}
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableScroll>
         </>
       )}
 
@@ -498,43 +510,47 @@ function SubmissionTableContent() {
           <h2>
             Receipt — {receipt.length} of {entrants.length} accepted
           </h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '4px 12px', textAlign: 'left' }}>Entrant</th>
-                <th style={{ padding: '4px 12px', textAlign: 'left' }}>Answers</th>
-                <th style={{ padding: '4px 12px', textAlign: 'center' }}>Score</th>
-                <th style={{ padding: '4px 12px', textAlign: 'left' }}>Accepted at</th>
-                <th style={{ padding: '4px 12px', textAlign: 'left' }}>Submission ID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {receipt.map((entry) => (
-                <tr key={entry.entrantId}>
-                  <td style={{ padding: '4px 12px' }}>{entry.entrantName}</td>
-                  <td
-                    style={{
-                      padding: '4px 12px',
-                      fontFamily: 'monospace',
-                      maxWidth: '300px',
-                      whiteSpace: 'normal',
-                    }}
-                  >
-                    {questions.map((q) => `Q${q}:${entry.answers[q] || '-'}`).join('  ')}
-                  </td>
-                  <td style={{ padding: '4px 12px', textAlign: 'center' }}>
-                    {entry.score !== null ? `${entry.score.toFixed(1)}%` : '—'}
-                  </td>
-                  <td style={{ padding: '4px 12px' }}>
-                    {new Date(entry.submittedAt).toLocaleString()}
-                  </td>
-                  <td style={{ padding: '4px 12px', fontFamily: 'monospace', fontSize: '0.85em' }}>
-                    {entry.submissionId || '—'}
-                  </td>
+          <TableScroll label="Submission receipt">
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ padding: '4px 12px', textAlign: 'left' }}>Entrant</th>
+                  <th style={{ padding: '4px 12px', textAlign: 'left' }}>Answers</th>
+                  <th style={{ padding: '4px 12px', textAlign: 'center' }}>Score</th>
+                  <th style={{ padding: '4px 12px', textAlign: 'left' }}>Accepted at</th>
+                  <th style={{ padding: '4px 12px', textAlign: 'left' }}>Submission ID</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {receipt.map((entry) => (
+                  <tr key={entry.entrantId}>
+                    <td style={{ padding: '4px 12px' }}>{entry.entrantName}</td>
+                    <td
+                      style={{
+                        padding: '4px 12px',
+                        fontFamily: 'monospace',
+                        maxWidth: '300px',
+                        whiteSpace: 'normal',
+                      }}
+                    >
+                      {questions.map((q) => `Q${q}:${entry.answers[q] || '-'}`).join('  ')}
+                    </td>
+                    <td style={{ padding: '4px 12px', textAlign: 'center' }}>
+                      {entry.score !== null ? `${entry.score.toFixed(1)}%` : '—'}
+                    </td>
+                    <td style={{ padding: '4px 12px' }}>
+                      {new Date(entry.submittedAt).toLocaleString()}
+                    </td>
+                    <td
+                      style={{ padding: '4px 12px', fontFamily: 'monospace', fontSize: '0.85em' }}
+                    >
+                      {entry.submissionId || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
         </div>
       )}
     </div>

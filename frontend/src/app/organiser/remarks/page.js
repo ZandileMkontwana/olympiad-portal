@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import OrganiserShell from '@/components/OrganiserShell';
 import {
   listAllOrganisers,
   listRemarkQueue,
@@ -167,19 +166,15 @@ export default function RemarksPage() {
 
   if (checking) {
     return (
-      <main className="organiser-shell">
-        <p style={{ padding: '48px', fontSize: '14px', color: '#817a91' }}>Loading...</p>
-      </main>
+      <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
     );
   }
 
   return (
-    <OrganiserShell activeNav="remarks" breadcrumb="Appeals" user={user}>
+    <>
       <div className="organiser-page-heading">
         <h1>Appeals</h1>
-        <p>
-          Route pending appeals to a reviewer, then decide the ones assigned to you.
-        </p>
+        <p>Route pending appeals to a reviewer, then decide the ones assigned to you.</p>
       </div>
 
       <h2 style={{ marginBottom: '8px' }}>Pending appeals</h2>
@@ -244,7 +239,10 @@ export default function RemarksPage() {
                 </div>
               </div>
               {assignErrorId === r.id && (
-                <p role="alert" style={{ color: 'red', fontSize: '0.9em', margin: '8px 0 0 0' }}>
+                <p
+                  role="alert"
+                  style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', margin: '8px 0 0 0' }}
+                >
                   {assignError}
                 </p>
               )}
@@ -315,7 +313,7 @@ export default function RemarksPage() {
                         justifyContent: 'space-between',
                         gap: '10px',
                         fontSize: '0.9em',
-                        borderBottom: '1px solid #eee',
+                        borderBottom: '1px solid var(--c-bd-eeeeee)',
                         paddingBottom: '4px',
                       }}
                     >
@@ -333,7 +331,10 @@ export default function RemarksPage() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '16px', margin: '12px 0' }}>
+          <fieldset
+            style={{ display: 'flex', gap: '16px', margin: '12px 0', border: 0, padding: 0 }}
+          >
+            <legend className="sr-only">Decision</legend>
             <label>
               <input
                 type="radio"
@@ -354,7 +355,7 @@ export default function RemarksPage() {
               />{' '}
               Reject
             </label>
-          </div>
+          </fieldset>
 
           {decision === 'approved' && (
             <div style={{ marginBottom: '12px' }}>
@@ -383,7 +384,10 @@ export default function RemarksPage() {
           </div>
 
           {formStatus === 'error' && (
-            <p role="alert" style={{ color: 'red', fontSize: '0.9em', marginBottom: '8px' }}>
+            <p
+              role="alert"
+              style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em', marginBottom: '8px' }}
+            >
               {formError}
             </p>
           )}
@@ -403,6 +407,6 @@ export default function RemarksPage() {
           </div>
         </form>
       )}
-    </OrganiserShell>
+    </>
   );
 }

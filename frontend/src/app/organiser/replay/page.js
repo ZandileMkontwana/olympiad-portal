@@ -3,18 +3,44 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import OrganiserShell from '@/components/OrganiserShell';
 import { listOlympiads, fetchRoundReplay, ApiError } from '@/lib/api';
 
 const ACTION_STYLES = {
-  round_opened: { color: '#16a34a', bg: '#f0fdf4', label: 'Round opened', icon: '▶' },
-  round_closed: { color: '#dc2626', bg: '#fef2f2', label: 'Round closed', icon: '■' },
-  auto_advanced: { color: '#2563eb', bg: '#eff6ff', label: 'Auto-advanced', icon: '→' },
-  notification_sent: { color: '#9333ea', bg: '#faf5ff', label: 'Notification', icon: '✉' },
+  round_opened: {
+    color: 'var(--c-t-117b38)',
+    bg: 'var(--c-bg-f0fdf4)',
+    label: 'Round opened',
+    icon: '▶',
+  },
+  round_closed: {
+    color: 'var(--c-t-cf2121)',
+    bg: 'var(--c-bg-fef2f2)',
+    label: 'Round closed',
+    icon: '■',
+  },
+  auto_advanced: {
+    color: 'var(--c-t-1e5eea)',
+    bg: 'var(--c-bg-eff6ff)',
+    label: 'Auto-advanced',
+    icon: '→',
+  },
+  notification_sent: {
+    color: 'var(--c-t-9333ea)',
+    bg: 'var(--c-bg-faf5ff)',
+    label: 'Notification',
+    icon: '✉',
+  },
 };
 
 function actionMeta(action) {
-  return ACTION_STYLES[action] || { color: '#6b7280', bg: '#f9fafb', label: action, icon: '•' };
+  return (
+    ACTION_STYLES[action] || {
+      color: 'var(--c-t-646b78)',
+      bg: 'var(--c-bg-f9fafb)',
+      label: action,
+      icon: '•',
+    }
+  );
 }
 
 function formatTimestamp(iso) {
@@ -79,11 +105,7 @@ export default function ReplayPage() {
   }, [selectedRoundId, getToken]);
 
   if (checking) {
-    return (
-      <OrganiserShell activeNav="replay" breadcrumb="Replay" user={user}>
-        <p>Loading...</p>
-      </OrganiserShell>
-    );
+    return <p>Loading...</p>;
   }
 
   // Build a flat list of all rounds across olympiads for the dropdown.
@@ -92,7 +114,7 @@ export default function ReplayPage() {
   );
 
   return (
-    <OrganiserShell activeNav="replay" breadcrumb="Replay" user={user}>
+    <>
       <div className="organiser-page-heading">
         <h1>Round Replay</h1>
         <p>View the timeline of automatic actions the scheduler performed on a round.</p>
@@ -132,7 +154,11 @@ export default function ReplayPage() {
       {status === 'loading' && <p className="description">Loading replay data...</p>}
 
       {/* Error */}
-      {status === 'error' && <p style={{ color: 'red', fontSize: '0.9em' }}>{error}</p>}
+      {status === 'error' && (
+        <p role="alert" style={{ color: 'var(--c-t-b42318)', fontSize: '0.9em' }}>
+          {error}
+        </p>
+      )}
 
       {/* Replay timeline */}
       {status === 'ready' && replay && (
@@ -219,7 +245,7 @@ export default function ReplayPage() {
                           padding: '10px 14px',
                           borderRadius: '8px',
                           backgroundColor: meta.bg,
-                          border: `1px solid ${meta.color}22`,
+                          border: `1px solid color-mix(in srgb, ${meta.color} 13%, transparent)`,
                         }}
                       >
                         <div
@@ -245,14 +271,14 @@ export default function ReplayPage() {
                           <span
                             style={{
                               fontSize: '0.75em',
-                              color: '#6b7280',
+                              color: 'var(--c-t-646b78)',
                               whiteSpace: 'nowrap',
                             }}
                           >
                             {formatTimestamp(entry.timestamp)}
                           </span>
                         </div>
-                        <p style={{ margin: 0, fontSize: '0.85em', color: '#374151' }}>
+                        <p style={{ margin: 0, fontSize: '0.85em', color: 'var(--c-t-374151)' }}>
                           {entry.summary}
                         </p>
                       </div>
@@ -264,6 +290,6 @@ export default function ReplayPage() {
           )}
         </div>
       )}
-    </OrganiserShell>
+    </>
   );
 }

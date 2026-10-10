@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
+const activityBus = require('../lib/activityBus');
 const { requireRole } = require('../middleware/auth');
 const { TRANSACTION_OPTIONS } = require('../lib/transactionOptions');
 const { isDbBusyError, respondDbBusy } = require('../lib/dbErrors');
@@ -143,6 +144,15 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
         submittedAt: submission.submittedAt,
       });
     }
+
+    // Live activity feed (US-4.1): a new submission landed for this round.
+    activityBus.broadcast({
+      type: 'submission_received',
+      message: `${entrant.name} submitted for ${round.name}`,
+      roundId: round.id,
+      olympiadId: round.olympiadId,
+      schoolId: entrant.schoolId,
+    });
   } catch (err) {
     if (err.httpStatus) {
       return res.status(err.httpStatus).json({ error: err.message });

@@ -1,25 +1,33 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import '@/app/auth.css';
 import {
   Archive as ArchiveIcon,
   Bell,
-  CalendarDays,
   ChevronRight,
   ClipboardCheck,
   History,
   LayoutDashboard,
   MessageSquareQuote,
+  Menu,
   MoreHorizontal,
-  Search,
+  Settings2,
+  X,
 } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
+import Modal from '@/components/Modal';
+import { TourHost, useTour } from '@/components/OnboardingTour';
+import { ORGANISER_TOUR } from '@/lib/tour';
+import { buildActivityStreamUrl } from '@/lib/api';
+import { useAuth } from '@clerk/nextjs';
 
-const ClerkSignOutButton = dynamic(
-  () => import('@clerk/nextjs').then((mod) => mod.SignOutButton),
-  { ssr: false }
-);
+const ClerkSignOutButton = dynamic(() => import('@clerk/nextjs').then((mod) => mod.SignOutButton), {
+  ssr: false,
+});
 
 const NAV_ITEMS = [
   { href: '/organiser', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
@@ -38,13 +46,118 @@ const NAV_ITEMS = [
  *  - user: { name, email, role } — used for the profile block and avatar initials
  *  - children: page content rendered inside <div className="organiser-main">
  */
-export default function OrganiserShell({ activeNav, breadcrumb, user, children }) {
+export default function OrganiserShell(props) {
+  // New organisers get a short guided tour on their first visit (#317).
+  return (
+    <TourHost tour={ORGANISER_TOUR} userId={props.user?.id ?? props.user?.email}>
+      <OrganiserShellLayout {...props} />
+    </TourHost>
+  );
+}
+
+function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
+  const { startTour } = useTour();
+  const { getToken } = useAuth();
+  const [showSettings, setShowSettings] = useState(false);
   const initials = initialsFrom(user?.name || user?.email || '?');
+  const pathname = usePathname();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const menuButtonRef = useRef(null);
+  const wasOpen = useRef(false);
+  const close = useCallback(() => setOpen(false), []);
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+
+  // Connect to the activity SSE stream for the notifications dropdown.
+  useEffect(() => {
+    if (!notifOpen) return undefined;
+    let es;
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      es = new EventSource(buildActivityStreamUrl(token));
+      es.addEventListener('history', (e) => {
+        try {
+          setNotifications(JSON.parse(e.data).slice(0, 8));
+        } catch {}
+      });
+      es.addEventListener('message', (e) => {
+        try {
+          const item = JSON.parse(e.data);
+          setNotifications((prev) => [item, ...prev].slice(0, 8));
+        } catch {}
+      });
+    })();
+    return () => {
+      if (es) es.close();
+    };
+  }, [notifOpen, getToken]);
+
+  // Close dropdown on click outside or Escape.
+  useEffect(() => {
+    if (!notifOpen) return undefined;
+    const onClick = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setNotifOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [notifOpen]);
+
+  // Close the mobile drawer whenever the route changes. (state adjusted during render, not in an effect)
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname);
+    setOpen(false);
+    setNotifOpen(false);
+  }
+
+  useEffect(() => {
+    if (!open) {
+      if (wasOpen.current) menuButtonRef.current?.focus();
+      wasOpen.current = false;
+      return undefined;
+    }
+    wasOpen.current = true;
+    document.getElementById('organiser-sidebar')?.querySelector('a, button')?.focus();
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   return (
-    <main className="organiser-shell">
-      <aside className="organiser-sidebar">
-        <Link href="/" className="organiser-brand">
+    <div className="organiser-shell">
+      <aside
+        id="organiser-sidebar"
+        aria-label="Sidebar"
+        className={`organiser-sidebar${open ? ' is-open' : ''}`}
+      >
+        <button
+          type="button"
+          className="icon-button organiser-sidebar-close"
+          onClick={close}
+          aria-label="Close menu"
+        >
+          <X size={20} aria-hidden="true" />
+        </button>
+        <Link href="/organiser" className="organiser-brand">
           <span className="organiser-brand-mark">
             <svg width="30" height="30" viewBox="0 0 40 40" fill="none" aria-hidden="true">
               <circle cx="20" cy="20" r="18" stroke="#6c4fd8" strokeWidth="2.5" fill="none" />
@@ -70,12 +183,18 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
         </Link>
 
         <p className="organiser-nav-label">Workspace</p>
-        <nav className="organiser-nav" aria-label="Organiser navigation">
+        <nav className="organiser-nav" aria-label="Organiser navigation" data-tour="organiser-nav">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeNav === item.key;
             return (
-              <Link key={item.key} href={item.href} className={isActive ? 'is-active' : ''}>
+              <Link
+                key={item.key}
+                href={item.href}
+                className={isActive ? 'is-active' : ''}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={close}
+              >
                 <Icon size={17} /> {item.label}
               </Link>
             );
@@ -83,6 +202,15 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
         </nav>
 
         <div className="organiser-sidebar-bottom">
+          <button
+            type="button"
+            className="organiser-logout organiser-settings"
+            onClick={() => {
+              setShowSettings(true);
+            }}
+          >
+            <Settings2 size={14} aria-hidden="true" /> Settings
+          </button>
           {ClerkSignOutButton && (
             <ClerkSignOutButton redirectUrl="/login">
               <button type="button" className="organiser-logout">
@@ -101,28 +229,101 @@ export default function OrganiserShell({ activeNav, breadcrumb, user, children }
         </div>
       </aside>
 
+      {open && (
+        <button
+          type="button"
+          className="organiser-scrim"
+          aria-label="Close menu"
+          tabIndex={-1}
+          onClick={close}
+        />
+      )}
+
       <section className="organiser-content">
         <header className="organiser-topbar">
           <div className="organiser-breadcrumb">
+            <button
+              ref={menuButtonRef}
+              type="button"
+              className="icon-button organiser-menu-button"
+              aria-label="Open menu"
+              aria-expanded={open}
+              aria-controls="organiser-sidebar"
+              onClick={() => setOpen(true)}
+            >
+              <Menu size={22} aria-hidden="true" />
+            </button>
             <span>Workspace</span>
             <ChevronRight size={14} />
             <strong>{breadcrumb || 'Overview'}</strong>
           </div>
           <div className="organiser-actions">
-            <button className="icon-button" aria-label="Search" type="button">
-              <Search size={18} />
-            </button>
-            <button className="icon-button" aria-label="Notifications" type="button">
-              <Bell size={18} />
-              <i />
-            </button>
+            <ThemeToggle />
+            <div className="organiser-dropdown-wrap" ref={notifRef}>
+              <button
+                className="icon-button"
+                aria-label="Notifications"
+                aria-expanded={notifOpen}
+                type="button"
+                onClick={() => setNotifOpen((v) => !v)}
+              >
+                <Bell size={18} />
+                {notifications.length > 0 && <i />}
+              </button>
+              {notifOpen && (
+                <div
+                  className="organiser-dropdown organiser-notif-dropdown"
+                  role="region"
+                  aria-label="Notifications"
+                >
+                  <h4 className="organiser-dropdown-heading">Recent activity</h4>
+                  {notifications.length === 0 && (
+                    <p className="organiser-search-empty">No recent activity</p>
+                  )}
+                  {notifications.map((n, i) => (
+                    <div key={`${n.type}-${n.ts}-${i}`} className="organiser-notif-item">
+                      <span className="organiser-notif-type">{formatNotifType(n.type)}</span>
+                      <span className="organiser-notif-detail">{n.detail || n.type}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <span className="top-avatar">{initials}</span>
           </div>
         </header>
 
-        <div className="organiser-main">{children}</div>
+        <main id="main-content" tabIndex={-1} className="organiser-main">
+          {children}
+        </main>
       </section>
-    </main>
+
+      {showSettings && (
+        <Modal title="Settings" onClose={() => setShowSettings(false)}>
+          <div className="modal-stack">
+            <section className="modal-card" aria-labelledby="settings-profile">
+              <h3 id="settings-profile">Profile</h3>
+              <p>Name: {user?.name || 'N/A'}</p>
+              <p>Email: {user?.email || 'N/A'}</p>
+            </section>
+            <section className="modal-card" aria-labelledby="settings-tour">
+              <h3 id="settings-tour">Onboarding</h3>
+              <p>Take the short guided tour of the portal again.</p>
+              <button
+                type="button"
+                className="modal-action"
+                onClick={() => {
+                  setShowSettings(false);
+                  startTour();
+                }}
+              >
+                Replay tour
+              </button>
+            </section>
+          </div>
+        </Modal>
+      )}
+    </div>
   );
 }
 
@@ -130,4 +331,9 @@ function initialsFrom(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
+}
+
+function formatNotifType(type) {
+  if (!type) return 'Activity';
+  return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }

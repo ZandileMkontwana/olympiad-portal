@@ -8,6 +8,7 @@ const mockReplace = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 // Mutable Clerk state — individual tests override before rendering.
@@ -19,6 +20,7 @@ vi.mock('@clerk/nextjs', () => ({
     isSignedIn: clerkState.isSignedIn,
     getToken: vi.fn().mockResolvedValue('clerk-token'),
   }),
+  useClerk: () => ({ signOut: vi.fn() }),
   SignIn: () => <div data-testid="clerk-signin">Clerk sign-in</div>,
 }));
 
@@ -43,6 +45,7 @@ vi.mock('../../auth.css', () => ({}));
 import LoginPage from './[[...rest]]/page';
 import { studentLogin } from '@/lib/api';
 import { setStudentSession } from '@/lib/studentSession';
+import { expectNoAxeViolations } from '@/test/axe';
 
 // ── tests ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +55,11 @@ describe('Login page', () => {
     clerkState.isLoaded = true;
     clerkState.isSignedIn = false;
     sessionState.session = null;
+  });
+
+  it('has no axe accessibility violations', async () => {
+    const { container } = render(<LoginPage />);
+    await expectNoAxeViolations(container);
   });
 
   describe('Role picker', () => {

@@ -223,7 +223,7 @@ function SitContent() {
 
   if (checking || !user) {
     return (
-      <main className="round-page">
+      <main id="main-content" tabIndex={-1} className="round-page">
         <p>Loading...</p>
       </main>
     );
@@ -231,7 +231,7 @@ function SitContent() {
 
   if (!roundId) {
     return (
-      <main className="round-page">
+      <main id="main-content" tabIndex={-1} className="round-page">
         <div className="message">No round ID was provided.</div>
       </main>
     );
@@ -239,7 +239,7 @@ function SitContent() {
 
   if (phase === 'loading') {
     return (
-      <main className="round-page">
+      <main id="main-content" tabIndex={-1} className="round-page">
         <h1>Take a Test</h1>
         <p className="description" style={{ fontSize: '1.1rem' }}>
           Loading your test…
@@ -250,7 +250,7 @@ function SitContent() {
 
   if (phase === 'error') {
     return (
-      <main className="round-page">
+      <main id="main-content" tabIndex={-1} className="round-page">
         <h1>Take a Test</h1>
         <div
           role="alert"
@@ -260,7 +260,7 @@ function SitContent() {
             borderRadius: '8px',
             padding: '16px',
             background: 'rgba(224,97,95,0.05)',
-            color: '#e0615f',
+            color: 'var(--c-t-b42318)',
           }}
         >
           {error}
@@ -275,20 +275,26 @@ function SitContent() {
   }
 
   return (
-    <main className="round-page">
+    <main id="main-content" tabIndex={-1} className="round-page">
       <h1>{sittingData ? sittingData.round.name : 'Take a Test'}</h1>
 
-      {error && <p className="message">{error}</p>}
+      {error && (
+        <p className="message" role="alert">
+          {error}
+        </p>
+      )}
 
       {sittingData && !submitted && (
         <>
           <p
-            className="description"
+            className="description sit-status"
             style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '1.1rem' }}
           >
             <span>
               Time remaining:{' '}
-              <strong style={{ color: timeRemaining === 'expired' ? '#dc2626' : undefined }}>
+              <strong
+                style={{ color: timeRemaining === 'expired' ? 'var(--c-t-dc2626)' : undefined }}
+              >
                 {timeRemaining === 'expired' ? 'EXPIRED' : timeRemaining}
               </strong>
             </span>
@@ -305,7 +311,7 @@ function SitContent() {
           </p>
 
           {timeRemaining === 'expired' && (
-            <p className="message">
+            <p className="message" role="alert">
               This test has expired — the round has closed. Your saved answers remain on record.
             </p>
           )}
@@ -330,6 +336,9 @@ function SitContent() {
                   <strong style={{ minWidth: '56px', fontSize: '1.15rem' }}>Q{q}</strong>
                   <input
                     type="text"
+                    className="sit-answer"
+                    autoComplete="off"
+                    autoCapitalize="characters"
                     maxLength={1}
                     placeholder="—"
                     value={answers[q] || ''}
@@ -405,7 +414,13 @@ function SitContent() {
 
 export default function SitPage() {
   return (
-    <Suspense fallback={<main className="round-page">Loading...</main>}>
+    <Suspense
+      fallback={
+        <main id="main-content" tabIndex={-1} className="round-page">
+          Loading...
+        </main>
+      }
+    >
       <SitContent />
     </Suspense>
   );

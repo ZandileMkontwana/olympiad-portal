@@ -23,10 +23,12 @@ function initials(name) {
     .join('');
 }
 function scoreColor(score) {
-  if (score === null || score === undefined) return '#c9c3e0';
-  if (score >= 75) return '#3fae7a';
-  if (score >= 50) return '#e0a83e';
-  return '#e0615f';
+  // CSS variables (see theme.css): darker in light mode, lighter in dark mode,
+  // so score text stays readable (WCAG AA) in both themes.
+  if (score === null || score === undefined) return 'var(--score-none)';
+  if (score >= 75) return 'var(--score-good)';
+  if (score >= 50) return 'var(--score-mid)';
+  return 'var(--score-low)';
 }
 function scoreLabel(score) {
   if (score === null || score === undefined) return 'No score';
@@ -64,13 +66,23 @@ function ScoreRing({ score, size = 52 }) {
   const color = scoreColor(score);
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <svg
+        width={size}
+        height={size}
+        style={{ transform: 'rotate(-90deg)' }}
+        role="img"
+        aria-label={
+          score === null || score === undefined
+            ? 'No score yet'
+            : `Average score ${Math.round(pct)} percent`
+        }
+      >
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(139,92,246,0.1)"
+          className="chart-track"
           strokeWidth="6"
         />
         <circle
@@ -78,12 +90,11 @@ function ScoreRing({ score, size = 52 }) {
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke={color}
           strokeWidth="6"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+          style={{ stroke: color, transition: 'stroke-dashoffset 0.6s ease' }}
         />
       </svg>
       <div
@@ -95,7 +106,7 @@ function ScoreRing({ score, size = 52 }) {
           justifyContent: 'center',
           fontSize: size < 60 ? '0.7em' : '0.8em',
           fontWeight: 700,
-          color: score === null ? '#a89fc9' : '#2d2640',
+          color: score === null ? 'var(--c-t-a89fc9)' : 'var(--c-t-2d2640)',
         }}
       >
         {score === null ? '—' : `${score.toFixed(0)}%`}
@@ -111,7 +122,7 @@ function StatCard({ icon, label, value, sub, accent, trend }) {
     <div
       style={{
         flex: 1,
-        background: 'white',
+        background: 'var(--t-surface)',
         borderRadius: '16px',
         padding: '20px 22px',
         boxShadow: '0 2px 10px rgba(139,92,246,0.08)',
@@ -151,7 +162,7 @@ function StatCard({ icon, label, value, sub, accent, trend }) {
             style={{
               fontSize: '0.72em',
               fontWeight: 700,
-              color: trend > 0 ? '#3fae7a' : '#8b7fa8',
+              color: trend > 0 ? 'var(--c-t-3fae7a)' : 'var(--c-t-8b7fa8)',
               background: trend > 0 ? 'rgba(63,174,122,0.1)' : 'rgba(139,92,246,0.08)',
               padding: '3px 8px',
               borderRadius: '20px',
@@ -163,14 +174,27 @@ function StatCard({ icon, label, value, sub, accent, trend }) {
       </div>
       <div>
         <p
-          style={{ margin: 0, fontSize: '1.9em', fontWeight: 800, color: '#2d2640', lineHeight: 1 }}
+          style={{
+            margin: 0,
+            fontSize: '1.9em',
+            fontWeight: 800,
+            color: 'var(--c-t-2d2640)',
+            lineHeight: 1,
+          }}
         >
           {value}
         </p>
-        <p style={{ margin: '6px 0 0', fontSize: '0.82em', color: '#8b7fa8', fontWeight: 500 }}>
+        <p
+          style={{
+            margin: '6px 0 0',
+            fontSize: '0.82em',
+            color: 'var(--c-t-706391)',
+            fontWeight: 500,
+          }}
+        >
           {label}
         </p>
-        {sub && <p style={{ margin: 0, fontSize: '0.72em', color: '#a89fc9' }}>{sub}</p>}
+        {sub && <p style={{ margin: 0, fontSize: '0.72em', color: 'var(--c-t-6e5fa5)' }}>{sub}</p>}
       </div>
     </div>
   );
@@ -203,7 +227,7 @@ function GradeChart({ entrants }) {
   return (
     <div
       style={{
-        background: 'white',
+        background: 'var(--t-surface)',
         borderRadius: '18px',
         padding: '26px',
         border: '1px solid rgba(139,92,246,0.1)',
@@ -211,9 +235,16 @@ function GradeChart({ entrants }) {
         height: '100%',
       }}
     >
-      <h3 style={{ margin: '0 0 22px', fontSize: '1.05em', fontWeight: 700, color: '#2d2640' }}>
+      <h2
+        style={{
+          margin: '0 0 22px',
+          fontSize: '1.05em',
+          fontWeight: 700,
+          color: 'var(--c-t-2d2640)',
+        }}
+      >
         Average Score by Grade
-      </h3>
+      </h2>
       <div
         style={{
           display: 'flex',
@@ -245,7 +276,7 @@ function GradeChart({ entrants }) {
                 maxWidth: '56px',
                 height: g.avg !== null ? `${(g.avg / max) * 140}px` : '4px',
                 borderRadius: '10px 10px 4px 4px',
-                background: `linear-gradient(180deg, ${scoreColor(g.avg)}, ${scoreColor(g.avg)}cc)`,
+                background: `linear-gradient(180deg, ${scoreColor(g.avg)}, color-mix(in srgb, ${scoreColor(g.avg)} 80%, transparent))`,
                 transition: 'height 0.5s ease',
                 minHeight: '4px',
               }}
@@ -254,7 +285,7 @@ function GradeChart({ entrants }) {
               style={{
                 fontSize: '0.85em',
                 fontWeight: 700,
-                color: '#6d3fd1',
+                color: 'var(--c-t-6d3fd1)',
                 background: 'rgba(139,92,246,0.08)',
                 padding: '3px 10px',
                 borderRadius: '8px',
@@ -262,7 +293,9 @@ function GradeChart({ entrants }) {
             >
               {g.grade}
             </span>
-            <span style={{ fontSize: '0.68em', color: '#a89fc9' }}>{g.count} students</span>
+            <span style={{ fontSize: '0.68em', color: 'var(--c-t-6e5fa5)' }}>
+              {g.count} students
+            </span>
           </div>
         ))}
       </div>
@@ -279,22 +312,22 @@ function DistributionPanel({ entrants }) {
     return [
       {
         label: 'Excellent',
-        color: '#3fae7a',
+        color: 'var(--c-t-2b7854)',
         count: scored.filter((e) => e.averageScore >= 75).length,
       },
       {
         label: 'Good',
-        color: '#e0a83e',
+        color: 'var(--c-t-8b6216)',
         count: scored.filter((e) => e.averageScore >= 50 && e.averageScore < 75).length,
       },
       {
         label: 'Developing',
-        color: '#d97855',
+        color: 'var(--c-t-b04c27)',
         count: scored.filter((e) => e.averageScore >= 25 && e.averageScore < 50).length,
       },
       {
         label: 'Needs support',
-        color: '#e0615f',
+        color: 'var(--c-t-b42318)',
         count: scored.filter((e) => e.averageScore < 25).length,
       },
     ].map((b) => ({ ...b, pct: (b.count / total) * 100 }));
@@ -304,7 +337,7 @@ function DistributionPanel({ entrants }) {
   return (
     <div
       style={{
-        background: 'white',
+        background: 'var(--t-surface)',
         borderRadius: '18px',
         padding: '26px',
         border: '1px solid rgba(139,92,246,0.1)',
@@ -312,9 +345,16 @@ function DistributionPanel({ entrants }) {
         height: '100%',
       }}
     >
-      <h3 style={{ margin: '0 0 22px', fontSize: '1.05em', fontWeight: 700, color: '#2d2640' }}>
+      <h2
+        style={{
+          margin: '0 0 22px',
+          fontSize: '1.05em',
+          fontWeight: 700,
+          color: 'var(--c-t-2d2640)',
+        }}
+      >
         Performance Distribution
-      </h3>
+      </h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {bands.map((b) => (
           <div key={b.label}>
@@ -326,8 +366,8 @@ function DistributionPanel({ entrants }) {
                 marginBottom: '6px',
               }}
             >
-              <span style={{ color: '#5e5478', fontWeight: 600 }}>{b.label}</span>
-              <span style={{ color: '#2d2640', fontWeight: 700 }}>{b.count}</span>
+              <span style={{ color: 'var(--c-t-5e5478)', fontWeight: 600 }}>{b.label}</span>
+              <span style={{ color: 'var(--c-t-2d2640)', fontWeight: 700 }}>{b.count}</span>
             </div>
             <div
               style={{
@@ -350,7 +390,7 @@ function DistributionPanel({ entrants }) {
           </div>
         ))}
         {unscored > 0 && (
-          <p style={{ margin: '4px 0 0', fontSize: '0.75em', color: '#a89fc9' }}>
+          <p style={{ margin: '4px 0 0', fontSize: '0.75em', color: 'var(--c-t-6e5fa5)' }}>
             +{unscored} entrant{unscored !== 1 ? 's' : ''} with no submissions yet
           </p>
         )}
@@ -374,7 +414,7 @@ function TopPodium({ entrants }) {
     return (
       <div
         style={{
-          background: 'white',
+          background: 'var(--t-surface)',
           borderRadius: '18px',
           padding: '26px',
           border: '1px solid rgba(139,92,246,0.1)',
@@ -384,7 +424,7 @@ function TopPodium({ entrants }) {
           justifyContent: 'center',
         }}
       >
-        <p style={{ color: '#a89fc9', fontSize: '0.85em' }}>No scores yet</p>
+        <p style={{ color: 'var(--c-t-6e5fa5)', fontSize: '0.85em' }}>No scores yet</p>
       </div>
     );
   const medals = ['🥇', '🥈', '🥉'];
@@ -392,7 +432,7 @@ function TopPodium({ entrants }) {
   return (
     <div
       style={{
-        background: 'white',
+        background: 'var(--t-surface)',
         borderRadius: '18px',
         padding: '26px',
         border: '1px solid rgba(139,92,246,0.1)',
@@ -400,9 +440,16 @@ function TopPodium({ entrants }) {
         height: '100%',
       }}
     >
-      <h3 style={{ margin: '0 0 24px', fontSize: '1.05em', fontWeight: 700, color: '#2d2640' }}>
+      <h2
+        style={{
+          margin: '0 0 24px',
+          fontSize: '1.05em',
+          fontWeight: 700,
+          color: 'var(--c-t-2d2640)',
+        }}
+      >
         Top Performers
-      </h3>
+      </h2>
       <div
         style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: '14px' }}
       >
@@ -430,7 +477,7 @@ function TopPodium({ entrants }) {
                     idx === 0
                       ? 'linear-gradient(135deg, #fbbf24, #f59e0b)'
                       : idx === 1
-                        ? 'linear-gradient(135deg, #c4b5fd, #8b5cf6)'
+                        ? 'linear-gradient(135deg, var(--c-bg-c4b5fd), #8b5cf6)'
                         : 'linear-gradient(135deg, #f5c78a, #d97706)',
                   color: 'white',
                   display: 'flex',
@@ -447,7 +494,7 @@ function TopPodium({ entrants }) {
                   margin: 0,
                   fontSize: '0.8em',
                   fontWeight: 600,
-                  color: '#2d2640',
+                  color: 'var(--c-t-2d2640)',
                   textAlign: 'center',
                   maxWidth: '100%',
                   overflow: 'hidden',
@@ -466,7 +513,7 @@ function TopPodium({ entrants }) {
                     idx === 0
                       ? 'linear-gradient(180deg, #8b5cf6, #6d3fd1)'
                       : idx === 1
-                        ? 'linear-gradient(180deg, #c4b5fd, #a78bfa)'
+                        ? 'linear-gradient(180deg, var(--c-bg-c4b5fd), #a78bfa)'
                         : 'linear-gradient(180deg, #e0d4f5, #c4b5fd)',
                   display: 'flex',
                   alignItems: 'center',
@@ -527,6 +574,7 @@ export default function SchoolDashboardPage() {
         setOlympiads(olymData.filter((o) => o.schoolAccess === 'approved'));
         setStatus('ready');
       } catch (err) {
+        console.error('Failed to load school dashboard:', err);
         setStatus('error');
       }
     }
@@ -753,7 +801,7 @@ export default function SchoolDashboardPage() {
           minHeight: '100vh',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#faf9fc',
+          background: 'var(--c-bg-faf9fc)',
         }}
       >
         <div
@@ -784,10 +832,10 @@ export default function SchoolDashboardPage() {
       >
         <div style={{ textAlign: 'center', maxWidth: '420px' }}>
           <p style={{ fontSize: '3em', margin: '0 0 12px' }}>{noSchool ? '🏫' : '⚠️'}</p>
-          <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>
+          <h2 style={{ margin: '0 0 8px', color: 'var(--c-t-2d2640)' }}>
             {noSchool ? 'No School Linked' : 'Something went wrong'}
           </h2>
-          <p style={{ color: '#8b7fa8' }}>
+          <p style={{ color: 'var(--c-t-706391)' }}>
             {noSchool
               ? 'Complete your educator profile to link a school.'
               : "Couldn't load the dashboard. Try refreshing."}
@@ -946,14 +994,19 @@ export default function SchoolDashboardPage() {
             padding: '60px 32px',
             textAlign: 'center',
             borderRadius: '20px',
-            background: 'white',
+            background: 'var(--t-surface)',
             border: '1px solid rgba(139,92,246,0.12)',
           }}
         >
           <p style={{ fontSize: '3em', margin: '0 0 12px' }}>🎓</p>
-          <h2 style={{ margin: '0 0 8px', color: '#2d2640' }}>No Students Yet</h2>
+          <h2 style={{ margin: '0 0 8px', color: 'var(--c-t-2d2640)' }}>No Students Yet</h2>
           <p
-            style={{ color: '#8b7fa8', maxWidth: '420px', margin: '0 auto 24px', lineHeight: 1.6 }}
+            style={{
+              color: 'var(--c-t-706391)',
+              maxWidth: '420px',
+              margin: '0 auto 24px',
+              lineHeight: 1.6,
+            }}
           >
             Add your first student below and their performance will appear here.
           </p>
@@ -969,6 +1022,7 @@ export default function SchoolDashboardPage() {
             }}
           >
             <input
+              aria-label="Student name"
               type="text"
               placeholder="Student name"
               value={newName}
@@ -983,6 +1037,7 @@ export default function SchoolDashboardPage() {
               }}
             />
             <input
+              aria-label="Student email"
               type="email"
               placeholder="Student email"
               value={newEmail}
@@ -997,6 +1052,7 @@ export default function SchoolDashboardPage() {
               }}
             />
             <select
+              aria-label="Student grade"
               value={newGrade}
               onChange={(e) => setNewGrade(e.target.value)}
               style={{
@@ -1005,7 +1061,7 @@ export default function SchoolDashboardPage() {
                 borderRadius: '10px',
                 border: '1px solid rgba(139,92,246,0.25)',
                 fontSize: '0.88em',
-                background: 'white',
+                background: 'var(--t-surface)',
               }}
             >
               <option value="" disabled>
@@ -1018,6 +1074,7 @@ export default function SchoolDashboardPage() {
               ))}
             </select>
             <select
+              aria-label="Olympiad to register for"
               value={selectedOlympiadId}
               onChange={(e) => setSelectedOlympiadId(e.target.value)}
               style={{
@@ -1026,7 +1083,7 @@ export default function SchoolDashboardPage() {
                 borderRadius: '10px',
                 border: '1px solid rgba(139,92,246,0.25)',
                 fontSize: '0.88em',
-                background: 'white',
+                background: 'var(--t-surface)',
               }}
             >
               <option value="" disabled>
@@ -1060,7 +1117,7 @@ export default function SchoolDashboardPage() {
             style={{
               margin: '12px auto 0',
               fontSize: '0.75em',
-              color: '#a89fc9',
+              color: 'var(--c-t-6e5fa5)',
               maxWidth: '480px',
             }}
           >
@@ -1072,7 +1129,7 @@ export default function SchoolDashboardPage() {
               style={{
                 marginTop: '12px',
                 fontSize: '0.85em',
-                color: addMessage.type === 'success' ? '#3fae7a' : '#e0615f',
+                color: addMessage.type === 'success' ? 'var(--c-t-3fae7a)' : 'var(--c-t-e0615f)',
                 fontWeight: 600,
               }}
             >
@@ -1086,7 +1143,7 @@ export default function SchoolDashboardPage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1.3fr 1fr 1fr',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
               gap: '18px',
               marginTop: '24px',
               alignItems: 'stretch',
@@ -1108,9 +1165,11 @@ export default function SchoolDashboardPage() {
               gap: '12px',
             }}
           >
-            <h3 style={{ margin: 0, fontSize: '1.1em', fontWeight: 700, color: '#2d2640' }}>
+            <h2
+              style={{ margin: 0, fontSize: '1.1em', fontWeight: 700, color: 'var(--c-t-2d2640)' }}
+            >
               Students by Olympiad ({filteredEntrants.length})
-            </h3>
+            </h2>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setShowAddForm(!showAddForm)}
@@ -1129,6 +1188,7 @@ export default function SchoolDashboardPage() {
                 {showAddForm ? 'Cancel' : '+ Add Student'}
               </button>
               <input
+                aria-label="Search students by name"
                 type="text"
                 placeholder="🔍  Search by name..."
                 value={search}
@@ -1143,6 +1203,7 @@ export default function SchoolDashboardPage() {
                 }}
               />
               <select
+                aria-label="Filter by grade"
                 value={gradeFilter}
                 onChange={(e) => setGradeFilter(e.target.value)}
                 style={{
@@ -1150,7 +1211,7 @@ export default function SchoolDashboardPage() {
                   borderRadius: '10px',
                   border: '1px solid rgba(139,92,246,0.25)',
                   fontSize: '0.88em',
-                  background: 'white',
+                  background: 'var(--t-surface)',
                 }}
               >
                 <option value="all">All grades</option>
@@ -1161,6 +1222,7 @@ export default function SchoolDashboardPage() {
                 ))}
               </select>
               <select
+                aria-label="Filter by olympiad"
                 value={olympiadFilter}
                 onChange={(e) => setOlympiadFilter(e.target.value)}
                 style={{
@@ -1168,7 +1230,7 @@ export default function SchoolDashboardPage() {
                   borderRadius: '10px',
                   border: '1px solid rgba(139,92,246,0.25)',
                   fontSize: '0.88em',
-                  background: 'white',
+                  background: 'var(--t-surface)',
                 }}
               >
                 <option value="all">All Olympiads</option>
@@ -1179,6 +1241,7 @@ export default function SchoolDashboardPage() {
                 ))}
               </select>
               <select
+                aria-label="Sort students"
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value)}
                 style={{
@@ -1186,7 +1249,7 @@ export default function SchoolDashboardPage() {
                   borderRadius: '10px',
                   border: '1px solid rgba(139,92,246,0.25)',
                   fontSize: '0.88em',
-                  background: 'white',
+                  background: 'var(--t-surface)',
                 }}
               >
                 <option value="score">Sort: Score</option>
@@ -1200,8 +1263,8 @@ export default function SchoolDashboardPage() {
                   borderRadius: '10px',
                   border: '1px solid rgba(139,92,246,0.25)',
                   fontSize: '0.88em',
-                  background: 'white',
-                  color: '#6d3fd1',
+                  background: 'var(--t-surface)',
+                  color: 'var(--c-t-6d3fd1)',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -1217,26 +1280,27 @@ export default function SchoolDashboardPage() {
                 marginTop: '16px',
                 padding: '20px 24px',
                 borderRadius: '14px',
-                background: 'white',
+                background: 'var(--t-surface)',
                 border: '1px solid rgba(139,92,246,0.12)',
                 boxShadow: '0 2px 10px rgba(139,92,246,0.06)',
               }}
             >
-              <h4
+              <h3
                 style={{
                   margin: '0 0 12px',
                   fontSize: '0.95em',
                   fontWeight: 700,
-                  color: '#2d2640',
+                  color: 'var(--c-t-2d2640)',
                 }}
               >
                 Add a New Student
-              </h4>
+              </h3>
               <form
                 onSubmit={handleAddStudent}
                 style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}
               >
                 <input
+                  aria-label="Student name"
                   type="text"
                   placeholder="Student name"
                   value={newName}
@@ -1251,6 +1315,7 @@ export default function SchoolDashboardPage() {
                   }}
                 />
                 <input
+                  aria-label="Student email"
                   type="email"
                   placeholder="Student email"
                   value={newEmail}
@@ -1265,6 +1330,7 @@ export default function SchoolDashboardPage() {
                   }}
                 />
                 <select
+                  aria-label="Student grade"
                   value={newGrade}
                   onChange={(e) => setNewGrade(e.target.value)}
                   style={{
@@ -1273,7 +1339,7 @@ export default function SchoolDashboardPage() {
                     borderRadius: '10px',
                     border: '1px solid rgba(139,92,246,0.25)',
                     fontSize: '0.88em',
-                    background: 'white',
+                    background: 'var(--t-surface)',
                   }}
                 >
                   <option value="" disabled>
@@ -1286,6 +1352,7 @@ export default function SchoolDashboardPage() {
                   ))}
                 </select>
                 <select
+                  aria-label="Olympiad to register for"
                   value={selectedOlympiadId}
                   onChange={(e) => setSelectedOlympiadId(e.target.value)}
                   style={{
@@ -1294,7 +1361,7 @@ export default function SchoolDashboardPage() {
                     borderRadius: '10px',
                     border: '1px solid rgba(139,92,246,0.25)',
                     fontSize: '0.88em',
-                    background: 'white',
+                    background: 'var(--t-surface)',
                   }}
                 >
                   <option value="" disabled>
@@ -1324,7 +1391,7 @@ export default function SchoolDashboardPage() {
                   {adding ? 'Adding...' : 'Add Student'}
                 </button>
               </form>
-              <p style={{ margin: '10px 0 0', fontSize: '0.75em', color: '#a89fc9' }}>
+              <p style={{ margin: '10px 0 0', fontSize: '0.75em', color: 'var(--c-t-6e5fa5)' }}>
                 The student is emailed a link to set their password — they then sign in with their
                 email and password.
               </p>
@@ -1333,7 +1400,8 @@ export default function SchoolDashboardPage() {
                   style={{
                     marginTop: '10px',
                     fontSize: '0.85em',
-                    color: addMessage.type === 'success' ? '#3fae7a' : '#e0615f',
+                    color:
+                      addMessage.type === 'success' ? 'var(--c-t-3fae7a)' : 'var(--c-t-e0615f)',
                     fontWeight: 600,
                   }}
                 >
@@ -1350,12 +1418,12 @@ export default function SchoolDashboardPage() {
                 padding: '40px',
                 textAlign: 'center',
                 borderRadius: '16px',
-                background: 'white',
+                background: 'var(--t-surface)',
                 border: '1px solid rgba(139,92,246,0.1)',
               }}
             >
               <p style={{ fontSize: '2em', margin: '0 0 8px' }}>🔍</p>
-              <p style={{ margin: 0, color: '#8b7fa8', fontWeight: 600 }}>
+              <p style={{ margin: 0, color: 'var(--c-t-706391)', fontWeight: 600 }}>
                 No students match your filters
               </p>
               <button
@@ -1365,8 +1433,8 @@ export default function SchoolDashboardPage() {
                   padding: '8px 20px',
                   borderRadius: '8px',
                   border: '1px solid rgba(139,92,246,0.25)',
-                  background: 'white',
-                  color: '#6d3fd1',
+                  background: 'var(--t-surface)',
+                  color: 'var(--c-t-6d3fd1)',
                   fontWeight: 600,
                   fontSize: '0.85em',
                   cursor: 'pointer',
@@ -1383,7 +1451,7 @@ export default function SchoolDashboardPage() {
                 marginTop: '16px',
                 fontSize: '0.85em',
                 fontWeight: 600,
-                color: resendMessage.type === 'success' ? '#3fae7a' : '#e0615f',
+                color: resendMessage.type === 'success' ? 'var(--c-t-3fae7a)' : 'var(--c-t-e0615f)',
               }}
             >
               {resendMessage.text}
@@ -1391,12 +1459,15 @@ export default function SchoolDashboardPage() {
           )}
           {entrantsByOlympiad.map((group) => (
             <div key={group.olympiadName} style={{ marginTop: '20px' }}>
-              <h4
+              <h3
                 style={{
                   margin: '0 0 10px',
                   fontSize: '0.95em',
                   fontWeight: 700,
-                  color: group.olympiadName === 'No Olympiad' ? '#8b7fa8' : '#6d3fd1',
+                  color:
+                    group.olympiadName === 'No Olympiad'
+                      ? 'var(--c-t-8b7fa8)'
+                      : 'var(--c-t-6d3fd1)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
@@ -1412,11 +1483,11 @@ export default function SchoolDashboardPage() {
                   }}
                 />
                 {group.olympiadName} ({group.entrants.length})
-              </h4>
+              </h3>
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',
                   gap: '14px',
                 }}
               >
@@ -1424,7 +1495,7 @@ export default function SchoolDashboardPage() {
                   <div
                     key={entrant.id}
                     style={{
-                      background: 'white',
+                      background: 'var(--t-surface)',
                       borderRadius: '16px',
                       padding: '16px 18px',
                       border: '1px solid rgba(139,92,246,0.08)',
@@ -1448,7 +1519,7 @@ export default function SchoolDashboardPage() {
                         width: '44px',
                         height: '44px',
                         borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)',
+                        background: 'linear-gradient(135deg, var(--c-bg-c4b5fd), #8b5cf6)',
                         color: 'white',
                         display: 'flex',
                         alignItems: 'center',
@@ -1465,7 +1536,7 @@ export default function SchoolDashboardPage() {
                         style={{
                           margin: 0,
                           fontWeight: 600,
-                          color: '#2d2640',
+                          color: 'var(--c-t-2d2640)',
                           fontSize: '0.92em',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -1479,7 +1550,7 @@ export default function SchoolDashboardPage() {
                         style={{
                           margin: '2px 0 0',
                           fontSize: '0.72em',
-                          color: '#a89fc9',
+                          color: 'var(--c-t-6e5fa5)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -1497,7 +1568,7 @@ export default function SchoolDashboardPage() {
                             fontSize: '0.68em',
                             fontWeight: 600,
                             background: 'rgba(139,92,246,0.08)',
-                            color: '#6d3fd1',
+                            color: 'var(--c-t-6d3fd1)',
                           }}
                         >
                           Grade {entrant.grade}
@@ -1509,7 +1580,7 @@ export default function SchoolDashboardPage() {
                             fontSize: '0.68em',
                             fontWeight: 600,
                             background: 'rgba(139,92,246,0.05)',
-                            color: '#8b7fa8',
+                            color: 'var(--c-t-706391)',
                           }}
                         >
                           {entrant.submissionCount} sub{entrant.submissionCount !== 1 ? 's' : ''}
@@ -1521,7 +1592,7 @@ export default function SchoolDashboardPage() {
                               borderRadius: '6px',
                               fontSize: '0.68em',
                               fontWeight: 600,
-                              background: `${scoreColor(entrant.averageScore)}18`,
+                              background: `color-mix(in srgb, ${scoreColor(entrant.averageScore)} 10%, transparent)`,
                               color: scoreColor(entrant.averageScore),
                             }}
                           >
@@ -1536,7 +1607,7 @@ export default function SchoolDashboardPage() {
                               fontSize: '0.68em',
                               fontWeight: 600,
                               background: 'rgba(63,174,122,0.12)',
-                              color: '#2d8a5e',
+                              color: 'var(--c-t-277751)',
                             }}
                           >
                             Active
@@ -1550,7 +1621,7 @@ export default function SchoolDashboardPage() {
                               fontSize: '0.68em',
                               fontWeight: 600,
                               background: 'rgba(224,168,62,0.15)',
-                              color: '#b07d1e',
+                              color: 'var(--c-t-8b6318)',
                             }}
                           >
                             Invite pending
@@ -1564,7 +1635,7 @@ export default function SchoolDashboardPage() {
                               fontSize: '0.68em',
                               fontWeight: 600,
                               background: 'rgba(139,92,246,0.05)',
-                              color: '#8b7fa8',
+                              color: 'var(--c-t-706391)',
                             }}
                           >
                             No account
@@ -1584,7 +1655,7 @@ export default function SchoolDashboardPage() {
                               borderRadius: '8px',
                               border: '1px solid rgba(139,92,246,0.3)',
                               background: 'rgba(139,92,246,0.06)',
-                              color: '#6d3fd1',
+                              color: 'var(--c-t-6d3fd1)',
                               fontWeight: 600,
                               fontSize: '0.72em',
                               cursor: resendingId === entrant.id ? 'wait' : 'pointer',
@@ -1606,7 +1677,7 @@ export default function SchoolDashboardPage() {
                             borderRadius: '8px',
                             border: '1px solid rgba(224,97,95,0.35)',
                             background: 'rgba(224,97,95,0.06)',
-                            color: '#e0615f',
+                            color: 'var(--c-t-b42318)',
                             fontWeight: 600,
                             fontSize: '0.72em',
                             cursor: removingId === entrant.id ? 'wait' : 'pointer',

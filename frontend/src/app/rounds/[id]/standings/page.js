@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { fetchStandings, getSchoolStandings, ApiError } from '@/lib/api';
+import TableScroll from '@/components/TableScroll';
 
 export default function StandingsPage() {
   const { id: roundId } = useParams();
@@ -39,6 +40,12 @@ export default function StandingsPage() {
       cancelled = true;
     };
   }, [roundId, getToken]);
+
+  // Only show the Variants column when at least one entrant actually has a
+  // resolved variant assignment to show (backend/src/routes/rounds.js —
+  // GET /rounds/:id/standings — omits it entirely for single-variant
+  // questions, so most rounds without multi-variant papers show nothing).
+  const hasVariantInfo = standings.some((row) => row.variants && row.variants.length > 0);
 
   // Per-school standings — fetched lazily, only once the tab is first opened
   const [schoolStandings, setSchoolStandings] = useState([]);
@@ -76,7 +83,7 @@ export default function StandingsPage() {
   }, [activeTab, roundId, getToken]);
 
   return (
-    <main className="mx-auto max-w-3xl px-8 py-12">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl px-8 py-12">
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Standings</h1>
       <div className="mt-3 h-px w-12 bg-lavender" aria-hidden="true" />
       <p className="mt-3 text-sm text-ink-soft">
@@ -136,7 +143,10 @@ export default function StandingsPage() {
           )}
 
           {status === 'ready' && (
-            <div className="mt-8 overflow-hidden rounded-lg border border-lavender/20">
+            <TableScroll
+              label="Entrant standings"
+              className="mt-8 rounded-lg border border-lavender/20"
+            >
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-lavender/20 bg-surface">
@@ -149,6 +159,11 @@ export default function StandingsPage() {
                     <th scope="col" className="px-4 py-3 font-medium text-ink-soft">
                       School
                     </th>
+                    {hasVariantInfo && (
+                      <th scope="col" className="px-4 py-3 font-medium text-ink-soft">
+                        Variants
+                      </th>
+                    )}
                     <th scope="col" className="px-4 py-3 text-right font-medium text-ink-soft">
                       Score
                     </th>
@@ -190,6 +205,19 @@ export default function StandingsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-ink-soft">{row.schoolName}</td>
+                      {hasVariantInfo && (
+                        <td className="px-4 py-3 text-ink-soft">
+                          {row.variants && row.variants.length > 0 ? (
+                            <span className="text-xs">
+                              {row.variants
+                                .map((v) => `Q${v.questionNumber}: ${v.variantLabel}`)
+                                .join(', ')}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-ink-soft/60">—</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-right font-mono text-ink">
                         {row.score.toFixed(2)}
                       </td>
@@ -197,7 +225,7 @@ export default function StandingsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </>
       )}
@@ -224,7 +252,10 @@ export default function StandingsPage() {
           )}
 
           {schoolStatus === 'ready' && (
-            <div className="mt-8 overflow-hidden rounded-lg border border-lavender/20">
+            <TableScroll
+              label="School standings"
+              className="mt-8 rounded-lg border border-lavender/20"
+            >
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-lavender/20 bg-surface">
@@ -260,7 +291,7 @@ export default function StandingsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           )}
         </>
       )}

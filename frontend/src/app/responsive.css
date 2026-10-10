@@ -1,0 +1,247 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   Responsive layer (Sprint 4, #314)
+   Targets: 320px (phone), 768px (tablet), 1024px (small laptop).
+   Loaded after globals.css from the root layout.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Safety nets: nothing may push the page wider than the viewport ──────── */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+body {
+  overflow-wrap: break-word;
+}
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+/* Flex/grid children may shrink below their content width. */
+.page-shell,
+.organiser-content,
+.dashboard,
+.organiser-main {
+  min-width: 0;
+}
+
+/* ── Horizontally scrollable tables (see components/TableScroll.jsx) ─────── */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll > table {
+  min-width: max-content;
+}
+.table-scroll:focus-visible {
+  outline: 2px solid #6546d8;
+  outline-offset: 2px;
+}
+
+/* Topbar: hamburger + breadcrumb sit together. */
+.topbar-left {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+.breadcrumbs,
+.organiser-breadcrumb {
+  min-width: 0;
+}
+.breadcrumbs strong,
+.organiser-breadcrumb strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The hamburger / close buttons only exist on narrow screens. */
+.menu-button,
+.mobile-close,
+.organiser-menu-button,
+.organiser-sidebar-close {
+  display: none;
+}
+.scrim,
+.organiser-scrim {
+  display: none;
+}
+
+/* ── Sidebars become off-canvas drawers at <= 860px ──────────────────────── */
+@media (max-width: 860px) {
+  .menu-button,
+  .mobile-close,
+  .organiser-menu-button,
+  .organiser-sidebar-close {
+    align-items: center;
+    display: inline-grid;
+    justify-content: center;
+    place-items: center;
+  }
+  .organiser-menu-button,
+  .organiser-sidebar-close {
+    display: inline-flex;
+  }
+  .organiser-sidebar-close {
+    align-self: flex-end;
+    margin: -8px 0 8px;
+  }
+
+  .sidebar,
+  .organiser-sidebar {
+    box-shadow: none;
+    flex: none !important; /* Don't reserve space in flex container when position: fixed */
+    height: 100dvh;
+    inset: 0 auto 0 0;
+    min-height: 0;
+    overflow-y: auto;
+    position: fixed !important;
+    transform: translateX(-100%);
+    transition:
+      transform 0.2s ease,
+      visibility 0s linear 0.2s;
+    visibility: hidden; /* closed drawer is not focusable / not read out */
+    width: min(280px, 86vw);
+    z-index: 40;
+  }
+  /* Override the desktop flex-basis so the sidebar doesn't reserve space */
+  .organiser-sidebar {
+    flex-basis: 0 !important;
+  }
+  /* Sidebar is position:fixed + flex:none on mobile, so content fills full width */
+  .sidebar-open,
+  .organiser-sidebar.is-open {
+    box-shadow: 12px 0 30px rgba(23, 37, 84, 0.18);
+    transform: none;
+    transition: transform 0.2s ease;
+    visibility: visible;
+  }
+  .scrim,
+  .organiser-scrim {
+    background: rgba(23, 37, 84, 0.45);
+    border: 0;
+    display: block;
+    inset: 0;
+    position: fixed;
+    z-index: 30;
+  }
+
+  /* Drawer contents: roomier tap targets, readable log-out. */
+  .sidebar .nav-item,
+  .organiser-nav a {
+    min-height: 44px;
+  }
+  .sidebar-profile button {
+    font-size: 13px !important;
+    min-height: 44px;
+    padding: 0 4px !important;
+  }
+
+  .topbar {
+    height: 60px;
+    padding: 0 16px;
+  }
+  .organiser-topbar {
+    gap: 8px;
+    padding: 10px 16px;
+  }
+  .organiser-main {
+    padding: 28px 16px 56px;
+  }
+  .dashboard {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+/* ── Phones (<= 600px) ───────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* 16px stops iOS Safari zooming into a focused field. */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+  .organiser-breadcrumb > span,
+  .organiser-breadcrumb > svg {
+    display: none;
+  }
+  .round-page {
+    padding: 24px 16px;
+  }
+  .card {
+    padding: 18px;
+  }
+  /* Full-width primary actions are easier to hit with a thumb. */
+  .round-page .button {
+    box-sizing: border-box;
+    text-align: center;
+  }
+}
+
+/* ── Touch targets: >= 44px on touch devices (WCAG 2.5.5) ────────────────── */
+@media (pointer: coarse) {
+  .button,
+  .nav-item,
+  .icon-button,
+  .menu-button,
+  .filter-button,
+  .text-button,
+  select,
+  input[type='text'],
+  input[type='number'],
+  input[type='search'],
+  input[type='email'],
+  input[type='password'],
+  input[type='date'],
+  input[type='datetime-local'],
+  input[type='time'] {
+    min-height: 44px;
+  }
+  .icon-button,
+  .menu-button {
+    min-width: 44px;
+  }
+}
+
+/* ── Online sitting page: usable on a phone during a timed test ──────────── */
+.sit-answer {
+  min-height: 48px;
+  min-width: 56px;
+}
+@media (max-width: 760px) {
+  .sit-status {
+    background: var(--background);
+    border-bottom: 1px solid var(--border-lavender);
+    margin: 0 -16px 12px;
+    padding: 10px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .sit-answer {
+    font-size: 20px !important;
+    min-height: 52px;
+    min-width: 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .organiser-sidebar {
+    transition: none;
+  }
+}

@@ -98,20 +98,24 @@ export default function NotificationsConfigPage() {
 
   if (checking || status === 'loading') {
     return (
-      <main className="round-page">
+      <main id="main-content" tabIndex={-1} className="round-page">
         <p>Loading...</p>
       </main>
     );
   }
 
   return (
-    <main className="round-page">
+    <main id="main-content" tabIndex={-1} className="round-page">
       <h1>Notification Rules</h1>
       <p className="description">
         Round <strong>{roundId}</strong> — configure which automatic emails are sent, and to whom.
       </p>
 
-      {status === 'error' && <p className="message">{errorMessage}</p>}
+      {status === 'error' && (
+        <p className="message" role="alert">
+          {errorMessage}
+        </p>
+      )}
 
       {status === 'ready' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
@@ -137,6 +141,7 @@ export default function NotificationsConfigPage() {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <select
+                      aria-label={`Recipients for ${TRIGGER_LABELS[rule.triggerType] || rule.triggerType}`}
                       value={rule.recipientRole}
                       disabled={!rule.enabled || isSaving}
                       onChange={(e) => handleRecipientChange(rule.triggerType, e.target.value)}
@@ -172,8 +177,8 @@ export default function NotificationsConfigPage() {
                       style={{
                         padding: '6px 14px',
                         borderRadius: '4px',
-                        border: '1px solid #ccc',
-                        background: '#fff',
+                        border: '1px solid var(--c-bd-cccccc)',
+                        background: 'var(--c-bg-ffffff)',
                         cursor: isTesting ? 'wait' : 'pointer',
                         fontSize: '0.85rem',
                       }}
@@ -189,7 +194,7 @@ export default function NotificationsConfigPage() {
                     style={{
                       marginTop: '4px',
                       padding: '16px',
-                      background: '#f9fafb',
+                      background: 'var(--c-bg-f9fafb)',
                       borderLeft: '3px solid #3b82f6',
                       fontSize: '0.9rem',
                     }}
@@ -197,33 +202,42 @@ export default function NotificationsConfigPage() {
                     <div style={{ marginBottom: '8px' }}>
                       <strong>Status: </strong>
                       {testResult.enabled ? (
-                        <span style={{ color: '#16a34a' }}>Enabled</span>
+                        <span style={{ color: 'var(--c-t-117b38)' }}>Enabled</span>
                       ) : (
-                        <span style={{ color: '#dc2626' }}>Disabled</span>
+                        <span style={{ color: 'var(--c-t-cf2121)' }}>Disabled</span>
                       )}
                     </div>
 
                     <div style={{ marginBottom: '8px' }}>
                       <strong>Recipients: </strong>
                       {testResult.recipients.length === 0 ? (
-                        <span style={{ color: '#6b7280' }}>None</span>
+                        <span style={{ color: 'var(--c-t-646b78)' }}>None</span>
                       ) : (
                         <span>{testResult.recipients.length} recipient(s)</span>
                       )}
                     </div>
 
                     {testResult.recipients.length > 0 && (
-                      <ul style={{ margin: '0 0 12px 0', paddingLeft: '20px', color: '#374151' }}>
+                      <ul
+                        style={{
+                          margin: '0 0 12px 0',
+                          paddingLeft: '20px',
+                          color: 'var(--c-t-374151)',
+                        }}
+                      >
                         {testResult.recipients.map((r, i) => (
                           <li key={i}>
                             {r.email}
                             {r.entrantName && (
-                              <span style={{ color: '#6b7280' }}> (re: {r.entrantName})</span>
+                              <span style={{ color: 'var(--c-t-646b78)' }}>
+                                {' '}
+                                (re: {r.entrantName})
+                              </span>
                             )}
                             {r.alreadyNotified && (
                               <span
                                 style={{
-                                  color: '#d97706',
+                                  color: 'var(--c-t-a05804)',
                                   fontSize: '0.8rem',
                                   marginLeft: '6px',
                                 }}
@@ -241,9 +255,9 @@ export default function NotificationsConfigPage() {
                         style={{
                           marginTop: '8px',
                           padding: '12px',
-                          background: '#fff',
+                          background: 'var(--c-bg-ffffff)',
                           borderRadius: '4px',
-                          border: '1px solid #e5e7eb',
+                          border: '1px solid var(--c-bd-e5e7eb)',
                         }}
                       >
                         <div style={{ marginBottom: '6px' }}>
@@ -256,7 +270,7 @@ export default function NotificationsConfigPage() {
                             wordBreak: 'break-word',
                             margin: 0,
                             fontSize: '0.85rem',
-                            color: '#4b5563',
+                            color: 'var(--c-t-4b5563)',
                           }}
                         >
                           {testResult.emailPreview.text}
@@ -272,7 +286,7 @@ export default function NotificationsConfigPage() {
       )}
 
       {errorMessage && status === 'ready' && (
-        <p className="message" style={{ marginTop: '12px' }}>
+        <p className="message" role="alert" style={{ marginTop: '12px' }}>
           {errorMessage}
         </p>
       )}

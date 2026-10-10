@@ -1,0 +1,188 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   Accessibility layer (Sprint 4, #315)
+   Loaded after responsive.css from the root layout.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Visually hidden, still announced by screen readers and still focusable. */
+.sr-only {
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+/* Skip link: first tab stop on every page, visible only when focused. */
+.skip-link {
+  background: #201a3d;
+  border-radius: 0 0 8px 0;
+  color: #fff;
+  font-weight: 600;
+  left: 0;
+  padding: 12px 18px;
+  position: fixed;
+  text-decoration: none;
+  top: 0;
+  transform: translateY(-120%);
+  z-index: 2000;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* The skip link focuses <main>; don't draw a ring around the whole page. */
+main:focus {
+  outline: none;
+}
+
+/* A visible focus indicator everywhere. `!important` is deliberate: many
+   inline styles in the app set `outline: none`, which would otherwise win. */
+:focus-visible {
+  outline: 3px solid #5435c4 !important;
+  outline-offset: 2px !important;
+}
+/* Light ring on dark backgrounds (hero cards, drawer scrim, footer bands). */
+.hero-card :focus-visible,
+.educator-banner :focus-visible,
+.cta-band :focus-visible,
+.auth-story :focus-visible {
+  outline-color: var(--c-bd-ffffff) !important;
+}
+
+/* A file input hidden with sr-only inside a <label class="button"> still
+   needs to show focus on the label. */
+label:has(> input[type='file'].sr-only:focus-visible) {
+  outline: 3px solid #5435c4;
+  outline-offset: 2px;
+}
+
+/* Modal dialog (components/Modal.jsx) */
+.modal-backdrop {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 1000;
+}
+.modal-panel {
+  background: var(--c-bg-ffffff);
+  border-radius: 12px;
+  color: var(--c-t-172554);
+  max-height: 80vh;
+  max-width: 500px;
+  overflow: auto;
+  padding: 24px;
+  width: 90%;
+}
+.modal-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.modal-header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.modal-close {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  color: var(--c-t-172554);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+}
+.modal-close:hover {
+  background: var(--c-bg-f0edff);
+}
+.modal-intro {
+  color: var(--c-t-5a6478);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+.modal-empty {
+  background: var(--c-bg-f7f8fc);
+  border-radius: 8px;
+  padding: 32px;
+  text-align: center;
+}
+.modal-empty svg {
+  color: var(--c-t-6546d8);
+  margin-bottom: 12px;
+}
+.modal-empty p {
+  color: var(--c-t-5a6478);
+  font-size: 14px;
+  margin: 0;
+}
+.modal-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal-card {
+  background: var(--c-bg-f7f8fc);
+  border-radius: 8px;
+  padding: 16px;
+}
+.modal-card h3 {
+  color: var(--c-t-172554);
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+.modal-card p {
+  color: var(--c-t-5a6478);
+  font-size: 13px;
+  margin: 0;
+}
+.modal-card .modal-action {
+  background: #6c4fd8;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 12px;
+  min-height: 40px;
+  padding: 0 16px;
+}
+.modal-card .modal-action:hover {
+  background: #4a34a8;
+}
+.modal-card p + p {
+  margin-top: 4px;
+}
+
+/* Honour the OS "reduce motion" setting everywhere (WCAG 2.3.3), including
+   inline-style animations such as the sign-in spinner. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Windows High Contrast / forced colours: keep borders visible. */
+@media (forced-colors: active) {
+  .card,
+  .panel,
+  .stat-card,
+  .modal-panel {
+    border: 1px solid CanvasText;
+  }
+}

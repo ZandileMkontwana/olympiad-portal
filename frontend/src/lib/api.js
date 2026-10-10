@@ -210,6 +210,18 @@ export function fetchAccessRequests(token) {
 }
 
 /**
+ * Builds the SSE stream URL for the live activity feed. EventSource cannot
+ * set Authorization headers, so the Clerk token travels as a query parameter
+ * and the backend promotes it to a Bearer header before auth runs.
+ * Wired to GET /api/activity/stream (backend/src/routes/activity.js).
+ *
+ * @param {string} token - Clerk JWT
+ */
+export function buildActivityStreamUrl(token) {
+  return `${API_BASE_URL}/api/activity/stream?token=${encodeURIComponent(token)}`;
+}
+
+/**
  * Approves a pending school access request.
  * Wired to POST /api/olympiads/access-requests/:id/approve (backend/src/routes/rounds.js).
  *
@@ -1087,6 +1099,159 @@ export function fetchRoundReplay(roundId, token) {
  */
 export function fetchSignals(roundId, token) {
   return requestJson(`/api/rounds/${roundId}/signals`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// ─── Questions & Variants ────────────────────────────────────────────────────
+
+/**
+ * Lists all questions for a paper, ordered by question number.
+ * Wired to GET /api/papers/:paperId/questions (backend/src/routes/questions.js).
+ *
+ * @param {string} paperId
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function listQuestions(paperId, token) {
+  return requestJson(`/api/papers/${paperId}/questions`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Creates a new question for a paper.
+ * Wired to POST /api/papers/:paperId/questions (backend/src/routes/questions.js).
+ *
+ * @param {string} paperId
+ * @param {{ number: number, text: string, type: string, marks: number, memoAnswer?: string, options?: object, rubric?: object }} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function createQuestion(paperId, data, token) {
+  return requestJson(`/api/papers/${paperId}/questions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Fetches a single question with its variants.
+ * Wired to GET /api/questions/:id (backend/src/routes/questions.js).
+ *
+ * @param {string} questionId
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function fetchQuestion(questionId, token) {
+  return requestJson(`/api/questions/${questionId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Updates a question.
+ * Wired to PUT /api/questions/:id (backend/src/routes/questions.js).
+ *
+ * @param {string} questionId
+ * @param {{ number?: number, text?: string, type?: string, marks?: number, memoAnswer?: string, options?: object, rubric?: object }} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function updateQuestion(questionId, data, token) {
+  return requestJson(`/api/questions/${questionId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Deletes a question and all its variants.
+ * Wired to DELETE /api/questions/:id (backend/src/routes/questions.js).
+ *
+ * @param {string} questionId
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function deleteQuestion(questionId, token) {
+  return requestJson(`/api/questions/${questionId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Lists all variants for a question.
+ * Wired to GET /api/questions/:id/variants (backend/src/routes/questions.js).
+ *
+ * @param {string} questionId
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function listVariants(questionId, token) {
+  return requestJson(`/api/questions/${questionId}/variants`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Creates a new variant for a question.
+ * Wired to POST /api/questions/:id/variants (backend/src/routes/questions.js).
+ *
+ * @param {string} questionId
+ * @param {{ label: string, text?: string, memoAnswer?: string, options?: object }} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function createVariant(questionId, data, token) {
+  return requestJson(`/api/questions/${questionId}/variants`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Updates a variant.
+ * Wired to PUT /api/variants/:id (backend/src/routes/questions.js).
+ *
+ * @param {string} variantId
+ * @param {{ label?: string, text?: string, memoAnswer?: string, options?: object }} data
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function updateVariant(variantId, data, token) {
+  return requestJson(`/api/variants/${variantId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Deletes a variant.
+ * Wired to DELETE /api/variants/:id (backend/src/routes/questions.js).
+ *
+ * @param {string} variantId
+ * @param {string} token - Clerk JWT for the Authorization header
+ */
+export function deleteVariant(variantId, token) {
+  return requestJson(`/api/variants/${variantId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+// Analytics API functions
+
+/**
+ * Fetch comprehensive analytics for a round (organiser only)
+ */
+export async function fetchRoundAnalytics(roundId, token) {
+  return requestJson(`/api/analytics/rounds/${roundId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Fetch analytics for a specific school in a round
+ */
+export async function fetchRoundSchoolAnalytics(roundId, schoolId, token) {
+  return requestJson(`/api/analytics/rounds/${roundId}/schools/${schoolId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 }

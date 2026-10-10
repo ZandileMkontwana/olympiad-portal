@@ -34,7 +34,38 @@ describe('Sittings routes', () => {
     paper: {
       fileUrl: 'https://test.supabase.co/test-bucket/paper.pdf',
       memoUrl: 'https://test.supabase.co/test-bucket/memo.pdf',
-      memoAnswers: { 1: 'A', 2: 'C', 3: 'B' },
+      questions: [
+        {
+          id: '1',
+          number: 1,
+          text: 'Question 1',
+          type: 'MCQ',
+          marks: 1,
+          options: ['A', 'B', 'C'],
+          memoAnswer: 'A',
+          variants: [],
+        },
+        {
+          id: '2',
+          number: 2,
+          text: 'Question 2',
+          type: 'MCQ',
+          marks: 1,
+          options: ['A', 'B', 'C'],
+          memoAnswer: 'C',
+          variants: [],
+        },
+        {
+          id: '3',
+          number: 3,
+          text: 'Question 3',
+          type: 'MCQ',
+          marks: 1,
+          options: ['A', 'B', 'C'],
+          memoAnswer: 'B',
+          variants: [],
+        },
+      ],
     },
   };
 
@@ -97,10 +128,18 @@ describe('Sittings routes', () => {
       expect(res.body.sitting.id).toBe('sitting-1');
       expect(res.body.round.name).toBe('Round 1');
       expect(res.body.paper.fileUrl).toBe(openRound.paper.fileUrl);
-      // Question IDs only — the memo answers must never leak
-      expect(res.body.paper.questions).toEqual(['1', '2', '3']);
-      expect(JSON.stringify(res.body)).not.toContain('"A"');
-      expect(JSON.stringify(res.body)).not.toContain('memoAnswers');
+      // Questions are sent with their content, but memo answers must never leak
+      expect(res.body.paper.questions.map((q) => q.id)).toEqual(['1', '2', '3']);
+      expect(res.body.paper.questions[0]).toMatchObject({
+        id: '1',
+        number: 1,
+        text: 'Question 1',
+        type: 'MCQ',
+        marks: 1,
+        options: ['A', 'B', 'C'],
+      });
+      expect(JSON.stringify(res.body)).not.toContain('memoAnswer');
+      expect(JSON.stringify(res.body)).not.toContain('rubric');
       // expiresAt is the round's close time (the time limit)
       expect(res.body.sitting.expiresAt).toBe(openRound.closeTime.toISOString());
       expect(prisma.sitting.upsert).toHaveBeenCalledWith({
@@ -449,6 +488,7 @@ describe('Sittings routes', () => {
       expiresAt: new Date('2030-01-01T00:00:00.000Z'),
       completedAt: null,
       round: openRound, // paper.memoAnswers: { 1: 'A', 2: 'C', 3: 'B' }
+      entrant: { name: 'Test Entrant', schoolId: 'school-1' },
     });
 
     const createdSubmission = (result) => ({
@@ -489,10 +529,10 @@ describe('Sittings routes', () => {
       expect(res.body.result.score).toBeCloseTo(200 / 3, 5);
     });
 
-    it('creates the submission without a result when there is no memo answer key', async () => {
+    it('creates the submission without a result when there is nothing to automark', async () => {
       prisma.sitting.findUnique.mockResolvedValue({
         ...submittableSitting(),
-        round: { ...openRound, paper: { ...openRound.paper, memoAnswers: null } },
+        round: { ...openRound, paper: { ...openRound.paper, questions: [] } },
       });
       prisma.submission.create.mockResolvedValue(createdSubmission(null));
 
