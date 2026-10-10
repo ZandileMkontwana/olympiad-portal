@@ -13,6 +13,8 @@ The database is PostgreSQL, hosted on Supabase — the choice of host and the re
 erDiagram
   OLYMPIAD ||--o{ ROUND : has
   ROUND ||--o| PAPER : uses
+  PAPER ||--o{ QUESTION : has
+  QUESTION ||--o{ QUESTIONVARIANT : has
   ROUND ||--o{ SUBMISSION : receives
   ROUND ||--o{ ROUNDENTRANT : has
   ROUND ||--o{ SITTING : has
@@ -23,6 +25,8 @@ erDiagram
   ENTRANT ||--o{ ROUNDENTRANT : has
   ENTRANT ||--o{ SITTING : takes
   SUBMISSION ||--|| RESULT : produces
+  SUBMISSION ||--o| MARKINGTASK : "may have"
+  SUBMISSION ||--o{ REMARKREQUEST : receives
   USER |o--o| ENTRANT : "may be"
   ROUND ||--o{ NOTIFICATIONRULE : has
   ROUND ||--o{ NOTIFICATIONLOG : has
@@ -32,6 +36,7 @@ erDiagram
   USER |o--o{ SCHOOLOLYMPIAD : "requested by"
   OLYMPIAD ||--o{ OLYMPIADORGANISER : "managed by"
   USER ||--o{ OLYMPIADORGANISER : "organises"
+  ROUND |o--o{ AUDITLOG : has
 
   OLYMPIAD {
     string id PK
@@ -49,6 +54,8 @@ erDiagram
     datetime openTime
     datetime closeTime
     string state
+    float qualifyingThreshold "optional"
+    string prerequisiteRoundId FK "optional"
   }
   SCHOOL {
     string id PK
@@ -70,6 +77,9 @@ erDiagram
     string email
     string role
     string clerkUserId
+    string passwordHash "optional"
+    string invitationToken "optional"
+    datetime invitationExpiresAt "optional"
   }
   EDUCATOR {
     string id PK
@@ -89,6 +99,26 @@ erDiagram
     string memoUrl
     json memoAnswers "optional"
   }
+  QUESTION {
+    string id PK
+    string paperId FK
+    int number
+    string text
+    string type
+    float marks
+    string memoAnswer "optional"
+    json options "optional"
+    json rubric "optional"
+    float difficulty "optional"
+  }
+  QUESTIONVARIANT {
+    string id PK
+    string questionId FK
+    string label
+    string text "optional"
+    string memoAnswer "optional"
+    json options "optional"
+  }
   SUBMISSION {
     string id PK
     string roundId FK
@@ -103,6 +133,36 @@ erDiagram
     float score
     datetime releasedAt
   }
+  MARKINGTASK {
+    string id PK
+    string submissionId FK
+    string status
+    string assignedToId FK "optional"
+    float score "optional"
+    json breakdown "optional"
+  }
+  REMARKREQUEST {
+    string id PK
+    string submissionId FK
+    string requestedById FK
+    string reason
+    string status
+    float newScore "optional"
+  }
+  AUDITLOG {
+    string id PK
+    string action
+    string roundId FK "optional"
+    json payload "optional"
+    datetime timestamp
+  }
+  APIKEY {
+    string id PK
+    string key
+    string name
+    string createdBy
+    datetime revokedAt "optional"
+  }
   ROUNDENTRANT {
     string id PK
     string roundId FK
@@ -114,6 +174,7 @@ erDiagram
     string roundId FK
     string entrantId FK
     json answers "optional"
+    json variantChoices "optional"
     datetime startedAt
     datetime expiresAt
     datetime completedAt "optional"
@@ -151,7 +212,7 @@ erDiagram
 Top-level competition. Has many rounds, each on its own schedule. The optional `description`, `grades`, `startDate` and `endDate` fields are organiser-set info, shown to educators on the olympiad info card before their school joins.
 
 ### Round
-The core state machine: `scheduled → open → closed → released`, driven by a scheduler comparing the current time against `openTime`/`closeTime`. Everything else in the system depends on this table's state.
+The core state machine: `scheduled → open → closed → released`, driven by a scheduler comparing the current time against `openTime`/`closeTime`. Everything else in the system depends on this table's state. Rounds can also gate entry: `qualifyingThreshold` (the minimum score to pass) and `prerequisiteRoundId` (a round that must be passed first) drive automatic advancement — when a round closes, the scheduler registers qualifying entrants into the next round, and `autoAdvanceProcessedAt` keeps that transition exactly-once.
 
 ### School
 A registered school competing in the olympiad. Has many educators and entrants.
@@ -160,7 +221,7 @@ A registered school competing in the olympiad. Has many educators and entrants.
 A school's participation in an olympiad, gated by organiser approval — the school is "part of" an olympiad exactly when its row here has `status: 'approved'`, which is what unlocks registering entrants into that olympiad's rounds. `status` moves `pending → approved | declined`, and a declined school can re-request (the upsert flips the row back to `pending`). A unique constraint on `(schoolId, olympiadId)` keeps one row per school per olympiad, and `requestedById` records which educator asked. The migration that introduced this table backfilled every existing participation to `approved`, so schools that were already competing kept their access.
 
 ### User
-Login account for anyone — organiser, educator, or student. `name` is the user's display name, required at registration. Password handling goes through our auth library, not custom code. Public registration only ever creates `educator` accounts - organiser accounts are provisioned directly by the team.
+Login account for anyone — organiser, educator, or student. `name` is the user's display name, required at registration. Public registration only ever creates `educator` accounts - organiser accounts are provisioned directly by the team. Educators and organisers authenticate through Clerk (`clerkUserId`); students instead receive an invitation (`invitationToken`, expiring at `invitationExpiresAt`) and set a `passwordHash`, then sign in with email and password for a JWT.
 
 ### Educator
 Links a `User` account to a `School`. Educators upload results on behalf of their entrants.
@@ -169,19 +230,31 @@ Links a `User` account to a `School`. Educators upload results on behalf of thei
 A competing student, registered against a school. An entrant may be linked to a `User` account so the student can sign in and see their own sittings and results — educators create entrant records before any student account exists, so the link (made through the claim-code flow at student registration) is optional.
 
 ### Paper
-A round's uploaded test and memo. Download is gated by the round's current state — not accessible before `open`. `memoAnswers` stores the answer key as structured JSON (question number → correct answer), separate from the memo PDF, since automarking needs data it can read programmatically.
+A round's uploaded test and memo. Download is gated by the round's current state — not accessible before `open`. `memoAnswers` stores the answer key as structured JSON (question number → correct answer), separate from the memo PDF, since automarking needs data it can read programmatically. A paper can additionally carry a structured question bank (`Question` rows) for online sittings — separate from, and in addition to, the uploaded PDFs.
+
+### Question
+A structured question in a paper's question bank — the data behind online sittings, distinct from the uploaded PDF. A unique constraint on `(paperId, number)` keeps one question per number per paper. `type` is one of `multiple_choice`, `short_answer`, `essay` or `numeric`; `memoAnswer` drives automarking, `options` holds MCQ choices as JSON, and `rubric` carries marking guidance for the manually-marked types. `difficulty` is the question's success rate (0.0–1.0), recalculated from variant-aware results when a round closes and again when results are released; `null` means no data yet. Memo answers and rubrics are never sent to students.
+
+### QuestionVariant
+An alternative version of a question — the anti-collusion mechanism for online sittings. A variant can override the question's `text`, `memoAnswer` and `options`; a `null` text falls back to the parent question. A unique constraint on `(questionId, label)` keeps one variant per label. When a sitting starts, each entrant is assigned one variant per question deterministically (a hash of the entrant and question ids) and the choices are stored in `Sitting.variantChoices` — the same entrant always gets the same variant, but two students sitting side by side see different papers. Automarking prefers the assigned variant's `memoAnswer`.
 
 ### Submission
-An educator's results for their entrants. `idempotencyKey` prevents the same submission being recorded twice on retry.
+An educator's results for their entrants. `idempotencyKey` prevents the same submission being recorded twice on retry. A submission may also enter the manual-marking workflow (`MarkingTask`) and receive appeals (`RemarkRequest`).
 
 ### RoundEntrant
 Tracks which entrants are registered to sit a specific round — required since the brief specifies entrants are put forward and registered against individual rounds, not just against the olympiad generally. A unique constraint on `(roundId, entrantId)` prevents duplicate registration. This table is what powers the "Submit Results" flow — an educator's submission page lists only entrants registered for that round.
 
 ### Sitting
-An entrant's online test-taking session for a round — the online counterpart to sitting the paper physically. A unique constraint on `(roundId, entrantId)` enforces one sitting per entrant per round; requesting a sitting again returns the existing in-progress one, so a reconnect resumes where the student left off. `answers` holds the student's auto-saved work as they type, `expiresAt` mirrors the round's `closeTime`, and `completedAt` is set once the sitting is submitted.
+An entrant's online test-taking session for a round — the online counterpart to sitting the paper physically. A unique constraint on `(roundId, entrantId)` enforces one sitting per entrant per round; requesting a sitting again returns the existing in-progress one, so a reconnect resumes where the student left off. `answers` holds the student's auto-saved work as they type, `expiresAt` mirrors the round's `closeTime`, and `completedAt` is set once the sitting is submitted. `variantChoices` records which variant of each question this entrant was assigned (a JSON map of question id → variant id), fixed deterministically when the sitting starts.
 
 ### Result
 The mark for a submission. `releasedAt` stays empty until the round closes, so scores aren't visible to schools early.
+
+### MarkingTask
+A submission queued for manual marking — the workflow for answers automarking can't score. One-to-one with its `Submission` (`submissionId` is unique). Progresses `unassigned → assigned → marked → moderated`; `assignedToId` records the marker, `moderatedById` the moderator, and `breakdown` stores per-question partial credit as JSON.
+
+### RemarkRequest
+An educator's appeal against a marked submission. `requestedById` is the appealing educator; status moves `pending → assigned → approved | rejected` under an assigned organiser reviewer. On approval the `newScore` replaces the result's score and qualification-based advancement is re-evaluated atomically in the same transaction.
 
 ### NotificationRule
 A per-round toggle for each of the four notification triggers (`before_open`, `before_close`, `missing_submission`, `results_released`). Organisers configure these per round from the organiser console; a unique constraint on `(roundId, triggerType)` keeps one rule per trigger per round. Absence of a rule means the trigger is **enabled** — rounds created before this feature existed keep behaving exactly as before, since the scheduler's enablement check treats a missing row as on.
@@ -199,6 +272,12 @@ A join table that records which organisers have access to which olympiads. Every
 - **Removing:** Any existing organiser can remove a co-organiser, but the **creator** (the user referenced by `Olympiad.organiserId`) is never removable — not even by themselves.
 - **Backfill:** The migration that introduced this table inserted a row for every existing `Olympiad.organiserId`, so no creator lost access.
 - **Creation flow:** When a new olympiad is created, the creator is automatically added to this table.
+
+### AuditLog
+One row per automatic action the scheduler performs on a round — `round_opened`, `round_closed`, `auto_advanced`, `notification_sent`, `entrants_registered` — with a JSON `payload` for detail. This is what the organiser audit log and round replay timeline read.
+
+### ApiKey
+An organiser-issued key granting external consumers read-only access to the public API. `revokedAt` staying `null` means the key is active; revocation takes effect immediately because every request re-checks it.
 
 ## Co-organiser model
 

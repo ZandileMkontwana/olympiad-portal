@@ -14,27 +14,27 @@ npm run test:coverage
 ```
 This runs the full backend and frontend suites with coverage enabled, from the repo root.
 
-## Current coverage (as of the Sprint 4 QA sweep, 6 October 2026)
+## Current coverage (as of Sprint 4 close, 10 October 2026)
 
-**Backend** — 26 test files, 550 tests, all passing
+**Backend** — 31 test files, 636 tests, all passing
 | Metric | Coverage |
 |---|---|
-| Statements | 85.73% |
-| Branches | 75.95% |
-| Functions | 89.86% |
-| Lines | 86.11% |
+| Statements | 86.28% |
+| Branches | 77.49% |
+| Functions | 91.36% |
+| Lines | 86.51% |
 
-The core is well covered — the scheduler (including all four notification jobs), auth middleware, the email library, certificates generation, timezone utilities, qualification logic, and the main route files (rounds, sittings, submissions, marking, remark, entrants, schools, students, studentAuth, papers, auth, certificates, olympiadOrganisers, audit log). `index.js` (the app entry point), the external/API-key routes and some branch logic in `authorization.js` are the main gaps.
+The core is well covered — the scheduler (including all four notification jobs), auth middleware, the email library, certificates generation, timezone utilities, qualification logic, the variant-assignment and question-difficulty libraries, and the main route files (rounds, sittings, submissions, marking, remark, entrants, schools, students, studentAuth, papers, questions, analytics, auth, certificates, olympiadOrganisers, audit log). `index.js` (the app entry point), the external/API-key routes and some branch logic in `authorization.js` are the main gaps.
 
-**Frontend** — 28 test files, 355 tests, all passing
+**Frontend** — 32 test files, 400 tests, all passing
 | Metric | Coverage |
 |---|---|
-| Statements | 94.82% |
+| Statements | 90.83% |
 | Branches | 87.4% |
-| Functions | 100% |
-| Lines | 98.24% |
+| Functions | 88.88% |
+| Lines | 93.72% |
 
-Covers the full API client (all exported functions including Sprint 3 additions: marking queue, remark/appeals, co-organisers, audit log, replay, results management, standings), the student session library, all auth-related React hooks (`useAuthRedirect`, `useRequireRole`, `useStudentAuth`), and component tests for the student sitting page, student dashboard and results review, the student registration page, the educator school dashboard, round view with appeals, the marking page, the standings page, and the set-password page.
+Covers the full API client (all exported functions including Sprint 3's marking queue, remark/appeals, co-organisers, audit log, replay, results management and standings, and Sprint 4's question bank, variants and analytics calls), the student session library, all auth-related React hooks (`useAuthRedirect`, `useRequireRole`, `useStudentAuth`), and component tests for the student sitting page, student dashboard and results review, the student registration page, the educator school dashboard, round view with appeals, the marking page, the standings page, the set-password page, the organiser question bank editor, and the analytics charts (participation, score distribution, question performance).
 
 Both suites enforce coverage thresholds in their `vitest.config.mjs` (80% lines/functions/statements, 75% branches) — a build fails if coverage drops below them.
 
@@ -56,7 +56,11 @@ Both suites enforce coverage thresholds in their `vitest.config.mjs` (80% lines/
 - Student session storage (localStorage get/set/clear with validation)
 - Student auth hook (session check, redirect, signOut, getToken, unmount safety)
 - Frontend auth redirect hooks, the full API client (all exported functions), and page components (sitting, student dashboard/results, registration, school dashboard, standings, round view with appeals, marking page, set-password)
-- The Sprint 4 additions: the SSE activity feed (event bus, stream route, pre-Clerk query-token promotion) and the branded email template library
+- The Sprint 4 additions: the SSE activity feed (event bus, stream route, pre-Clerk query-token promotion), the branded email template library, the question bank with variants, and the analytics endpoints
+- Question bank: question CRUD with organiser scoping and duplicate-number/label conflict handling, and variant CRUD
+- Deterministic per-entrant variant assignment (djb2 hash), variant-aware automarking, and memo secrecy (memo answers are never sent to students)
+- Question difficulty success-rate recalculation at round close and on results release
+- Analytics endpoints: round-wide metrics for organisers (participation, score distribution, per-question performance, school breakdown) and per-school metrics for educators
 - The theme system (light/dark with stored preference and system default) and the onboarding tour state library
 - Accessibility checks via axe (`expectNoAxeViolations`) inside the covered page suites
 
