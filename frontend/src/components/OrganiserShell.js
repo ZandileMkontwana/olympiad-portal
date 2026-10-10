@@ -64,6 +64,9 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const deleteButtonRef = useRef(null);
+  const deleteDialogRef = useRef(null);
+  const deleteDialogWasOpen = useRef(false);
   const initials = initialsFrom(user?.name || user?.email || '?');
   const pathname = usePathname();
   const router = useRouter();
@@ -146,6 +149,19 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
       document.body.style.overflow = previousOverflow;
     };
   }, [open]);
+
+  // Focus the dialog when it opens; return focus to trigger on close.
+  useEffect(() => {
+    if (showDeleteDialog) {
+      deleteDialogWasOpen.current = true;
+      requestAnimationFrame(() => {
+        deleteDialogRef.current?.focus();
+      });
+    } else if (deleteDialogWasOpen.current) {
+      deleteDialogWasOpen.current = false;
+      deleteButtonRef.current?.focus();
+    }
+  }, [showDeleteDialog]);
 
   async function handleDeleteAccount() {
     setDeleting(true);
@@ -240,7 +256,11 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
           <button
             type="button"
             className="organiser-logout"
-            onClick={() => setShowDeleteDialog(true)}
+            ref={deleteButtonRef}
+            onClick={() => {
+              setDeleteError('');
+              setShowDeleteDialog(true);
+            }}
             style={{ color: 'var(--c-t-706391, #666)' }}
           >
             Delete account
@@ -354,8 +374,15 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
       {/* Delete account confirmation dialog */}
       {showDeleteDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
+          <div
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="organiser-delete-heading"
+            tabIndex={-1}
+            className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+          >
+            <h2 id="organiser-delete-heading" className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
             <p className="mt-3 text-sm text-ink-soft">
               This will permanently delete your account and all associated data. This cannot be undone.
             </p>
@@ -363,7 +390,7 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
               If you own any olympiads, you must transfer ownership to another organiser first.
             </p>
             {deleteError && (
-              <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{deleteError}</div>
+              <div role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{deleteError}</div>
             )}
             <div className="mt-6 flex justify-end gap-3">
               <button

@@ -307,4 +307,13 @@ describe('EducatorSidebar delete account', () => {
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('has correct ARIA attributes on the dialog', async () => {
+    render(<EducatorSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'educator-delete-heading');
+    expect(document.getElementById('educator-delete-heading')).toHaveTextContent(/delete your account\?/i);
+  });
 });

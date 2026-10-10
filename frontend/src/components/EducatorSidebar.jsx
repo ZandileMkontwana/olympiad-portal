@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Modal from '@/components/Modal';
 import { useTour } from '@/components/OnboardingTour';
 import Link from 'next/link';
@@ -63,6 +63,9 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const deleteButtonRef = useRef(null);
+  const deleteDialogRef = useRef(null);
+  const deleteDialogWasOpen = useRef(false);
 
   if (!clerkUser) {
     return (
@@ -99,6 +102,19 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
     if (!window.confirm('Are you sure you want to log out?')) return;
     await signOut({ redirectUrl: '/login' });
   }
+
+  // Focus the dialog when it opens; return focus to trigger on close.
+  useEffect(() => {
+    if (showDeleteDialog) {
+      deleteDialogWasOpen.current = true;
+      requestAnimationFrame(() => {
+        deleteDialogRef.current?.focus();
+      });
+    } else if (deleteDialogWasOpen.current) {
+      deleteDialogWasOpen.current = false;
+      deleteButtonRef.current?.focus();
+    }
+  }, [showDeleteDialog]);
 
   async function handleDeleteAccount() {
     setDeleting(true);
@@ -223,6 +239,7 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
                   {' · '}
                   <button
                     type="button"
+                    ref={deleteButtonRef}
                     onClick={() => {
                       setDeleteError('');
                       setShowDeleteDialog(true);
@@ -280,8 +297,15 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
       {/* Delete account confirmation dialog */}
       {showDeleteDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
+          <div
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="educator-delete-heading"
+            tabIndex={-1}
+            className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+          >
+            <h2 id="educator-delete-heading" className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
             <p className="mt-3 text-sm text-ink-soft">
               This will permanently delete your account and all associated data. This cannot be undone.
             </p>

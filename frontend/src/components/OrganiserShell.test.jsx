@@ -175,7 +175,7 @@ describe('OrganiserShell delete account', () => {
     fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/transfer ownership/i)).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(/transfer ownership/i);
     });
   });
 
@@ -187,7 +187,7 @@ describe('OrganiserShell delete account', () => {
     fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/network error/i)).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(/network error/i);
     });
   });
 
@@ -199,12 +199,21 @@ describe('OrganiserShell delete account', () => {
     fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/network error/i)).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
 
-    expect(screen.queryByText(/network error/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('has correct ARIA attributes on the dialog', async () => {
+    renderShell();
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'organiser-delete-heading');
+    expect(document.getElementById('organiser-delete-heading')).toHaveTextContent(/delete your account\?/i);
   });
 });
