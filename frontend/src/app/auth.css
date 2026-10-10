@@ -512,6 +512,11 @@
   border: 1px solid var(--c-bd-ecd9a3);
   color: var(--c-t-7a5a13);
 }
+.auth-page .auth-alert-success {
+  background: #eef8f2;
+  border: 1px solid #b5dfc7;
+  color: #2a6b4a;
+}
 .auth-page .auth-note {
   background: var(--mint);
   border: 1px solid var(--line);

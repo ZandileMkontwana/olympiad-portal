@@ -716,4 +716,270 @@ describe('Entrants routes', () => {
       expect(res.status).toBe(500);
     });
   });
+
+  describe('GET /entrants/duplicates', () => {
+    it('returns empty array when no duplicates exist', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', user: { email: 'alice@school.com' } },
+        { id: 'entrant-2', name: 'Bob Jones', grade: '10', user: null },
+        { id: 'entrant-3', name: 'Carol White', grade: '11', user: { email: 'carol@school.com' } },
+      ]);
+
+      const res = await request(app).get('/api/entrants/duplicates');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toEqual([]);
+    });
+
+    it('detects duplicates with exact name and grade match', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', user: { email: 'alice1@school.com' }, createdAt: new Date('2024-01-01') },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '10', user: { email: 'alice2@school.com' }, createdAt: new Date('2024-01-02') },
+        { id: 'entrant-3', name: 'Bob Jones', grade: '10', user: null, createdAt: new Date('2024-01-03') },
+      ]);
+
+      const res = await request(app).get('/api/entrants/duplicates');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toHaveLength(1);
+      expect(res.body.duplicates[0].confidence).toBe('high');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2);
+      expect(res.body.duplicates[0].entrants[0]).toMatchObject({
+        id: 'entrant-1',
+        name: 'Alice Smith',
+        grade: '10',
+        email: 'alice1@school.com',
+      });
+      expect(res.body.duplicates[0].entrants[1]).toMatchObject({
+        id: 'entrant-2',
+        name: 'Alice Smith',
+        grade: '10',
+        email: 'alice2@school.com',
+      });
+    });
+
+    it('normalizes names by lowercasing and trimming whitespace', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', user: null, createdAt: new Date() },
+        { id: 'entrant-2', name: '  alice   smith  ', grade: '10', user: null, createdAt: new Date() },
+        { id: 'entrant-3', name: 'ALICE SMITH', grade: '10', user: null, createdAt: new Date() },
+      ]);
+
+      const res = await request(app).get('/api/entrants/duplicates');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toHaveLength(1);
+      expect(res.body.duplicates[0].confidence).toBe('high');
+      expect(res.body.duplicates[0].entrants).toHaveLength(3);
+    });
+
+    it('treats different grades as non-duplicates', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', user: null, createdAt: new Date() },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '11', user: null, createdAt: new Date() },
+      ]);
+
+      const res = await request(app).get('/api/entrants/duplicates');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toEqual([]);
+    });
+
+    it('returns multiple duplicate groups', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', user: null, createdAt: new Date() },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '10', user: null, createdAt: new Date() },
+        { id: 'entrant-3', name: 'Bob Jones', grade: '11', user: null, createdAt: new Date() },
+        { id: 'entrant-4', name: 'Bob Jones', grade: '11', user: null, createdAt: new Date() },
+        { id: 'entrant-5', name: 'Bob Jones', grade: '11', user: null, createdAt: new Date() },
+      ]);
+
+      const res = await request(app).get('/api/entrants/duplicates');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toHaveLength(2);
+      expect(res.body.duplicates[0].confidence).toBe('high');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2); // Alice group
+      expect(res.body.duplicates[1].confidence).toBe('high');
+      expect(res.body.duplicates[1].entrants).toHaveLength(3); // Bob group
+    });
+
+    it('returns 403 when the account has no educator profile', async () => {
+      prisma.educator.findUnique.mockResolvedValue(null);
+      const res = await request(app).get('/api/entrants/duplicates');
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 500 on unexpected error', async () => {
+      prisma.entrant.findMany.mockRejectedValue(new Error('DB error'));
+      const res = await request(app).get('/api/entrants/duplicates');
+      expect(res.status).toBe(500);
+    });
+  });
+
+  describe('GET /entrants/duplicates/all', () => {
+    // Organiser-only endpoint: detects duplicates across all schools
+    function createOrganiserApp(authenticated = true) {
+      const organiserApp = express();
+      organiserApp.use(express.json());
+      if (authenticated) {
+        organiserApp.use((req, _res, next) => {
+          req.auth = () => ({ userId: 'clerk-organiser-1' });
+          next();
+        });
+      }
+      organiserApp.use('/api', entrantsRouter);
+      return organiserApp;
+    }
+
+    let organiserApp;
+
+    beforeEach(() => {
+      organiserApp = createOrganiserApp();
+      // Override user mock to return organiser role
+      prisma.user.findUnique.mockImplementation(({ where }) => {
+        if (where.clerkUserId) {
+          return Promise.resolve({
+            id: 'user-organiser',
+            email: 'organiser@olympiad.com',
+            role: 'organiser',
+            name: 'Organiser One',
+          });
+        }
+        return Promise.resolve(null);
+      });
+    });
+
+    it('returns 401 when not authenticated', async () => {
+      const unauthApp = createOrganiserApp(false);
+      const res = await request(unauthApp).get('/api/entrants/duplicates/all');
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 403 when user is not an organiser', async () => {
+      // Override the organiser mock to return educator role for this test
+      prisma.user.findUnique.mockImplementation(({ where }) => {
+        if (where.clerkUserId) {
+          return Promise.resolve({
+            id: 'user-1',
+            email: 'teacher@school.com',
+            role: 'educator',
+            name: 'Teacher One',
+          });
+        }
+        return Promise.resolve(null);
+      });
+      // Use the default educator app
+      const res = await request(app).get('/api/entrants/duplicates/all');
+      expect(res.status).toBe(403);
+    });
+
+    it('returns empty array when no duplicates exist', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', schoolId: 'school-1', user: { email: 'alice@school1.com' }, school: { name: 'School One' } },
+        { id: 'entrant-2', name: 'Bob Jones', grade: '10', schoolId: 'school-2', user: null, school: { name: 'School Two' } },
+        { id: 'entrant-3', name: 'Carol White', grade: '11', schoolId: 'school-1', user: { email: 'carol@school1.com' }, school: { name: 'School One' } },
+      ]);
+
+      const res = await request(organiserApp).get('/api/entrants/duplicates/all');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toEqual([]);
+    });
+
+    it('detects cross-school duplicates with same name and grade', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', schoolId: 'school-1', user: { email: 'alice@school1.com' }, school: { name: 'School One' }, createdAt: new Date('2024-01-01') },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '10', schoolId: 'school-2', user: { email: 'alice@school2.com' }, school: { name: 'School Two' }, createdAt: new Date('2024-01-02') },
+        { id: 'entrant-3', name: 'Bob Jones', grade: '10', schoolId: 'school-1', user: null, school: { name: 'School One' }, createdAt: new Date('2024-01-03') },
+      ]);
+
+      const res = await request(organiserApp).get('/api/entrants/duplicates/all');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toHaveLength(1);
+      expect(res.body.duplicates[0].confidence).toBe('low');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2);
+      expect(res.body.duplicates[0].entrants[0]).toMatchObject({
+        id: 'entrant-1',
+        name: 'Alice Smith',
+        grade: '10',
+        email: 'alice@school1.com',
+        schoolName: 'School One',
+      });
+      expect(res.body.duplicates[0].entrants[1]).toMatchObject({
+        id: 'entrant-2',
+        name: 'Alice Smith',
+        grade: '10',
+        email: 'alice@school2.com',
+        schoolName: 'School Two',
+      });
+    });
+
+    it('normalizes names across schools', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', schoolId: 'school-1', user: null, school: { name: 'School One' }, createdAt: new Date() },
+        { id: 'entrant-2', name: '  alice   smith  ', grade: '10', schoolId: 'school-2', user: null, school: { name: 'School Two' }, createdAt: new Date() },
+        { id: 'entrant-3', name: 'ALICE SMITH', grade: '10', schoolId: 'school-3', user: null, school: { name: 'School Three' }, createdAt: new Date() },
+      ]);
+
+      const res = await request(organiserApp).get('/api/entrants/duplicates/all');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toHaveLength(1);
+      expect(res.body.duplicates[0].confidence).toBe('low');
+      expect(res.body.duplicates[0].entrants).toHaveLength(3);
+    });
+
+    it('treats different grades as non-duplicates', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', schoolId: 'school-1', user: null, school: { name: 'School One' }, createdAt: new Date() },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '11', schoolId: 'school-2', user: null, school: { name: 'School Two' }, createdAt: new Date() },
+      ]);
+
+      const res = await request(organiserApp).get('/api/entrants/duplicates/all');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toEqual([]);
+    });
+
+    it('returns multiple duplicate groups', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', schoolId: 'school-1', user: null, school: { name: 'School One' }, createdAt: new Date() },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '10', schoolId: 'school-2', user: null, school: { name: 'School Two' }, createdAt: new Date() },
+        { id: 'entrant-3', name: 'Bob Jones', grade: '11', schoolId: 'school-1', user: null, school: { name: 'School One' }, createdAt: new Date() },
+        { id: 'entrant-4', name: 'Bob Jones', grade: '11', schoolId: 'school-3', user: null, school: { name: 'School Three' }, createdAt: new Date() },
+        { id: 'entrant-5', name: 'Bob Jones', grade: '11', schoolId: 'school-2', user: null, school: { name: 'School Two' }, createdAt: new Date() },
+      ]);
+
+      const res = await request(organiserApp).get('/api/entrants/duplicates/all');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toHaveLength(2);
+      expect(res.body.duplicates[0].confidence).toBe('low');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2); // Alice group
+      expect(res.body.duplicates[1].confidence).toBe('low');
+      expect(res.body.duplicates[1].entrants).toHaveLength(3); // Bob group
+    });
+
+    it('marks same-school duplicates as high confidence', async () => {
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10', schoolId: 'school-1', user: null, school: { name: 'School One' }, createdAt: new Date() },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '10', schoolId: 'school-1', user: null, school: { name: 'School One' }, createdAt: new Date() },
+      ]);
+
+      const res = await request(organiserApp).get('/api/entrants/duplicates/all');
+
+      expect(res.status).toBe(200);
+      expect(res.body.duplicates).toHaveLength(1);
+      expect(res.body.duplicates[0].confidence).toBe('high');
+      expect(res.body.duplicates[0].entrants).toHaveLength(2);
+    });
+
+    it('returns 500 on unexpected error', async () => {
+      prisma.entrant.findMany.mockRejectedValue(new Error('DB error'));
+      const res = await request(organiserApp).get('/api/entrants/duplicates/all');
+      expect(res.status).toBe(500);
+    });
+  });
 });

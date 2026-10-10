@@ -155,6 +155,38 @@ describe('StandingsPage', () => {
 
       expect(getSchoolStandings).not.toHaveBeenCalled();
     });
+
+    it('shows a duplicate warning badge for flagged entrants', async () => {
+      fetchStandings.mockResolvedValue([
+        {
+          rank: 1,
+          entrantId: 'entrant-1',
+          entrantName: 'Alice Smith',
+          schoolName: 'Wits High School',
+          score: 85,
+          submittedAt: '2026-09-12T20:56:55.855Z',
+          isDuplicate: true,
+        },
+        {
+          rank: 2,
+          entrantId: 'entrant-2',
+          entrantName: 'Bob Jones',
+          schoolName: 'Wits High School',
+          score: 75,
+          submittedAt: '2026-09-12T20:57:55.855Z',
+          isDuplicate: false,
+        },
+      ]);
+
+      render(<StandingsPage />);
+
+      expect(await screen.findByText('Alice Smith')).toBeInTheDocument();
+      expect(screen.getByText('Duplicate')).toBeInTheDocument();
+      expect(screen.getByText('Bob Jones')).toBeInTheDocument();
+      // Bob should not have the duplicate badge
+      const bobRow = screen.getByText('Bob Jones').closest('tr');
+      expect(bobRow.querySelector('span')).toBeNull();
+    });
   });
 
   describe('Per School tab', () => {

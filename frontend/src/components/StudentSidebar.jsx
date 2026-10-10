@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Modal from '@/components/Modal';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
 import {
   LayoutDashboard,
@@ -17,6 +17,8 @@ import {
   MoreHorizontal,
   X,
 } from 'lucide-react';
+import { deleteAccount } from '@/lib/api';
+import { clearStudentSession } from '@/lib/studentSession';
 
 function initials(name) {
   return (name || '')
@@ -52,8 +54,12 @@ const WORKSPACE_LINKS = [
 
 export default function StudentSidebar({ open = false, onClose } = {}) {
   const pathname = usePathname() || '';
+  const router = useRouter();
+  const { user, checking, signOut, getToken } = useStudentAuth();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [hash, setHash] = useState(typeof window !== 'undefined' ? window.location.hash.slice(1) : '');
-  const { user, checking, signOut } = useStudentAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [showResources, setShowResources] = useState(false);
 
@@ -80,6 +86,21 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
   async function handleLogout() {
     if (!window.confirm('Log out of the Olympiad Portal?')) return;
     await signOut({ redirectUrl: '/login' });
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const token = await getToken();
+      await deleteAccount(token);
+      // Account deleted — clear local session and redirect to login
+      clearStudentSession();
+      router.replace('/login?deleted=1');
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete your account. Please try again.');
+      setDeleting(false);
+    }
   }
 
   if (checking) {
@@ -207,24 +228,40 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
           <div className="avatar">{userInitials}</div>
           <div>
             <strong>{name}</strong>
-            <span>
+            <span style={{ display: 'flex', gap: '8px' }}>
               {checking ? (
                 'Loading...'
               ) : (
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                    color: 'var(--c-t-b42318)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                  }}
-                >
-                  Log out
-                </button>
+                <>
+                  <button
+                    onClick={handleLogout}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'var(--c-t-b42318)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Log out
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteDialog(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'var(--c-t-706391)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Delete account
+                  </button>
+                </>
               )}
             </span>
           </div>
@@ -256,6 +293,41 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
             <p>No resources available yet</p>
           </div>
         </Modal>
+      )}
+
+      {/* Delete account confirmation dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
+            <p className="mt-3 text-sm text-ink-soft">
+              This will permanently delete your account and all your data, including your test
+              history, results, and submissions. This cannot be undone.
+            </p>
+            {deleteError && (
+              <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{deleteError}</div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteDialog(false);
+                  setDeleteError('');
+                }}
+                disabled={deleting}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-ink-soft hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete my account'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

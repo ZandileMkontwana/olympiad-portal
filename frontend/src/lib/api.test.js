@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ApiError,
+  parseRetryAfter,
   listOlympiads,
   createOlympiad,
   updateOlympiad,
@@ -28,6 +29,7 @@ import {
   fetchMyResult,
   fetchMyRounds,
   fetchSchoolDashboard,
+  fetchSchoolAnalytics,
   fetchStandings,
   getSchoolStandings,
   fetchNotificationRules,
@@ -97,7 +99,8 @@ describe('api client', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(ApiError);
         expect(err.status).toBe(0);
-        expect(err.message).toMatch(/Could not reach/);
+        expect(err.message).toMatch(/server is currently busy/);
+        expect(err.attempts).toBe(4);
       }
     });
 
@@ -129,8 +132,9 @@ describe('api client', () => {
         await listRounds();
         expect.fail('Should have thrown');
       } catch (err) {
-        expect(err.message).toBe('Request failed with status 500');
+        expect(err.message).toMatch(/server is currently busy/);
         expect(err.status).toBe(500);
+        expect(err.attempts).toBe(4);
       }
     });
 
@@ -145,7 +149,8 @@ describe('api client', () => {
         await listRounds();
         expect.fail('Should have thrown');
       } catch (err) {
-        expect(err.message).toBe('Request failed with status 502');
+        expect(err.message).toMatch(/server is currently busy/);
+        expect(err.attempts).toBe(4);
       }
     });
   });
@@ -614,8 +619,9 @@ describe('api client', () => {
         expect.fail('Should have thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(ApiError);
-        expect(err.message).toBe('Failed to fetch archived papers');
+        expect(err.message).toMatch(/server is currently busy/);
         expect(err.status).toBe(500);
+        expect(err.attempts).toBe(4);
       }
     });
   });
@@ -1099,6 +1105,43 @@ describe('api client', () => {
     });
   });
 
+  describe('fetchSchoolAnalytics', () => {
+    it('sends GET to /api/schools/:id/analytics with Bearer token', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            school: { id: 'school-1', name: 'Test School' },
+            totalEntrants: 5,
+            rounds: [
+              {
+                round: { id: 'round-1', name: 'Round 1' },
+                registeredCount: 5,
+                submissionCount: 4,
+                participationRate: 80,
+                averageScore: 7.5,
+                highestScore: 10,
+              },
+            ],
+          }),
+      });
+
+      const result = await fetchSchoolAnalytics('school-1', 'test-token');
+
+      expect(result.totalEntrants).toBe(5);
+      expect(result.rounds).toHaveLength(1);
+      expect(result.rounds[0].participationRate).toBe(80);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:5000/api/schools/school-1/analytics',
+        expect.objectContaining({
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        })
+      );
+    });
+  });
+
   describe('fetchStandings', () => {
     it('sends GET to /api/rounds/:id/standings without a token', async () => {
       fetchMock.mockResolvedValue({
@@ -1444,6 +1487,224 @@ describe('api client', () => {
           body: JSON.stringify({ assignedToId: 'organiser-2' }),
         })
       );
+    });
+  });
+
+  describe('retry logic', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('succeeds on the first attempt without retrying', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ data: 'ok' }),
+      });
+
+      const promise = listRounds();
+      const result = await promise;
+
+      expect(result).toEqual({ data: 'ok' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries on network failure and succeeds on the second attempt', async () => {
+      fetchMock
+        .mockRejectedValueOnce(new Error('Connection refused'))
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ data: 'recovered' }),
+        });
+
+      const promise = listRounds();
+      // Advance past the first retry delay (500ms * 2^0 = 500ms)
+      await vi.advanceTimersByTimeAsync(500);
+      const result = await promise;
+
+      expect(result).toEqual({ data: 'recovered' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries on 5xx and succeeds when the server recovers', async () => {
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          headers: { get: () => null },
+          json: () => Promise.resolve({ error: 'Service unavailable' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ data: 'recovered' }),
+        });
+
+      const promise = listRounds();
+      // Advance past the first retry delay
+      await vi.advanceTimersByTimeAsync(500);
+      const result = await promise;
+
+      expect(result).toEqual({ data: 'recovered' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('exhausts all retries on persistent network failure and reports attempts', async () => {
+      fetchMock.mockRejectedValue(new Error('Network down'));
+
+      // Attach catch immediately to avoid unhandled rejection during timer advancement
+      const result = listRounds().catch((err) => err);
+      // Advance through all retry delays: 500ms, 1000ms, 2000ms
+      await vi.advanceTimersByTimeAsync(3500);
+      const err = await result;
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect(err.status).toBe(0);
+      expect(err.attempts).toBe(4);
+      expect(err.message).toMatch(/server is currently busy/);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    });
+
+    it('exhausts all retries on persistent 5xx and reports attempts', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: { get: () => null },
+        json: () => Promise.resolve({ error: 'Internal error' }),
+      });
+
+      const result = listRounds().catch((err) => err);
+      // Advance through all retry delays: 500ms, 1000ms, 2000ms
+      await vi.advanceTimersByTimeAsync(3500);
+      const err = await result;
+
+      expect(err).toBeInstanceOf(ApiError);
+      expect(err.status).toBe(500);
+      expect(err.attempts).toBe(4);
+      expect(err.message).toMatch(/server is currently busy/);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    });
+
+    it('does not retry on 4xx client errors', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: 'Not found' }),
+      });
+
+      try {
+        await listRounds();
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err.status).toBe(404);
+        expect(err.attempts).toBe(1);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it('does not retry on 401 unauthorized', async () => {
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: 'Unauthorized' }),
+      });
+
+      try {
+        await listRounds();
+        expect.fail('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err.status).toBe(401);
+        expect(err.attempts).toBe(1);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it('respects Retry-After header when present', async () => {
+      const retryAfterSeconds = 2;
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          headers: { get: (name) => name === 'Retry-After' ? String(retryAfterSeconds) : null },
+          json: () => Promise.resolve({ error: 'Service unavailable' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ data: 'ok' }),
+        });
+
+      const promise = listRounds();
+      // The Retry-After says 2s = 2000ms; advance past it
+      await vi.advanceTimersByTimeAsync(2000);
+      const result = await promise;
+
+      expect(result).toEqual({ data: 'ok' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('caps Retry-After delay at 30 seconds', async () => {
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          headers: { get: (name) => name === 'Retry-After' ? '9999' : null },
+          json: () => Promise.resolve({ error: 'Service unavailable' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ data: 'ok' }),
+        });
+
+      const promise = listRounds();
+      // Should cap at 30s, not wait 9999s
+      await vi.advanceTimersByTimeAsync(30_000);
+      const result = await promise;
+
+      expect(result).toEqual({ data: 'ok' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('parseRetryAfter', () => {
+    it('returns null for null or undefined input', () => {
+      expect(parseRetryAfter(null)).toBeNull();
+      expect(parseRetryAfter(undefined)).toBeNull();
+    });
+
+    it('parses a plain-seconds value', () => {
+      expect(parseRetryAfter('5')).toBe(5000);
+      expect(parseRetryAfter('0')).toBe(0);
+      expect(parseRetryAfter('120')).toBe(120_000);
+    });
+
+    it('parses an HTTP-date in the future', () => {
+      const futureDate = new Date(Date.now() + 10_000).toUTCString();
+      const result = parseRetryAfter(futureDate);
+      // Allow 500ms tolerance for test execution time
+      expect(result).toBeGreaterThan(9000);
+      expect(result).toBeLessThanOrEqual(10_000);
+    });
+
+    it('returns 0 for an HTTP-date in the past', () => {
+      const pastDate = new Date(Date.now() - 60_000).toUTCString();
+      expect(parseRetryAfter(pastDate)).toBe(0);
+    });
+
+    it('returns null for unparseable values', () => {
+      expect(parseRetryAfter('not-a-date-or-number')).toBeNull();
+    });
+
+    it('treats empty string as 0 seconds (since Number("") is 0)', () => {
+      expect(parseRetryAfter('')).toBe(0);
     });
   });
 

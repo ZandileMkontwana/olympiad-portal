@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { listMarkingQueue, assignMarkingTask, submitMarking, ApiError } from '@/lib/api';
+import OrganiserShell from '@/components/OrganiserShell';
+import SignalBadge from '@/components/SignalBadge';
+import SignalDetailModal from '@/components/SignalDetailModal';
+import { listMarkingQueue, assignMarkingTask, submitMarking, fetchSignals, ApiError } from '@/lib/api';
 
 function questionIdsFromAnswers(answers) {
   if (!answers) return [];
@@ -22,6 +25,9 @@ export default function MarkingPage() {
   const [breakdown, setBreakdown] = useState({});
   const [formStatus, setFormStatus] = useState('idle'); // idle | submitting | error
   const [formError, setFormError] = useState('');
+
+  // Signal detail modal state
+  const [signalModal, setSignalModal] = useState(null); // { signals, entrantName, roundId }
 
   const loadQueue = useCallback(async () => {
     setStatus('loading');
@@ -76,6 +82,35 @@ export default function MarkingPage() {
 
   function updateBreakdownValue(questionId, value) {
     setBreakdown((prev) => ({ ...prev, [questionId]: value }));
+  }
+
+  async function handleBadgeClick(task) {
+    const entrantId = task.submission?.entrantId;
+    const roundId = task.submission?.roundId;
+    if (!entrantId || !roundId) return;
+
+    try {
+      const token = await getToken();
+      const data = await fetchSignals(roundId, token);
+      // Filter to signals that involve this entrant
+      const entrantSignals = data.flags.filter((f) => f.entrantIds.includes(entrantId));
+      setSignalModal({
+        signals: entrantSignals,
+        entrantName: task.submission?.entrant?.name || 'Unknown entrant',
+      });
+    } catch {
+      // If we can't fetch details, show the badge-level info we already have
+      const badgeSignals = (task.signals || []).map((s) => ({
+        type: s.type,
+        severity: s.severity,
+        details: {},
+        entrants: [],
+      }));
+      setSignalModal({
+        signals: badgeSignals,
+        entrantName: task.submission?.entrant?.name || 'Unknown entrant',
+      });
+    }
   }
 
   function totalScore() {
@@ -149,9 +184,10 @@ export default function MarkingPage() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
+                  gap: '10px',
                 }}
               >
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <p style={{ margin: 0, fontWeight: 600 }}>
                     {task.submission?.entrant?.name || 'Unknown entrant'}
                   </p>
@@ -159,6 +195,18 @@ export default function MarkingPage() {
                     {task.submission?.round?.name || 'Unknown round'} · status:{' '}
                     <span style={{ textTransform: 'capitalize' }}>{task.status}</span>
                   </p>
+                  {task.signals && task.signals.length > 0 && (
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      {task.signals.map((s, i) => (
+                        <SignalBadge
+                          key={`${s.type}-${s.severity}-${i}`}
+                          type={s.type}
+                          severity={s.severity}
+                          onClick={() => handleBadgeClick(task)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => handleSelectTask(task)} className="button">
                   Mark
@@ -241,6 +289,14 @@ export default function MarkingPage() {
             </button>
           </div>
         </form>
+      )}
+
+      {signalModal && (
+        <SignalDetailModal
+          signals={signalModal.signals}
+          entrantName={signalModal.entrantName}
+          onClose={() => setSignalModal(null)}
+        />
       )}
     </>
   );

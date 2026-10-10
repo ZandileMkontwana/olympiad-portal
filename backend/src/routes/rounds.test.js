@@ -56,6 +56,7 @@ describe('Rounds routes', () => {
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.educator, 'findUnique');
     vi.spyOn(prisma.entrant, 'findUnique');
+    vi.spyOn(prisma.entrant, 'findMany');
     vi.spyOn(prisma.notificationRule, 'findMany');
     vi.spyOn(prisma.notificationRule, 'upsert');
     vi.spyOn(prisma.notificationRule, 'deleteMany');
@@ -73,6 +74,8 @@ describe('Rounds routes', () => {
     // Default: no registrations anywhere (GET /olympiads enrichment counts
     // them) — schools have approved access (POST /rounds/:id/entrants gate).
     prisma.roundEntrant.findMany.mockResolvedValue([]);
+    // Default: no entrants for duplicate detection (standings endpoint)
+    prisma.entrant.findMany.mockResolvedValue([]);
     // Default: the Clerk user maps to an educator linked to school-1
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
@@ -1662,6 +1665,164 @@ describe('Rounds routes', () => {
 
       expect(res.status).toBe(500);
       expect(res.body.error).toMatch(/Failed/);
+    });
+
+    it('flags isDuplicate as false when no duplicates exist', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+        olympiadId: 'oly-1',
+      });
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            school: { name: 'School One' },
+          },
+          result: { score: 80 },
+          submittedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      // No duplicates in the school
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10' },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].isDuplicate).toBe(false);
+    });
+
+    it('flags isDuplicate as true when the entrant has a duplicate', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+        olympiadId: 'oly-1',
+      });
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            school: { name: 'School One' },
+          },
+          result: { score: 80 },
+          submittedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      // Two entrants with same name and grade = duplicates
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10' },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '10' },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].isDuplicate).toBe(true);
+    });
+
+    it('normalizes names when detecting duplicates', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+        olympiadId: 'oly-1',
+      });
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            school: { name: 'School One' },
+          },
+          result: { score: 80 },
+          submittedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      // Different casing and whitespace but same normalized name
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10' },
+        { id: 'entrant-2', name: '  ALICE   SMITH  ', grade: '10' },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].isDuplicate).toBe(true);
+    });
+
+    it('does not flag as duplicate when grades differ', async () => {
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+        olympiadId: 'oly-1',
+      });
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            school: { name: 'School One' },
+          },
+          result: { score: 80 },
+          submittedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      // Same name but different grades = not duplicates
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10' },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '11' },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].isDuplicate).toBe(false);
+    });
+
+    it('detects cross-school duplicates for organisers', async () => {
+      signInAsOrganiser();
+
+      prisma.round.findUnique.mockResolvedValue({
+        id: 'round-1',
+        name: 'Round 1',
+        olympiadId: 'oly-1',
+      });
+
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          entrant: {
+            id: 'entrant-1',
+            name: 'Alice Smith',
+            school: { name: 'School One' },
+          },
+          result: { score: 80 },
+          submittedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      // Organiser sees all schools — duplicate is at a different school
+      prisma.entrant.findMany.mockResolvedValue([
+        { id: 'entrant-1', name: 'Alice Smith', grade: '10' },
+        { id: 'entrant-2', name: 'Alice Smith', grade: '10' },
+      ]);
+
+      const res = await request(app).get('/api/rounds/round-1/standings');
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].isDuplicate).toBe(true);
     });
   });
 

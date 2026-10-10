@@ -173,10 +173,37 @@ export default function StandingsPage() {
                   {standings.map((row) => (
                     <tr
                       key={row.entrantId}
-                      className="border-b border-lavender/10 last:border-0 hover:bg-lavender/5"
+                      className={`border-b border-lavender/10 last:border-0 ${
+                        row.isDuplicate ? 'bg-amber-50' : 'hover:bg-lavender/5'
+                      }`}
                     >
                       <td className="px-4 py-3 font-mono text-ink-soft">{row.rank}</td>
-                      <td className="px-4 py-3 font-medium text-ink">{row.entrantName}</td>
+                      <td className="px-4 py-3 font-medium text-ink">
+                        {row.entrantName}
+                        {row.isDuplicate && (
+                          <span
+                            className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                            title="Potential duplicate account detected"
+                          >
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                              <line x1="12" y1="9" x2="12" y2="13" />
+                              <line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
+                            Duplicate
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-ink-soft">{row.schoolName}</td>
                       {hasVariantInfo && (
                         <td className="px-4 py-3 text-ink-soft">

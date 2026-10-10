@@ -7,7 +7,7 @@ services:
     runtime: node
     rootDir: backend
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install && npx prisma migrate deploy
     startCommand: npm start
     healthCheckPath: /api/olympiads
     envVars:

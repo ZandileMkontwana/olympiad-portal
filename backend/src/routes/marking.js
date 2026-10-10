@@ -3,6 +3,7 @@ const prisma = require('../lib/prisma');
 const activityBus = require('../lib/activityBus');
 const { requireRole } = require('../middleware/auth');
 const { isOlympiadOrganiser } = require('../lib/authorization');
+const { runAllSignals } = require('../cheating/signals');
 
 const router = express.Router();
 
@@ -10,6 +11,8 @@ const router = express.Router();
 // Lists marking tasks for organisers to work through. Defaults to showing
 // only unassigned tasks; pass ?status=all to see everything, or
 // ?status=assigned / ?status=marked / ?status=moderated to filter.
+// Each task includes a `signals` array of cheating-signal badges
+// (type + severity) computed from the round's submission data.
 router.get('/marking/queue', ...requireRole('organiser'), async (req, res) => {
   try {
     const { status } = req.query;
@@ -49,7 +52,73 @@ router.get('/marking/queue', ...requireRole('organiser'), async (req, res) => {
       orderBy: { createdAt: 'asc' },
     });
 
-    res.json(tasks);
+    // Compute cheating-signal badges per task. Collect unique round IDs
+    // from the queue, run signals for each round, then map flags back to
+    // the entrants they reference.
+    const roundIds = [...new Set(tasks.map((t) => t.submission.roundId))];
+    const entrantSignals = {}; // entrantId → [{ type, severity }]
+
+    for (const roundId of roundIds) {
+      const [round, sittings, submissions, paper] = await Promise.all([
+        prisma.round.findUnique({
+          where: { id: roundId },
+          select: { openTime: true, closeTime: true },
+        }),
+        prisma.sitting.findMany({
+          where: { roundId, completedAt: { not: null } },
+          select: { entrantId: true, startedAt: true, completedAt: true },
+        }),
+        prisma.submission.findMany({
+          where: { roundId },
+          select: { entrantId: true, answers: true, submittedAt: true },
+        }),
+        prisma.paper.findUnique({
+          where: { roundId },
+          select: { memoAnswers: true },
+        }),
+      ]);
+
+      if (!round || sittings.length === 0) continue;
+
+      const flags = runAllSignals({
+        sittings: sittings.map((s) => ({
+          entrantId: s.entrantId,
+          startedAt: s.startedAt.toISOString(),
+          submittedAt: s.completedAt.toISOString(),
+        })),
+        submissions: submissions.map((s) => ({
+          entrantId: s.entrantId,
+          answers: s.answers,
+          submittedAt: s.submittedAt.toISOString(),
+        })),
+        roundWindow: {
+          openTime: round.openTime.toISOString(),
+          closeTime: round.closeTime.toISOString(),
+        },
+        memoAnswers: paper?.memoAnswers || null,
+      });
+
+      for (const flag of flags) {
+        for (const eid of flag.entrantIds) {
+          if (!entrantSignals[eid]) entrantSignals[eid] = [];
+          // Avoid duplicate badges (same type + severity)
+          const dup = entrantSignals[eid].some(
+            (s) => s.type === flag.type && s.severity === flag.severity
+          );
+          if (!dup) {
+            entrantSignals[eid].push({ type: flag.type, severity: flag.severity });
+          }
+        }
+      }
+    }
+
+    // Attach signals to each task
+    const enriched = tasks.map((t) => ({
+      ...t,
+      signals: entrantSignals[t.submission.entrantId] || [],
+    }));
+
+    res.json(enriched);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch marking queue' });

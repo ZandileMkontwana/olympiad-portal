@@ -336,4 +336,103 @@ router.get('/entrants', ...requireRole('educator'), async (req, res) => {
   }
 });
 
+// GET /entrants/duplicates
+// Detects potential duplicate entrants within the educator's school.
+// Heuristic: same normalized name + same grade = likely duplicate.
+router.get('/entrants/duplicates', ...requireRole('educator'), async (req, res) => {
+  try {
+    const educator = await loadEducator(req, res);
+    if (!educator) return;
+
+    const entrants = await prisma.entrant.findMany({
+      where: { schoolId: educator.schoolId },
+      include: { user: { select: { email: true } } },
+    });
+
+    // Normalize name: lowercase, trim, collapse whitespace
+    const normalize = (name) => name.toLowerCase().trim().replace(/\s+/g, ' ');
+
+    // Group by (normalized name, grade)
+    const groups = new Map();
+    for (const entrant of entrants) {
+      const key = `${normalize(entrant.name)}|${entrant.grade}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(entrant);
+    }
+
+    // Return groups with more than one entrant.
+    // Confidence is always "high" here because all entrants share one school.
+    const duplicates = Array.from(groups.values())
+      .filter((group) => group.length > 1)
+      .map((group) => ({
+        confidence: 'high',
+        entrants: group.map((e) => ({
+          id: e.id,
+          name: e.name,
+          grade: e.grade,
+          email: e.user?.email || null,
+          createdAt: e.createdAt,
+        })),
+      }));
+
+    res.json({ duplicates });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not detect duplicates' });
+  }
+});
+
+// GET /entrants/duplicates/all
+// Organiser-only: detects potential duplicate entrants across all schools.
+// Heuristic: same normalized name + same grade = likely duplicate (cross-school).
+router.get(
+  '/entrants/duplicates/all',
+  ...requireRole('organiser'),
+  async (req, res) => {
+    try {
+      const entrants = await prisma.entrant.findMany({
+        include: { user: { select: { email: true } }, school: { select: { name: true } } },
+      });
+
+      // Normalize name: lowercase, trim, collapse whitespace
+      const normalize = (name) => name.toLowerCase().trim().replace(/\s+/g, ' ');
+
+      // Group by (normalized name, grade) — cross-school detection
+      const groups = new Map();
+      for (const entrant of entrants) {
+        const key = `${normalize(entrant.name)}|${entrant.grade}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(entrant);
+      }
+
+      // Return groups with more than one entrant.
+      // Confidence: "high" when all entrants share the same school (likely the
+      // same student registered twice), "low" when they span multiple schools
+      // (could be unrelated students who share a common name).
+      const duplicates = Array.from(groups.values())
+        .filter((group) => group.length > 1)
+        .map((group) => {
+          const schoolIds = new Set(group.map((e) => e.schoolId));
+          const confidence = schoolIds.size === 1 ? 'high' : 'low';
+          return {
+            confidence,
+            entrants: group.map((e) => ({
+              id: e.id,
+              name: e.name,
+              grade: e.grade,
+              email: e.user?.email || null,
+              schoolName: e.school.name,
+              createdAt: e.createdAt,
+            })),
+          };
+        });
+
+      res.json({ duplicates });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Could not detect duplicates' });
+    }
+  }
+);
+
 module.exports = router;

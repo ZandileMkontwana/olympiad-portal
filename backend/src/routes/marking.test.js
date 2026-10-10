@@ -28,6 +28,10 @@ describe('Marking routes', () => {
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findUnique');
     vi.spyOn(prisma.olympiadOrganiser, 'findMany');
+    vi.spyOn(prisma.round, 'findUnique');
+    vi.spyOn(prisma.sitting, 'findMany');
+    vi.spyOn(prisma.submission, 'findMany');
+    vi.spyOn(prisma.paper, 'findUnique');
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     // Default: the Clerk user maps to an organiser
@@ -80,6 +84,92 @@ describe('Marking routes', () => {
       prisma.markingTask.findMany.mockRejectedValue(new Error('DB error'));
       const res = await request(app).get('/api/marking/queue');
       expect(res.status).toBe(500);
+    });
+
+    it('attaches signal badges from the round to each task', async () => {
+      const now = new Date('2026-06-01T10:00:00Z');
+      prisma.markingTask.findMany.mockResolvedValue([
+        {
+          id: 'task-1',
+          status: 'unassigned',
+          submissionId: 'sub-1',
+          submission: {
+            id: 'sub-1',
+            entrantId: 'entrant-fast',
+            roundId: 'round-1',
+            entrant: { id: 'entrant-fast', name: 'Speedy' },
+            round: { id: 'round-1', openTime: now, closeTime: now },
+          },
+          assignedTo: null,
+          moderatedBy: null,
+        },
+      ]);
+
+      // Round time window: 60 minutes
+      prisma.round.findUnique.mockResolvedValue({
+        openTime: new Date('2026-06-01T09:00:00Z'),
+        closeTime: new Date('2026-06-01T10:00:00Z'),
+      });
+
+      // 8 sittings: one extreme outlier (2 min) among a tight cohort (~50 min)
+      prisma.sitting.findMany.mockResolvedValue([
+        { entrantId: 'entrant-fast', startedAt: new Date('2026-06-01T09:58:00Z'), completedAt: new Date('2026-06-01T10:00:00Z') },
+        { entrantId: 'e2', startedAt: new Date('2026-06-01T09:10:00Z'), completedAt: new Date('2026-06-01T09:59:00Z') },
+        { entrantId: 'e3', startedAt: new Date('2026-06-01T09:09:00Z'), completedAt: new Date('2026-06-01T09:58:00Z') },
+        { entrantId: 'e4', startedAt: new Date('2026-06-01T09:11:00Z'), completedAt: new Date('2026-06-01T10:00:00Z') },
+        { entrantId: 'e5', startedAt: new Date('2026-06-01T09:10:00Z'), completedAt: new Date('2026-06-01T09:57:00Z') },
+        { entrantId: 'e6', startedAt: new Date('2026-06-01T09:12:00Z'), completedAt: new Date('2026-06-01T10:01:00Z') },
+        { entrantId: 'e7', startedAt: new Date('2026-06-01T09:08:00Z'), completedAt: new Date('2026-06-01T09:56:00Z') },
+        { entrantId: 'e8', startedAt: new Date('2026-06-01T09:10:00Z'), completedAt: new Date('2026-06-01T09:58:00Z') },
+      ]);
+
+      prisma.submission.findMany.mockResolvedValue([]);
+      prisma.paper.findUnique.mockResolvedValue(null);
+
+      const res = await request(app).get('/api/marking/queue');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      // The fast entrant should have at least one signal badge
+      expect(res.body[0].signals.length).toBeGreaterThan(0);
+      expect(res.body[0].signals[0]).toHaveProperty('type');
+      expect(res.body[0].signals[0]).toHaveProperty('severity');
+    });
+
+    it('returns empty signals array when no flags are detected', async () => {
+      prisma.markingTask.findMany.mockResolvedValue([
+        {
+          id: 'task-1',
+          status: 'unassigned',
+          submissionId: 'sub-1',
+          submission: {
+            id: 'sub-1',
+            entrantId: 'entrant-normal',
+            roundId: 'round-1',
+            entrant: { id: 'entrant-normal', name: 'Normal' },
+            round: { id: 'round-1' },
+          },
+          assignedTo: null,
+          moderatedBy: null,
+        },
+      ]);
+
+      // Normal cohort — no outliers
+      prisma.round.findUnique.mockResolvedValue({
+        openTime: new Date('2026-06-01T09:00:00Z'),
+        closeTime: new Date('2026-06-01T10:00:00Z'),
+      });
+      prisma.sitting.findMany.mockResolvedValue([
+        { entrantId: 'entrant-normal', startedAt: new Date('2026-06-01T09:10:00Z'), completedAt: new Date('2026-06-01T09:55:00Z') },
+        { entrantId: 'e2', startedAt: new Date('2026-06-01T09:12:00Z'), completedAt: new Date('2026-06-01T09:50:00Z') },
+        { entrantId: 'e3', startedAt: new Date('2026-06-01T09:08:00Z'), completedAt: new Date('2026-06-01T09:52:00Z') },
+        { entrantId: 'e4', startedAt: new Date('2026-06-01T09:15:00Z'), completedAt: new Date('2026-06-01T09:58:00Z') },
+      ]);
+      prisma.submission.findMany.mockResolvedValue([]);
+      prisma.paper.findUnique.mockResolvedValue(null);
+
+      const res = await request(app).get('/api/marking/queue');
+      expect(res.status).toBe(200);
+      expect(res.body[0].signals).toEqual([]);
     });
   });
 
