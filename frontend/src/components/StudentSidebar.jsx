@@ -158,6 +158,18 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
     };
   }, [showSignOutConfirm, signingOut]);
 
+  // If signing out, show the overlay immediately — even before the user
+  // state has caught up. signOut() clears the session, which makes user
+  // null, and the early returns below would otherwise skip the overlay.
+  if (signingOut) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center" style={{ background: 'var(--c-bg-ffffff, #fff)' }}>
+        <div className="auth-spinner" />
+        <p className="mt-4 text-base font-medium" style={{ color: 'var(--ink, #241f38)' }}>Signing out…</p>
+      </div>
+    );
+  }
+
   if (checking) {
     return (
       <aside className="sidebar">
@@ -368,14 +380,6 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Full-page signing out overlay */}
-      {signingOut && (
-        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center" style={{ background: 'var(--c-bg-ffffff, #fff)' }}>
-          <div className="auth-spinner" />
-          <p className="mt-4 text-base font-medium" style={{ color: 'var(--ink, #241f38)' }}>Signing out…</p>
         </div>
       )}
 
