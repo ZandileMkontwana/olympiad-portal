@@ -5,7 +5,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5
 // Retry policy for transient failures (network errors and 5xx responses).
 // 4xx client errors are never retried — they indicate a permanent problem
 // (bad request, auth failure, etc.) that retrying won't fix.
-const MAX_RETRIES = 3;
+// MAX_RETRIES is the total number of attempts (1 initial + retries).
+const MAX_RETRIES = 4;
 const RETRY_BASE_DELAY_MS = 500;
 
 export class ApiError extends Error {

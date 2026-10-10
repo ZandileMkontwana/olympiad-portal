@@ -23,7 +23,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import Modal from '@/components/Modal';
 import { TourHost, useTour } from '@/components/OnboardingTour';
 import { ORGANISER_TOUR } from '@/lib/tour';
-import { buildActivityStreamUrl } from '@/lib/api';
+import { buildActivityStreamUrl, deleteAccount } from '@/lib/api';
 import { useAuth } from '@clerk/nextjs';
 
 const ClerkSignOutButton = dynamic(() => import('@clerk/nextjs').then((mod) => mod.SignOutButton), {
@@ -61,6 +61,9 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
   const { startTour } = useTour();
   const { getToken } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const initials = initialsFrom(user?.name || user?.email || '?');
   const pathname = usePathname();
   const router = useRouter();
@@ -144,6 +147,20 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
     };
   }, [open]);
 
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const token = await getToken();
+      await deleteAccount(token);
+      // Account deleted — redirect to login
+      router.replace('/login?deleted=1');
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete your account. Please try again.');
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="organiser-shell">
       <aside
@@ -220,6 +237,14 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
               </button>
             </ClerkSignOutButton>
           )}
+          <button
+            type="button"
+            className="organiser-logout"
+            onClick={() => setShowDeleteDialog(true)}
+            style={{ color: 'var(--c-t-706391, #666)' }}
+          >
+            Delete account
+          </button>
           <div className="organiser-profile">
             <span className="profile-avatar">{initials}</span>
             <span>
@@ -324,6 +349,41 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
             </section>
           </div>
         </Modal>
+      )}
+
+      {/* Delete account confirmation dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
+            <p className="mt-3 text-sm text-ink-soft">
+              This will permanently delete your account and all associated data, including any
+              olympiads you own and their rounds. This cannot be undone.
+            </p>
+            {deleteError && (
+              <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{deleteError}</div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteDialog(false);
+                  setDeleteError('');
+                }}
+                disabled={deleting}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-ink-soft hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete my account'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

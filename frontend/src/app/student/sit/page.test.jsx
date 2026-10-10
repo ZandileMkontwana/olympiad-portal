@@ -419,3 +419,68 @@ describe('SitPage beforeunload flush', () => {
     expect(flushSittingAnswers).not.toHaveBeenCalled();
   });
 });
+
+describe('SitPage server busy and retry UI', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    saveSittingAnswers.mockResolvedValue({});
+    authState.checking = false;
+    authState.user = {
+      id: 'user-1',
+      email: 'student@school.com',
+      role: 'student',
+      name: 'Thabo',
+      entrantId: 'entrant-1',
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('shows a retry button when the server is busy (5xx error)', async () => {
+    createSitting.mockRejectedValue(new ApiError('The server is currently busy. Please try again in a few moments.', 503));
+    render(<SitPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/server is currently busy/i);
+    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /back to dashboard/i })).toBeTruthy();
+  });
+
+  it('shows a retry button when there is a network error (status 0)', async () => {
+    createSitting.mockRejectedValue(new ApiError('The server is currently busy. Please try again in a few moments.', 0));
+    render(<SitPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/server is currently busy/i);
+    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy();
+  });
+
+  it('does not show a retry button for client errors (4xx)', async () => {
+    createSitting.mockRejectedValue(new ApiError('Not registered for this round', 403));
+    render(<SitPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not registered/i);
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
+    expect(screen.getByRole('link', { name: /back to dashboard/i })).toBeTruthy();
+  });
+
+  it('retries the sitting when the retry button is clicked', async () => {
+    // First attempt fails with server busy
+    createSitting.mockRejectedValueOnce(new ApiError('The server is currently busy. Please try again in a few moments.', 503));
+    render(<SitPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/server is currently busy/i);
+    const retryButton = screen.getByRole('button', { name: /retry/i });
+
+    // Second attempt succeeds
+    createSitting.mockResolvedValueOnce(sittingResponse(null));
+    await act(async () => {
+      fireEvent.click(retryButton);
+    });
+
+    // The sitting should now be loaded
+    expect(await screen.findByLabelText(/answer for question q1/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
+  });
+});

@@ -100,7 +100,7 @@ describe('api client', () => {
         expect(err).toBeInstanceOf(ApiError);
         expect(err.status).toBe(0);
         expect(err.message).toMatch(/server is currently busy/);
-        expect(err.attempts).toBe(3);
+        expect(err.attempts).toBe(4);
       }
     });
 
@@ -134,7 +134,7 @@ describe('api client', () => {
       } catch (err) {
         expect(err.message).toMatch(/server is currently busy/);
         expect(err.status).toBe(500);
-        expect(err.attempts).toBe(3);
+        expect(err.attempts).toBe(4);
       }
     });
 
@@ -150,7 +150,7 @@ describe('api client', () => {
         expect.fail('Should have thrown');
       } catch (err) {
         expect(err.message).toMatch(/server is currently busy/);
-        expect(err.attempts).toBe(3);
+        expect(err.attempts).toBe(4);
       }
     });
   });
@@ -621,7 +621,7 @@ describe('api client', () => {
         expect(err).toBeInstanceOf(ApiError);
         expect(err.message).toMatch(/server is currently busy/);
         expect(err.status).toBe(500);
-        expect(err.attempts).toBe(3);
+        expect(err.attempts).toBe(4);
       }
     });
   });
@@ -1559,15 +1559,15 @@ describe('api client', () => {
 
       // Attach catch immediately to avoid unhandled rejection during timer advancement
       const result = listRounds().catch((err) => err);
-      // Advance through all retry delays: 500ms, 1000ms
-      await vi.advanceTimersByTimeAsync(1500);
+      // Advance through all retry delays: 500ms, 1000ms, 2000ms
+      await vi.advanceTimersByTimeAsync(3500);
       const err = await result;
 
       expect(err).toBeInstanceOf(ApiError);
       expect(err.status).toBe(0);
-      expect(err.attempts).toBe(3);
+      expect(err.attempts).toBe(4);
       expect(err.message).toMatch(/server is currently busy/);
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
     });
 
     it('exhausts all retries on persistent 5xx and reports attempts', async () => {
@@ -1579,15 +1579,15 @@ describe('api client', () => {
       });
 
       const result = listRounds().catch((err) => err);
-      // Advance through all retry delays
-      await vi.advanceTimersByTimeAsync(1500);
+      // Advance through all retry delays: 500ms, 1000ms, 2000ms
+      await vi.advanceTimersByTimeAsync(3500);
       const err = await result;
 
       expect(err).toBeInstanceOf(ApiError);
       expect(err.status).toBe(500);
-      expect(err.attempts).toBe(3);
+      expect(err.attempts).toBe(4);
       expect(err.message).toMatch(/server is currently busy/);
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
     });
 
     it('does not retry on 4xx client errors', async () => {
