@@ -498,8 +498,9 @@ function OrganiserShellLayout({ activeNav, breadcrumb, user, children }) {
               <button
                 onClick={() => {
                   setSigningOut(true);
-                  setTimeout(() => {
-                    signOut({ redirectUrl: '/login' });
+                  setTimeout(async () => {
+                    await signOut();
+                    window.location.href = '/login';
                   }, 80);
                 }}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-white"
