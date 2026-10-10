@@ -24,12 +24,27 @@ export default function Modal({ title, onClose, children }) {
     const dialog = dialogRef.current;
     dialog?.querySelector(FOCUSABLE)?.focus();
 
-    // Prevent scroll by intercepting wheel, touchmove, and scroll events.
-    // This approach doesn't change any layout properties, so the sidebar
-    // won't jump.
+    // Prevent scroll by intercepting wheel and touchmove events.
+    // When the pointer is inside the modal panel we only allow the
+    // wheel if the panel itself is scrollable AND not already at its
+    // scroll limit — otherwise the event would chain to the page
+    // behind the backdrop.
     const preventScroll = (e) => {
-      // Allow scroll inside the modal panel itself.
-      if (dialog && dialog.contains(e.target)) return;
+      if (dialog && dialog.contains(e.target)) {
+        // Panel is internally scrollable — check limits.
+        const isScrollable = dialog.scrollHeight > dialog.clientHeight;
+        if (!isScrollable) {
+          e.preventDefault();
+          return;
+        }
+        const delta = e.deltaY;
+        const atTop = dialog.scrollTop <= 0;
+        const atBottom = dialog.scrollTop + dialog.clientHeight >= dialog.scrollHeight;
+        if ((delta < 0 && atTop) || (delta > 0 && atBottom)) {
+          e.preventDefault();
+        }
+        return;
+      }
       e.preventDefault();
     };
     const preventScrollKey = (e) => {

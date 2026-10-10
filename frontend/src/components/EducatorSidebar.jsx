@@ -90,12 +90,11 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
       });
       // Lock scroll while delete dialog is open.
       const preventScroll = (e) => {
-        if (deleteDialogRef.current && deleteDialogRef.current.contains(e.target)) return;
         e.preventDefault();
       };
       const preventScrollKey = (e) => {
         const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
-        if (scrollKeys.includes(e.key) && !(deleteDialogRef.current && deleteDialogRef.current.contains(e.target))) {
+        if (scrollKeys.includes(e.key)) {
           e.preventDefault();
         }
       };

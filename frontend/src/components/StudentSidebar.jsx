@@ -110,12 +110,11 @@ export default function StudentSidebar({ open = false, onClose } = {}) {
         deleteDialogRef.current?.focus();
       });
       const preventScroll = (e) => {
-        if (deleteDialogRef.current && deleteDialogRef.current.contains(e.target)) return;
         e.preventDefault();
       };
       const preventScrollKey = (e) => {
         const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
-        if (scrollKeys.includes(e.key) && !(deleteDialogRef.current && deleteDialogRef.current.contains(e.target))) {
+        if (scrollKeys.includes(e.key)) {
           e.preventDefault();
         }
       };
