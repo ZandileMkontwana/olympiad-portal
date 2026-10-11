@@ -86,7 +86,7 @@ async function requestJson(path, options = {}) {
 }
 
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -423,6 +423,38 @@ export function studentLogin({ email, password }) {
  */
 export function setStudentPassword({ token, password }) {
   return requestJson('/api/students/set-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+}
+
+/**
+ * Requests a self-service password reset for a student. Sends a reset
+ * link to the student's email if the account exists and is activated.
+ * Always returns 200 so the response never reveals whether the email exists.
+ * Wired to POST /api/students/forgot-password (backend/src/routes/studentAuth.js).
+ *
+ * @param {{email: string}} params
+ * @returns {Promise<{message: string}>}
+ */
+export function requestStudentPasswordReset({ email }) {
+  return requestJson('/api/students/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+/**
+ * Completes a student password reset using the token from the reset email.
+ * Sets the new password and returns a session token so the student is
+ * signed in immediately.
+ * Wired to POST /api/students/reset-password (backend/src/routes/studentAuth.js).
+ *
+ * @param {{token: string, password: string}} params
+ * @returns {Promise<{token: string, user: object}>}
+ */
+export function resetStudentPassword({ token, password }) {
+  return requestJson('/api/students/reset-password', {
     method: 'POST',
     body: JSON.stringify({ token, password }),
   });
@@ -770,7 +802,7 @@ export function fetchSchoolAnalytics(schoolId, token) {
 }
 
 export function dashboardPathForRole(role) {
-  if (role === 'organiser') return '/organiser'; // TODO: confirm real path
+  if (role === 'organiser') return '/organiser';
   if (role === 'educator') return '/educator';
   if (role === 'student') return '/student';
   return '/login';

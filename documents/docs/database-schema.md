@@ -16,8 +16,11 @@ erDiagram
   PAPER ||--o{ QUESTION : has
   QUESTION ||--o{ QUESTIONVARIANT : has
   ROUND ||--o{ SUBMISSION : receives
+  SUBMISSION ||--o| MARKINGTASK : "is marked via"
+  SUBMISSION ||--o{ REMARKREQUEST : "has"
   ROUND ||--o{ ROUNDENTRANT : has
   ROUND ||--o{ SITTING : has
+  ROUND ||--o{ AUDITLOG : "records"
   SCHOOL ||--o{ EDUCATOR : employs
   SCHOOL ||--o{ ENTRANT : registers
   USER ||--o| EDUCATOR : is
@@ -28,6 +31,8 @@ erDiagram
   SUBMISSION ||--o| MARKINGTASK : "may have"
   SUBMISSION ||--o{ REMARKREQUEST : receives
   USER |o--o| ENTRANT : "may be"
+  USER |o--o{ MARKINGTASK : "marks/moderates"
+  USER |o--o{ REMARKREQUEST : "requests/assigns/reviews"
   ROUND ||--o{ NOTIFICATIONRULE : has
   ROUND ||--o{ NOTIFICATIONLOG : has
   ENTRANT |o--o{ NOTIFICATIONLOG : concerns
@@ -46,6 +51,7 @@ erDiagram
     string grades "optional"
     datetime startDate "optional"
     datetime endDate "optional"
+    string organiserId FK "optional"
   }
   ROUND {
     string id PK
@@ -56,11 +62,13 @@ erDiagram
     string state
     float qualifyingThreshold "optional"
     string prerequisiteRoundId FK "optional"
+    datetime autoAdvanceProcessedAt "optional"
   }
   SCHOOL {
     string id PK
     string name
     string timezone
+    datetime createdAt
   }
   SCHOOLOLYMPIAD {
     string id PK
@@ -76,7 +84,8 @@ erDiagram
     string name
     string email
     string role
-    string clerkUserId
+    string clerkUserId "optional"
+    datetime createdAt
     string passwordHash "optional"
     string invitationToken "optional"
     datetime invitationExpiresAt "optional"
@@ -91,12 +100,14 @@ erDiagram
     string schoolId FK
     string name
     string grade
+    string userId FK "optional"
   }
   PAPER {
     string id PK
     string roundId FK
     string fileUrl
     string memoUrl
+    datetime uploadedAt
     json memoAnswers "optional"
   }
   QUESTION {
@@ -110,6 +121,8 @@ erDiagram
     json options "optional"
     json rubric "optional"
     float difficulty "optional"
+    datetime createdAt
+    datetime updatedAt
   }
   QUESTIONVARIANT {
     string id PK
@@ -118,6 +131,8 @@ erDiagram
     string text "optional"
     string memoAnswer "optional"
     json options "optional"
+    datetime createdAt
+    datetime updatedAt
   }
   SUBMISSION {
     string id PK
@@ -127,11 +142,37 @@ erDiagram
     string idempotencyKey
     datetime submittedAt
   }
+  MARKINGTASK {
+    string id PK
+    string submissionId FK
+    string status
+    string assignedToId FK "optional"
+    float score "optional"
+    json breakdown "optional"
+    datetime markedAt "optional"
+    string moderatedById FK "optional"
+    float moderatedScore "optional"
+    datetime moderatedAt "optional"
+    datetime createdAt
+  }
   RESULT {
     string id PK
     string submissionId FK
     float score
-    datetime releasedAt
+    datetime releasedAt "optional"
+  }
+  REMARKREQUEST {
+    string id PK
+    string submissionId FK
+    string requestedById FK
+    string reason
+    string status
+    string assignedToId FK "optional"
+    float newScore "optional"
+    string reviewedById FK "optional"
+    string reviewNotes "optional"
+    datetime createdAt
+    datetime reviewedAt "optional"
   }
   MARKINGTASK {
     string id PK
@@ -204,12 +245,27 @@ erDiagram
     string organiserId FK
     datetime addedAt
   }
+  AUDITLOG {
+    string id PK
+    string action
+    datetime timestamp
+    string roundId FK "optional"
+    json payload "optional"
+  }
+  APIKEY {
+    string id PK
+    string key
+    string name
+    datetime createdAt
+    datetime revokedAt "optional"
+    string createdBy
+  }
 ```
 
 ## Tables
 
 ### Olympiad
-Top-level competition. Has many rounds, each on its own schedule. The optional `description`, `grades`, `startDate` and `endDate` fields are organiser-set info, shown to educators on the olympiad info card before their school joins.
+Top-level competition. Has many rounds, each on its own schedule. The optional `description`, `grades`, `startDate` and `endDate` fields are organiser-set info, shown to educators on the olympiad info card before their school joins. The optional `organiserId` references the user who created the olympiad.
 
 ### Round
 The core state machine: `scheduled → open → closed → released`, driven by a scheduler comparing the current time against `openTime`/`closeTime`. Everything else in the system depends on this table's state. Rounds can also gate entry: `qualifyingThreshold` (the minimum score to pass) and `prerequisiteRoundId` (a round that must be passed first) drive automatic advancement — when a round closes, the scheduler registers qualifying entrants into the next round, and `autoAdvanceProcessedAt` keeps that transition exactly-once.
@@ -227,7 +283,7 @@ Login account for anyone — organiser, educator, or student. `name` is the user
 Links a `User` account to a `School`. Educators upload results on behalf of their entrants.
 
 ### Entrant
-A competing student, registered against a school. An entrant may be linked to a `User` account so the student can sign in and see their own sittings and results — educators create entrant records before any student account exists, so the link (made through the claim-code flow at student registration) is optional.
+A competing student, registered against a school. An entrant may be linked to a `User` account so the student can sign in and see their own sittings and results — educators create entrant records before any student account exists, so the link (made through the claim-code flow at student registration) is optional. The optional `userId` field is that link.
 
 ### Paper
 A round's uploaded test and memo. Download is gated by the round's current state — not accessible before `open`. `memoAnswers` stores the answer key as structured JSON (question number → correct answer), separate from the memo PDF, since automarking needs data it can read programmatically. A paper can additionally carry a structured question bank (`Question` rows) for online sittings — separate from, and in addition to, the uploaded PDFs.
@@ -272,6 +328,19 @@ A join table that records which organisers have access to which olympiads. Every
 - **Removing:** Any existing organiser can remove a co-organiser, but the **creator** (the user referenced by `Olympiad.organiserId`) is never removable — not even by themselves.
 - **Backfill:** The migration that introduced this table inserted a row for every existing `Olympiad.organiserId`, so no creator lost access.
 - **Creation flow:** When a new olympiad is created, the creator is automatically added to this table.
+
+<<<<<<< HEAD
+### Question
+A question in a paper's question bank. Each question has a `number` (position within the paper), `text` (the question content), `type` (`multiple_choice` | `short_answer` | `essay` | `numeric`), `marks` (maximum score), and optional `memoAnswer` (correct answer for auto-marking). MCQ questions store their options in `options` as JSON; essay/short-answer questions store their marking rubric in `rubric`. `difficulty` tracks the success rate (0.0-1.0) based on student attempts, updated as more sittings complete. A unique constraint on `(paperId, number)` keeps questions ordered within a paper.
+
+### QuestionVariant
+A per-question variant for automarking — allows different students to receive different versions of the same question. Each variant has a `label` (e.g. "Variant A"), optional `text` (null = use parent question text), optional `memoAnswer`, and optional `options`. A unique constraint on `(questionId, label)` keeps one variant per label per question.
+
+### MarkingTask
+The manual marking workflow for submissions that require human grading (essay/short-answer questions). Each submission gets one `MarkingTask` row. `status` moves `unassigned → assigned → marked → moderated`. `assignedToId` references the educator doing the marking; `score` and `breakdown` (per-question partial credit as JSON) are set when marking completes. `moderatedById`, `moderatedScore`, and `moderatedAt` track the moderation step. A unique constraint on `submissionId` keeps one task per submission.
+
+### RemarkRequest
+An appeal/remark workflow for students or educators contesting a mark. Each request has a `reason`, `status` (`pending` | `assigned` | `approved` | `rejected`), and optional `assignedToId` (the reviewer). When approved, `newScore` is set. `reviewedById` and `reviewNotes` record the decision. Indexes on `(assignedToId, status)` speed up the organiser's remark queue.
 
 ### AuditLog
 One row per automatic action the scheduler performs on a round — `round_opened`, `round_closed`, `auto_advanced`, `notification_sent`, `entrants_registered` — with a JSON `payload` for detail. This is what the organiser audit log and round replay timeline read.

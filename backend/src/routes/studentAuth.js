@@ -1,12 +1,20 @@
 const express = require('express');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
+const { sendPasswordResetEmail } = require('../lib/email');
 
 const router = express.Router();
 
 const TOKEN_TTL = '7d';
 const MIN_PASSWORD_LENGTH = 8;
+const RESET_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
+
+function buildResetUrl(token) {
+  const base = process.env.FRONTEND_URL || 'http://localhost:3000';
+  return `${base}/reset-password?token=${token}`;
+}
 
 /**
  * Signs the JWT students use for authenticated requests. The middleware
@@ -156,6 +164,97 @@ router.post('/students/refresh', async (req, res) => {
   } catch (err) {
     console.error('Student token refresh failed:', err);
     res.status(500).json({ error: 'Could not refresh session. Please try again.' });
+  }
+});
+
+// POST /students/forgot-password
+// Self-service password reset for students. Accepts an email, generates a
+// time-limited token, and sends a reset link. Deliberately vague: always
+// returns 200 so the response never reveals whether the email exists.
+router.post('/students/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ error: 'email is required' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).trim().toLowerCase() },
+    });
+
+    // Only send a reset email if the account exists, has a password set
+    // (i.e. is activated), and is a student. Otherwise silently succeed.
+    if (user && user.role === 'student' && user.passwordHash) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { invitationToken: token, invitationExpiresAt: expiresAt },
+      });
+
+      await sendPasswordResetEmail({
+        toEmail: user.email,
+        studentName: user.name,
+        resetUrl: buildResetUrl(token),
+      });
+    }
+
+    // Always 200 — never reveal whether the email exists or is activated.
+    res.json({ message: 'If that email is registered, a reset link has been sent.' });
+  } catch (err) {
+    console.error('Student forgot-password failed:', err);
+    res.status(500).json({ error: 'Could not process your request. Please try again.' });
+  }
+});
+
+// POST /students/reset-password
+// Public: consumes a reset token (from the forgot-password email), stores
+// the new password, clears the token, and returns a session token.
+router.post('/students/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body || {};
+    if (!token || !password) {
+      return res.status(400).json({ error: 'token and password are required' });
+    }
+
+    if (String(password).length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({
+        error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`,
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { invitationToken: String(token) },
+      include: { entrant: { include: { school: true } } },
+    });
+
+    if (!user || user.role !== 'student') {
+      return res.status(400).json({ error: 'This reset link is not valid.' });
+    }
+
+    if (!user.invitationExpiresAt || new Date(user.invitationExpiresAt) < new Date()) {
+      return res.status(400).json({
+        error: 'This reset link has expired. Request a new one from the login page.',
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(String(password), 10);
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        invitationToken: null,
+        invitationExpiresAt: null,
+      },
+      include: { entrant: { include: { school: true } } },
+    });
+
+    res.json({ token: signSessionToken(updated), user: toSessionUser(updated) });
+  } catch (err) {
+    console.error('Student reset-password failed:', err);
+    res.status(500).json({ error: 'Could not reset your password. Please try again.' });
   }
 });
 

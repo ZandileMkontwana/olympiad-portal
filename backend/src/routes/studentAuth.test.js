@@ -4,6 +4,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
+const sgMail = require('@sendgrid/mail');
 const prisma = require('../lib/prisma');
 const studentAuthRouter = require('./studentAuth');
 
@@ -44,6 +45,7 @@ describe('Student auth routes', () => {
   beforeEach(() => {
     vi.spyOn(prisma.user, 'findUnique');
     vi.spyOn(prisma.user, 'update');
+    vi.spyOn(sgMail, 'send').mockResolvedValue([{}]);
     vi.spyOn(console, 'error').mockImplementation(() => {});
     app = createApp();
   });
@@ -226,6 +228,146 @@ describe('Student auth routes', () => {
       prisma.user.findUnique.mockRejectedValue(new Error('DB error'));
       const res = await request(app)
         .post('/api/students/set-password')
+        .send({ token: 'tok', password: 'password123' });
+      expect(res.status).toBe(500);
+    });
+  });
+
+  describe('POST /api/students/forgot-password', () => {
+    it('returns 400 when email is missing', async () => {
+      const res = await request(app).post('/api/students/forgot-password').send({});
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/required/);
+    });
+
+    it('returns 200 even when no user exists (never reveals email existence)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      const res = await request(app)
+        .post('/api/students/forgot-password')
+        .send({ email: 'nobody@school.com' });
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/reset link/);
+    });
+
+    it('returns 200 without sending email for an educator account', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'u-1', role: 'educator', passwordHash: 'h' });
+      const res = await request(app)
+        .post('/api/students/forgot-password')
+        .send({ email: 'teacher@school.com' });
+      expect(res.status).toBe(200);
+    });
+
+    it('returns 200 without sending email for an unactivated student', async () => {
+      prisma.user.findUnique.mockResolvedValue(studentUser({ passwordHash: null }));
+      const res = await request(app)
+        .post('/api/students/forgot-password')
+        .send({ email: 'student@school.com' });
+      expect(res.status).toBe(200);
+    });
+
+    it('generates a token and updates the user for an activated student', async () => {
+      prisma.user.findUnique.mockResolvedValue(studentUser({ passwordHash: validHash }));
+      prisma.user.update.mockResolvedValue(studentUser({ passwordHash: validHash }));
+
+      const res = await request(app)
+        .post('/api/students/forgot-password')
+        .send({ email: 'student@school.com' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/reset link/);
+
+      const updateArg = prisma.user.update.mock.calls[0][0];
+      expect(updateArg.where).toEqual({ id: 'user-1' });
+      expect(updateArg.data.invitationToken).toEqual(expect.any(String));
+      expect(updateArg.data.invitationToken.length).toBe(64); // 32 bytes hex
+      expect(updateArg.data.invitationExpiresAt).toBeInstanceOf(Date);
+      expect(updateArg.data.invitationExpiresAt.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('returns 500 on unexpected error', async () => {
+      prisma.user.findUnique.mockRejectedValue(new Error('DB error'));
+      const res = await request(app)
+        .post('/api/students/forgot-password')
+        .send({ email: 'student@school.com' });
+      expect(res.status).toBe(500);
+    });
+  });
+
+  describe('POST /api/students/reset-password', () => {
+    it('returns 400 when token or password is missing', async () => {
+      const res = await request(app).post('/api/students/reset-password').send({ token: 'tok' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/required/);
+    });
+
+    it('returns 400 when the password is too short', async () => {
+      const res = await request(app)
+        .post('/api/students/reset-password')
+        .send({ token: 'tok', password: 'short' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/at least 8 characters/);
+    });
+
+    it('returns 400 for an unknown token', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      const res = await request(app)
+        .post('/api/students/reset-password')
+        .send({ token: 'unknown', password: 'password123' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/not valid/);
+    });
+
+    it('returns 400 when the reset link has expired', async () => {
+      prisma.user.findUnique.mockResolvedValue(
+        studentUser({ invitationToken: 'tok', invitationExpiresAt: new Date('2020-01-01') })
+      );
+      const res = await request(app)
+        .post('/api/students/reset-password')
+        .send({ token: 'tok', password: 'password123' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/expired/);
+    });
+
+    it('stores the new hash, clears the token, and returns a session', async () => {
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      prisma.user.findUnique.mockResolvedValue(
+        studentUser({
+          passwordHash: validHash,
+          invitationToken: 'reset-tok',
+          invitationExpiresAt: expiresAt,
+        })
+      );
+      prisma.user.update.mockResolvedValue(
+        studentUser({
+          passwordHash: 'new-hashed',
+          invitationToken: null,
+          invitationExpiresAt: null,
+        })
+      );
+
+      const res = await request(app)
+        .post('/api/students/reset-password')
+        .send({ token: 'reset-tok', password: 'newpassword123' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.token).toEqual(expect.any(String));
+      expect(res.body.user.email).toBe('student@school.com');
+
+      const updateArg = prisma.user.update.mock.calls[0][0];
+      expect(updateArg.data.invitationToken).toBeNull();
+      expect(updateArg.data.invitationExpiresAt).toBeNull();
+      await expect(bcrypt.compare('newpassword123', updateArg.data.passwordHash)).resolves.toBe(
+        true
+      );
+
+      const payload = jwt.verify(res.body.token, 'test-secret');
+      expect(payload.sub).toBe('user-1');
+    });
+
+    it('returns 500 on unexpected error', async () => {
+      prisma.user.findUnique.mockRejectedValue(new Error('DB error'));
+      const res = await request(app)
+        .post('/api/students/reset-password')
         .send({ token: 'tok', password: 'password123' });
       expect(res.status).toBe(500);
     });
