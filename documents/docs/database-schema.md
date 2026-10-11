@@ -329,7 +329,6 @@ A join table that records which organisers have access to which olympiads. Every
 - **Backfill:** The migration that introduced this table inserted a row for every existing `Olympiad.organiserId`, so no creator lost access.
 - **Creation flow:** When a new olympiad is created, the creator is automatically added to this table.
 
-<<<<<<< HEAD
 ### Question
 A question in a paper's question bank. Each question has a `number` (position within the paper), `text` (the question content), `type` (`multiple_choice` | `short_answer` | `essay` | `numeric`), `marks` (maximum score), and optional `memoAnswer` (correct answer for auto-marking). MCQ questions store their options in `options` as JSON; essay/short-answer questions store their marking rubric in `rubric`. `difficulty` tracks the success rate (0.0-1.0) based on student attempts, updated as more sittings complete. A unique constraint on `(paperId, number)` keeps questions ordered within a paper.
 
