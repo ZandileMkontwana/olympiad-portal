@@ -111,7 +111,7 @@ backend/
 
 ## Documentation
 
-Full project documentation is deployed at <https://olympiad-portal-docs.netlify.app>.
+Full project documentation is deployed at <https://zandilemkontwana.github.io/olympiad-portal/>.
 
 ## Database
 Uses PostgreSQL (hosted on Supabase) via Prisma. Run migrations with:
@@ -121,4 +121,4 @@ npx prisma migrate dev
 The round lifecycle scheduler runs automatically on server start, ticking every 30s to transition round states based on openTime/closeTime.
 
 ## API Endpoints
-All routes are mounted under `/api` — the full endpoint list lives in the [API Reference](https://olympiad-portal-docs.netlify.app/docs/api-reference).
+All routes are mounted under `/api` — the full endpoint list lives in the [API Reference](https://zandilemkontwana.github.io/olympiad-portal/docs/api-reference).

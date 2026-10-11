@@ -11,7 +11,7 @@ sidebar_position: 1
 |---|---|
 | Backend API (Render) | <https://olympiad-portal-backend.onrender.com> |
 | Frontend (Vercel) | <https://frontend-two-ruby-25.vercel.app> |
-| Documentation (Netlify) | <https://olympiad-portal-docs.netlify.app> |
+| Documentation (GitHub Pages) | <https://zandilemkontwana.github.io/olympiad-portal/> |
 
 ## Code Coverage
 
@@ -138,7 +138,7 @@ backend/
 
 ## Documentation
 
-Full project documentation (getting started, API reference, database schema, sprint records) is deployed at <https://olympiad-portal-docs.netlify.app> and lives in [`documents/docs/`](./documents/docs/).
+Full project documentation (getting started, API reference, database schema, sprint records) is deployed at <https://zandilemkontwana.github.io/olympiad-portal/> and lives in [`documents/docs/`](./documents/docs/).
 
 ## Getting Started — Frontend
 

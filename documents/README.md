@@ -2,7 +2,7 @@
 
 This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
 
-**Live site:** <https://olympiad-portal-docs.netlify.app>
+**Live site:** <https://zandilemkontwana.github.io/olympiad-portal/>
 
 ## Installation
 
