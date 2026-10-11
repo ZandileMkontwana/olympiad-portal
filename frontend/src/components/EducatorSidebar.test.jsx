@@ -12,6 +12,7 @@ const mockSignOut = vi.fn();
 const mockGetToken = vi.fn(() => Promise.resolve('test-token'));
 const mockReplace = vi.fn();
 const mockDeleteAccount = vi.fn();
+const mockFetchCurrentUser = vi.fn(() => Promise.resolve({ name: 'Ms Teacher', email: 'teacher@school.com' }));
 
 vi.mock('@clerk/nextjs', () => ({
   useClerk: () => ({ signOut: mockSignOut }),
@@ -34,6 +35,7 @@ vi.mock('next/link', () => ({
 
 vi.mock('@/lib/api', () => ({
   deleteAccount: (...args) => mockDeleteAccount(...args),
+  fetchCurrentUser: (...args) => mockFetchCurrentUser(...args),
 }));
 
 import EducatorSidebar from './EducatorSidebar';
@@ -233,6 +235,8 @@ describe('EducatorSidebar delete account', () => {
     mockReplace.mockReset();
     mockGetToken.mockReset();
     mockGetToken.mockImplementation(() => Promise.resolve('test-token'));
+    mockFetchCurrentUser.mockReset();
+    mockFetchCurrentUser.mockImplementation(() => Promise.resolve({ name: 'Ms Teacher', email: 'teacher@school.com' }));
   });
 
   it('shows a delete account button in the settings modal', async () => {
