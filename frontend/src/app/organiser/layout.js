@@ -1,14 +1,17 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
+import { useAuth, useUser } from '@clerk/nextjs';
 import OrganiserShell from '@/components/OrganiserShell';
+import { fetchCurrentUser } from '@/lib/api';
 import '@/app/auth.css';
 
 const ROUTE_MAP = {
   '/organiser': { activeNav: 'dashboard', breadcrumb: 'Overview' },
   '/organiser/marking': { activeNav: 'marking', breadcrumb: 'Marking Queue' },
   '/organiser/remarks': { activeNav: 'remarks', breadcrumb: 'Appeals' },
+  '/organiser/duplicates': { activeNav: 'duplicates', breadcrumb: 'Duplicates' },
   '/organiser/replay': { activeNav: 'replay', breadcrumb: 'Replay' },
   '/organiser/archive': { activeNav: 'archive', breadcrumb: 'Archive' },
   '/organiser/rounds/new': { activeNav: 'dashboard', breadcrumb: 'New Round' },
@@ -22,13 +25,32 @@ function initialsFrom(name) {
 }
 
 export default function OrganiserLayout({ children }) {
-  const { user } = useUser();
+  const { user: clerkUser } = useUser();
+  const { getToken } = useAuth();
   const pathname = usePathname();
+
+  // Fetch the database User record so the sidebar shows the real name
+  // (e.g. "Ronnie") instead of whatever the Clerk profile has.
+  const [dbUser, setDbUser] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const token = await getToken();
+      const fetched = await fetchCurrentUser(token);
+      if (!cancelled) setDbUser(fetched);
+    })();
+    return () => { cancelled = true; };
+  }, [getToken]);
+
+  // Prefer the database name; fall back to Clerk while loading.
+  const name = dbUser?.name || clerkUser?.fullName || clerkUser?.firstName || clerkUser?.emailAddresses?.[0]?.emailAddress || '';
+  const email = dbUser?.email || clerkUser?.emailAddresses?.[0]?.emailAddress || '';
+
   const organiserUser = {
-    name: user?.fullName || user?.firstName || user?.emailAddresses?.[0]?.emailAddress || '',
-    email: user?.emailAddresses?.[0]?.emailAddress || '',
-    role: 'organiser',
-    id: user?.id,
+    name,
+    email,
+    role: dbUser?.role || 'organiser',
+    id: clerkUser?.id,
   };
   const initials = initialsFrom(organiserUser.name);
   const route = ROUTE_MAP[pathname] || { activeNav: 'dashboard', breadcrumb: 'Overview' };

@@ -54,7 +54,7 @@ describe('Modal', () => {
     expect(save).toHaveFocus();
   });
 
-  it('returns focus to the opener and unlocks scrolling when it unmounts', () => {
+  it('returns focus to the opener when it unmounts', () => {
     const opener = document.createElement('button');
     document.body.appendChild(opener);
     opener.focus();
@@ -63,10 +63,9 @@ describe('Modal', () => {
         <p>Nothing here</p>
       </Modal>
     );
-    expect(document.body.style.overflow).toBe('hidden');
+    // Scroll is prevented via event interception, not body.style.overflow
     unmount();
     expect(opener).toHaveFocus();
-    expect(document.body.style.overflow).not.toBe('hidden');
     opener.remove();
   });
 

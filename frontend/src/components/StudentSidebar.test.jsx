@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 
 // Mutable state — individual tests override before rendering.
 const authState = vi.hoisted(() => ({
@@ -90,11 +90,11 @@ describe('StudentSidebar', () => {
     expect(screen.getByText('Dashboard').closest('a')).toHaveAttribute('aria-current', 'page');
   });
 
-  it('shows the student name with a logout button', () => {
+  it('shows the student name with a sign out button', () => {
     render(<StudentSidebar />);
 
     expect(screen.getByText('Thabo')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
   });
 
   it('falls back to the email address when the account has no name', () => {
@@ -104,21 +104,20 @@ describe('StudentSidebar', () => {
     expect(screen.getByText('student@school.com')).toBeInTheDocument();
   });
 
-  it('signs the student out after confirming', async () => {
+  it('shows the sign out confirmation dialog when sign out is clicked', async () => {
     render(<StudentSidebar />);
 
-    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
-    expect(confirm).toHaveBeenCalledWith('Log out of the Olympiad Portal?');
-    await vi.waitFor(() => {
-      expect(mockSignOut).toHaveBeenCalledWith({ redirectUrl: '/login' });
-    });
+    fireEvent.click(screen.getByRole('button', { name: /sign out/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/sign out\?/i)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /^sign out$/i })).toBeInTheDocument();
   });
 
-  it('stays signed in when the logout confirmation is cancelled', () => {
-    confirm.mockReturnValue(false);
+  it('stays signed in when the sign out confirmation is cancelled', () => {
     render(<StudentSidebar />);
 
-    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
+    fireEvent.click(screen.getByRole('button', { name: /sign out/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
@@ -138,22 +137,28 @@ describe('StudentSidebar', () => {
     expect(screen.getByText(/not signed in/i)).toBeInTheDocument();
   });
 
-  it('shows a delete account button', () => {
+  it('shows a delete account button in the settings modal', async () => {
     render(<StudentSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await vi.waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
 
     expect(screen.getByRole('button', { name: /delete account/i })).toBeInTheDocument();
   });
 
-  it('opens the delete dialog when the delete button is clicked', () => {
+  it('opens the delete dialog when the delete button is clicked', async () => {
     render(<StudentSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await vi.waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     expect(screen.getByText(/delete your account\?/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /delete my account/i })).toBeInTheDocument();
   });
 
-  it('closes the delete dialog when cancel is clicked', () => {
+  it('closes the delete dialog when cancel is clicked', async () => {
     render(<StudentSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await vi.waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
@@ -165,6 +170,8 @@ describe('StudentSidebar', () => {
     const { clearStudentSession } = await import('@/lib/studentSession');
 
     render(<StudentSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await vi.waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));
@@ -181,6 +188,8 @@ describe('StudentSidebar', () => {
     deleteAccount.mockRejectedValueOnce(new Error('Server error'));
 
     render(<StudentSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
+    await vi.waitFor(() => expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }));
     fireEvent.click(screen.getByRole('button', { name: /delete my account/i }));

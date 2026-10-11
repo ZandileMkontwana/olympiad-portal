@@ -24,8 +24,40 @@ export default function Modal({ title, onClose, children }) {
     const dialog = dialogRef.current;
     dialog?.querySelector(FOCUSABLE)?.focus();
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    // Prevent scroll by intercepting wheel and touchmove events.
+    // When the pointer is inside the modal panel we only allow the
+    // wheel if the panel itself is scrollable AND not already at its
+    // scroll limit — otherwise the event would chain to the page
+    // behind the backdrop.
+    const preventScroll = (e) => {
+      if (dialog && dialog.contains(e.target)) {
+        // Panel is internally scrollable — check limits.
+        const isScrollable = dialog.scrollHeight > dialog.clientHeight;
+        if (!isScrollable) {
+          e.preventDefault();
+          return;
+        }
+        const delta = e.deltaY;
+        const atTop = dialog.scrollTop <= 0;
+        const atBottom = dialog.scrollTop + dialog.clientHeight >= dialog.scrollHeight;
+        if ((delta < 0 && atTop) || (delta > 0 && atBottom)) {
+          e.preventDefault();
+        }
+        return;
+      }
+      e.preventDefault();
+    };
+    const preventScrollKey = (e) => {
+      const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+      if (scrollKeys.includes(e.key) && !dialog?.contains(e.target)) {
+        e.preventDefault();
+      }
+    };
+
+    // Use passive: false so preventDefault works.
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    document.addEventListener('keydown', preventScrollKey);
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -52,8 +84,10 @@ export default function Modal({ title, onClose, children }) {
     document.addEventListener('keydown', onKeyDown);
 
     return () => {
+      document.removeEventListener('wheel', preventScroll);
+      document.removeEventListener('touchmove', preventScroll);
+      document.removeEventListener('keydown', preventScrollKey);
       document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
   }, [onClose]);
