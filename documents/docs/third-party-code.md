@@ -59,11 +59,11 @@ The Next.js frontend is deployed on Vercel, which provides automatic builds from
 
 **URL:** Configured per-deployment; see the README for the current URL.
 
-### Netlify — Documentation Hosting
+### GitHub Pages — Documentation Hosting
 
-The Docusaurus documentation site is deployed to Netlify on every push to `main`.
+The Docusaurus documentation site is built via a GitHub Actions workflow and deployed to GitHub Pages on every push to `main`.
 
-**URL:** `https://olympiad-portal-docs.netlify.app`
+**URL:** `https://zandilemkontwana.github.io/olympiad-portal/`
 
 ### Gitea — Version Control and CI/CD
 
@@ -148,7 +148,7 @@ The repository is hosted on Gitea, with Gitea Actions providing CI (lint + test 
 |---|---|
 | `@docusaurus/core` | Static site generator for documentation |
 | `@docusaurus/preset-classic` | Default theme with docs, blog, and pages |
-| `netlify-cli` | CLI for deploying the built site to Netlify |
+| `@docusaurus/theme-mermaid` | Mermaid diagram support for documentation |
 
 ---
 
@@ -174,7 +174,7 @@ This separation exists because students authenticate with claim codes rather tha
 | File storage | Supabase Storage | Free (1 GB) |
 | Backend hosting | Render | Free (spins down when idle) |
 | Frontend hosting | Vercel | Free |
-| Documentation hosting | Netlify | Free |
+| Documentation hosting | GitHub Pages | Free |
 | Version control + CI | Gitea + Gitea Actions | Self-hosted |
 | Authentication (educators/organisers) | Clerk | Free tier |
 | Email | SendGrid | Free (100 emails/day) |

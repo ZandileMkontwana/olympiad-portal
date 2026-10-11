@@ -55,9 +55,9 @@ Please check [code_quality_tool](./code_quality_tool.md) document for details ab
 **Gitea Actions** — see [Git Methodology](./git-methodology) for details on our merge and versioning process.
 
 ## Documentation
-**Docusaurus**, deployed via **Netlify**, publicly accessible with no login required.
+**Docusaurus**, deployed via **GitHub Pages** (Gitea Actions → GitHub mirror → GitHub Pages), publicly accessible with no login required.
 
 ## Deployment
 - **Backend:** Render — `https://olympiad-portal-backend.onrender.com` (moved from Railway when its trial ended; Render was chosen because the round-lifecycle scheduler needs a long-running process, which serverless platforms don't provide)
 - **Frontend:** Vercel — `https://frontend-two-ruby-25.vercel.app`
-- **Docs:** Netlify — `https://olympiad-portal-docs.netlify.app`
+- **Docs:** GitHub Pages — `https://zandilemkontwana.github.io/olympiad-portal/`
