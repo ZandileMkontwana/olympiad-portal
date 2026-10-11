@@ -271,6 +271,41 @@ async function sendStudentInvitation({ toEmail, studentName, schoolName, invitat
   }
 }
 
+// Sends a student a password-reset link. Uses the same invitation token
+// mechanism as the initial invitation, but with distinct copy so the
+// student knows this is a reset, not a first-time activation.
+async function sendPasswordResetEmail({ toEmail, studentName, resetUrl }) {
+  const msg = {
+    to: toEmail,
+    from: brandedFrom(),
+    subject: 'Reset your Olympiad Portal password',
+    text:
+      `Hi ${studentName},\n\n` +
+      `A password reset was requested for your Olympiad Portal account.\n` +
+      `Click the link below to choose a new password:\n\n${resetUrl}\n\n` +
+      `This link expires in 48 hours. If you did not request a reset, you can ignore this email.\n\n` +
+      `If the link doesn't work, ask your educator to resend the invitation from your school dashboard.`,
+    html: brandEmailHtml({
+      heading: 'Reset your password',
+      bodyHtml:
+        `<p style="margin:0 0 10px;">Hi <strong>${studentName}</strong>,</p>` +
+        `<p style="margin:0 0 10px;">A password reset was requested for your Olympiad Portal account. Click below to choose a new password:</p>` +
+        `<p style="margin:0 0 10px;">This link expires in 48 hours. If you did not request a reset, you can ignore this email.</p>` +
+        `<p style="margin:0;">If the link doesn't work, ask your educator to resend the invitation from your school dashboard.</p>`,
+      cta: ctaButton('Reset my password', resetUrl),
+    }),
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`Password reset email sent to ${toEmail}`);
+    return true;
+  } catch (err) {
+    console.error('Failed to send password reset email:', err.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendSubmissionReceipt,
   sendRoundOpeningNotification,
@@ -278,6 +313,7 @@ module.exports = {
   sendResultsReleasedNotification,
   sendMissingSubmissionNotification,
   sendStudentInvitation,
+  sendPasswordResetEmail,
   buildRoundOpeningMessage,
   buildRoundClosingMessage,
   buildResultsReleasedMessage,

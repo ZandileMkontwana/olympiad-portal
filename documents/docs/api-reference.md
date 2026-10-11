@@ -842,6 +842,39 @@ Public. Consumes the invitation token from a student's invitation email, stores 
 
 ---
 
+### POST /api/students/forgot-password
+
+Public. Self-service password reset for students. Accepts an email address and, if the account exists and is activated, sends a branded reset link valid for 48 hours. Always returns 200 — the response never reveals whether the email is registered.
+
+**Body:**
+```json
+{ "email": "string" }
+```
+
+**Response (200):**
+```json
+{ "message": "If that email is registered, a reset link has been sent." }
+```
+
+**Errors:** `400` email missing, `500` server error.
+
+---
+
+### POST /api/students/reset-password
+
+Public. Consumes a reset token from the forgot-password email, stores the new password (bcrypt-hashed), clears the token, and returns a session token so the student is signed in immediately.
+
+**Body:**
+```json
+{ "token": "string", "password": "string" }
+```
+
+**Response (200):** same shape as [`POST /api/students/login`](#post-apistudentslogin).
+
+**Errors:** `400` token or password missing, password shorter than 8 characters, reset link not valid or expired.
+
+---
+
 ### GET /api/students/me/sittings
 
 Requires auth, role `student`. Lists the authenticated student's own sittings with round names and states, newest first.

@@ -136,14 +136,22 @@ export default function LoginPage() {
           <p className="auth-form-context">Continue your learning journey</p>
 
           {sessionExpired && (
-            <div className="auth-alert auth-alert-warning" role="alert" style={{ marginBottom: '16px' }}>
+            <div
+              className="auth-alert auth-alert-warning"
+              role="alert"
+              style={{ marginBottom: '16px' }}
+            >
               <strong>Session expired</strong>
               Your session has expired. Please sign in again to continue.
             </div>
           )}
 
           {accountDeleted && (
-            <div className="auth-alert auth-alert-success" role="alert" style={{ marginBottom: '16px' }}>
+            <div
+              className="auth-alert auth-alert-success"
+              role="alert"
+              style={{ marginBottom: '16px' }}
+            >
               <strong>Account deleted</strong>
               Your account has been successfully deleted.
             </div>
@@ -368,6 +376,11 @@ export default function LoginPage() {
 
               <p className="auth-embed-note">
                 Your educator registers you and emails an invitation link to set your password.
+              </p>
+              <p className="auth-embed-note" style={{ marginTop: '4px' }}>
+                <Link href="/forgot-password" className="text-lavender-deep hover:underline">
+                  Forgot your password?
+                </Link>
               </p>
             </>
           ) : (

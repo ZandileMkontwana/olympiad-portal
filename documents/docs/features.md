@@ -131,7 +131,7 @@ Students authenticate separately from educators/organisers, using a claim-code s
 - **Invitation-based registration** — educators create student accounts and email an invitation link.
 - **Set password** — students click the invitation link and set a password (stored as a bcrypt hash).
 - **JWT sessions** — after login, students receive a JWT stored in `localStorage` (separate from the Clerk session used by educators/organisers).
-- **Password reset** — educators can resend the invitation, which generates a fresh link for password reset.
+- **Password reset** — students can reset their password independently via a self-service flow: they enter their email on the login page's "Forgot your password?" link, receive a time-limited reset link via email, and choose a new password. Educators can also resend the invitation from the school dashboard.
 
 ### Online Sitting
 

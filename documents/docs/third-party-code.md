@@ -154,14 +154,15 @@ The repository is hosted on Gitea, with Gitea Actions providing CI (lint + test 
 
 ## Student Authentication (Custom)
 
-Unlike organiser/educator auth (handled by Clerk), student authentication is implemented in-house:
+Unlike organiser/educator auth (handled by Clerk), student authentication is implemented in-house using established security libraries:
 
 - **Password hashing** — `bcrypt` hashes claim-code passwords before storing them.
 - **Token issuance** — `jsonwebtoken` generates JWTs on successful student login (`POST /api/students/login`).
 - **Session storage** — the frontend stores the JWT and student user object in `localStorage` via `frontend/src/lib/studentSession.js`.
 - **Middleware** — `passport` with the `passport-local` strategy validates student credentials on login.
+- **Password reset** — students can self-service reset their password via `POST /api/students/forgot-password` (sends a time-limited reset link) and `POST /api/students/reset-password` (consumes the token and sets a new password). The flow uses the same `crypto.randomBytes` token generation and `invitationToken`/`invitationExpiresAt` fields as the educator-initiated invitation, with the same 48-hour expiry.
 
-This separation exists because students authenticate with claim codes rather than email/password, and the existing Clerk flow is designed for educator/organiser accounts.
+This separation exists because students authenticate with claim codes rather than email/password, and the existing Clerk flow is designed for educator/organiser accounts. The student flow uses well-established libraries (bcrypt, JWT, passport) following standard security practices — bcrypt for password storage, JWT for stateless session tokens with expiry, and crypto.randomBytes for reset token generation.
 
 ---
 
