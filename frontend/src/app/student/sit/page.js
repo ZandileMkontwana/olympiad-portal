@@ -225,34 +225,34 @@ function SitContent() {
 
   if (checking || !user) {
     return (
-      <main id="main-content" tabIndex={-1} className="round-page">
-        <p>Loading...</p>
-      </main>
+      <div className="round-page">
+        <p style={{ color: 'var(--c-t-6d667c)', fontSize: '14px' }}>Loading...</p>
+      </div>
     );
   }
 
   if (!roundId) {
     return (
-      <main id="main-content" tabIndex={-1} className="round-page">
+      <div className="round-page">
         <div className="message">No round ID was provided.</div>
-      </main>
+      </div>
     );
   }
 
   if (phase === 'loading') {
     return (
-      <main id="main-content" tabIndex={-1} className="round-page">
+      <div className="round-page">
         <h1>Take a Test</h1>
         <p className="description" style={{ fontSize: '1.1rem' }}>
           Loading your test…
         </p>
-      </main>
+      </div>
     );
   }
 
   if (phase === 'error') {
     return (
-      <main id="main-content" tabIndex={-1} className="round-page">
+      <div className="round-page">
         <h1>Take a Test</h1>
         <div
           role="alert"
@@ -298,12 +298,12 @@ function SitContent() {
             &larr; Back to dashboard
           </Link>
         </p>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="round-page">
+    <div className="round-page">
       <h1>{sittingData ? sittingData.round.name : 'Take a Test'}</h1>
 
       {error && (
@@ -436,7 +436,7 @@ function SitContent() {
           &larr; Back to dashboard
         </Link>
       </p>
-    </main>
+    </div>
   );
 }
 
@@ -444,9 +444,9 @@ export default function SitPage() {
   return (
     <Suspense
       fallback={
-        <main id="main-content" tabIndex={-1} className="round-page">
-          Loading...
-        </main>
+        <div className="round-page">
+          <p style={{ color: 'var(--c-t-6d667c)', fontSize: '14px' }}>Loading...</p>
+        </div>
       }
     >
       <SitContent />

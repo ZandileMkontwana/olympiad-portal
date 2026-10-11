@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import OrganiserShell from '@/components/OrganiserShell';
 import SignalBadge from '@/components/SignalBadge';
 import SignalDetailModal from '@/components/SignalDetailModal';
 import { listMarkingQueue, assignMarkingTask, submitMarking, fetchSignals, ApiError } from '@/lib/api';

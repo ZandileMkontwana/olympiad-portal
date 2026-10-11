@@ -6,15 +6,13 @@ import { useTour } from '@/components/OnboardingTour';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth, useClerk, useUser } from '@clerk/nextjs';
-import { deleteAccount } from '@/lib/api';
+import { deleteAccount, fetchCurrentUser } from '@/lib/api';
 import {
   LayoutDashboard,
   Trophy,
   Users,
   FileText,
   Settings2,
-  CircleHelp,
-  ArrowRight,
   GraduationCap,
   MoreHorizontal,
   X,
@@ -60,25 +58,85 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
   const { getToken } = useAuth();
   const { startTour } = useTour();
   const [showSettings, setShowSettings] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
-  const deleteButtonRef = useRef(null);
   const deleteDialogRef = useRef(null);
   const deleteDialogWasOpen = useRef(false);
 
-  // Focus the dialog when it opens; return focus to trigger on close.
+  // Fetch the database User record so the sidebar shows the real name
+  // instead of whatever the Clerk profile has.
+  const [dbUser, setDbUser] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const token = await getToken();
+      const fetched = await fetchCurrentUser(token);
+      if (!cancelled) setDbUser(fetched);
+    })();
+    return () => { cancelled = true; };
+  }, [getToken]);
+
+  // Focus the dialog when it opens.
   useEffect(() => {
     if (showDeleteDialog) {
       deleteDialogWasOpen.current = true;
       requestAnimationFrame(() => {
         deleteDialogRef.current?.focus();
       });
+      // Lock scroll while delete dialog is open.
+      const preventScroll = (e) => {
+        e.preventDefault();
+      };
+      const preventScrollKey = (e) => {
+        const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+        if (scrollKeys.includes(e.key)) {
+          e.preventDefault();
+        }
+      };
+      document.addEventListener('wheel', preventScroll, { passive: false });
+      document.addEventListener('touchmove', preventScroll, { passive: false });
+      document.addEventListener('keydown', preventScrollKey);
+      return () => {
+        document.removeEventListener('wheel', preventScroll);
+        document.removeEventListener('touchmove', preventScroll);
+        document.removeEventListener('keydown', preventScrollKey);
+      };
     } else if (deleteDialogWasOpen.current) {
       deleteDialogWasOpen.current = false;
-      deleteButtonRef.current?.focus();
     }
   }, [showDeleteDialog]);
+
+  // Scroll lock + Escape for the sign out confirmation dialog.
+  useEffect(() => {
+    if (!showSignOutConfirm || signingOut) return;
+    const preventScroll = (e) => {
+      e.preventDefault();
+    };
+    const preventScrollKey = (e) => {
+      const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+      if (scrollKeys.includes(e.key)) {
+        e.preventDefault();
+      }
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowSignOutConfirm(false);
+      }
+    };
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    document.addEventListener('keydown', preventScrollKey);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('wheel', preventScroll);
+      document.removeEventListener('touchmove', preventScroll);
+      document.removeEventListener('keydown', preventScrollKey);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showSignOutConfirm, signingOut]);
 
   if (!clerkUser) {
     return (
@@ -108,13 +166,10 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
     );
   }
 
-  const name = clerkUser.fullName || clerkUser.primaryEmailAddress?.emailAddress || 'Educator';
+  // Prefer the database name; fall back to Clerk while loading.
+  const name = dbUser?.name || clerkUser.fullName || clerkUser.primaryEmailAddress?.emailAddress || 'Educator';
+  const email = dbUser?.email || clerkUser.primaryEmailAddress?.emailAddress || '';
   const userInitials = initials(name);
-
-  async function handleLogout() {
-    if (!window.confirm('Are you sure you want to log out?')) return;
-    await signOut({ redirectUrl: '/login' });
-  }
 
   async function handleDeleteAccount() {
     setDeleting(true);
@@ -207,56 +262,20 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
         </nav>
         {!collapsed && (
           <>
-            <div className="sidebar-help">
-              <div className="help-icon">
-                <CircleHelp />
-              </div>
-              <div>
-                <strong>Need a hand?</strong>
-                <span>Visit the help centre</span>
-              </div>
-              <ArrowRight />
-            </div>
+            <button
+              className="nav-item"
+              disabled={signingOut}
+              onClick={() => setShowSignOutConfirm(true)}
+              style={{ margin: '0 8px' }}
+            >
+              <span style={{ color: 'var(--c-t-b42318)' }}>
+                {signingOut ? 'Signing out\u2026' : 'Sign out'}
+              </span>
+            </button>
             <div className="sidebar-profile">
               <div className="avatar">{userInitials}</div>
               <div>
                 <strong>{name}</strong>
-                <span>
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      color: 'var(--c-t-b42318)',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Log out
-                  </button>
-                  {' · '}
-                  <button
-                    type="button"
-                    ref={deleteButtonRef}
-                    onClick={() => {
-                      setDeleteError('');
-                      setShowDeleteDialog(true);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      color: 'var(--c-t-b42318)',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Delete account
-                  </button>
-                </span>
               </div>
               <MoreHorizontal className="profile-more" />
             </div>
@@ -270,7 +289,7 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
             <section className="modal-card" aria-labelledby="settings-profile">
               <h3 id="settings-profile">Profile</h3>
               <p>Name: {name}</p>
-              <p>Email: {clerkUser?.primaryEmailAddress?.emailAddress || 'N/A'}</p>
+              <p>Email: {email || 'N/A'}</p>
             </section>
             <section className="modal-card" aria-labelledby="settings-prefs">
               <h3 id="settings-prefs">Preferences</h3>
@@ -290,49 +309,119 @@ export default function EducatorSidebar({ collapsed = false, onToggle, open = fa
                 Replay tour
               </button>
             </section>
+            <section className="modal-card" aria-labelledby="settings-danger">
+              <h3 id="settings-danger">Danger zone</h3>
+              <p>Permanently delete your account and all associated data.</p>
+              <button
+                type="button"
+                className="modal-action"
+                onClick={() => {
+                  setDeleteError('');
+                  setShowSettings(false);
+                  setShowDeleteDialog(true);
+                }}
+                style={{ background: '#dc2626' }}
+              >
+                Delete account
+              </button>
+            </section>
           </div>
         </Modal>
       )}
 
+      {/* Sign out confirmation dialog */}
+      {showSignOutConfirm && !signingOut && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="educator-signout-heading"
+            tabIndex={-1}
+            className="mx-4 w-full max-w-sm rounded-xl p-6 shadow-xl"
+            style={{ background: 'var(--c-bg-ffffff, #fff)' }}
+          >
+            <h2 id="educator-signout-heading" className="font-display text-xl font-semibold" style={{ color: 'var(--ink, #241f38)' }}>Sign out?</h2>
+            <p className="mt-3 text-sm" style={{ color: 'var(--ink-soft, #6c628c)' }}>
+              Are you sure you want to sign out of your educator account?
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowSignOutConfirm(false)}
+                className="rounded-lg px-4 py-2 text-sm font-medium"
+                style={{ color: 'var(--ink-soft, #6c628c)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setSigningOut(true);
+                  // Fire signOut in background and immediately hard-redirect.
+                  // The browser navigates away before any intermediate page renders.
+                  setTimeout(() => {
+                    signOut();
+                    window.location.href = '/login';
+                  }, 80);
+                }}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-white"
+                style={{ background: 'var(--violet, #6c4fd8)' }}
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-page signing out overlay */}
+      {signingOut && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center" style={{ background: 'var(--c-bg-ffffff, #fff)' }}>
+          <div className="auth-spinner" />
+          <p className="mt-4 text-base font-medium" style={{ color: 'var(--ink, #241f38)' }}>Signing out…</p>
+        </div>
+      )}
+
       {/* Delete account confirmation dialog */}
       {showDeleteDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[1001] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div
             ref={deleteDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="educator-delete-heading"
             tabIndex={-1}
-            className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+            className="mx-4 w-full max-w-md rounded-xl p-6 shadow-xl"
+            style={{ background: 'var(--c-bg-ffffff, #fff)' }}
           >
-            <h2 id="educator-delete-heading" className="font-display text-xl font-semibold text-ink">Delete your account?</h2>
-            <p className="mt-3 text-sm text-ink-soft">
+            <h2 id="educator-delete-heading" className="font-display text-xl font-semibold" style={{ color: 'var(--ink, #241f38)' }}>Delete your account?</h2>
+            <p className="mt-3 text-sm" style={{ color: 'var(--ink-soft, #6c628c)' }}>
               This will permanently delete your account and all associated data. This cannot be undone.
             </p>
             {deleteError && (
-              <p role="alert" className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
+              <p role="alert" className="mt-3 rounded-md p-3 text-sm" style={{ background: 'var(--c-bg-fef2f2, #fef2f2)', color: 'var(--c-t-b91c1c, #b91c1c)' }}>
                 {deleteError}
               </p>
             )}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
                 onClick={() => {
                   setShowDeleteDialog(false);
                   setDeleteError('');
                 }}
                 disabled={deleting}
+                style={{ color: 'var(--ink-soft, #6c628c)' }}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 onClick={handleDeleteAccount}
                 disabled={deleting}
+                style={{ background: '#dc2626' }}
               >
-                {deleting ? 'Deleting…' : 'Delete my account'}
+                {deleting ? 'Deleting\u2026' : 'Delete my account'}
               </button>
             </div>
           </div>

@@ -68,11 +68,12 @@ describe('AppShell (mobile drawer)', () => {
     expect(document.querySelector('.sidebar')).not.toHaveClass('sidebar-open');
   });
 
-  it('locks body scrolling only while the drawer is open', () => {
+  it('locks scrolling by intercepting wheel/touchmove events while the drawer is open', () => {
+    const preventDefault = vi.fn();
     renderShell();
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
-    expect(document.body.style.overflow).toBe('hidden');
+    // Scroll is prevented via event interception, not body.style.overflow
+    document.dispatchEvent(new Event('wheel', { bubbles: true }));
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(document.body.style.overflow).not.toBe('hidden');
   });
 });

@@ -105,7 +105,9 @@ export default function ReplayPage() {
   }, [selectedRoundId, getToken]);
 
   if (checking) {
-    return <p>Loading...</p>;
+    return (
+      <p style={{ padding: '48px', fontSize: '14px', color: 'var(--c-t-6d667c)' }}>Loading...</p>
+    );
   }
 
   // Build a flat list of all rounds across olympiads for the dropdown.
