@@ -24,9 +24,14 @@ const config = {
   },
 
   // Set the production url of your site here
-  url: 'https://olympiad-portal-docs.netlify.app',
+  url: 'https://zandilemkontwana.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
-  baseUrl: '/',
+  baseUrl: '/olympiad-portal/',
+
+  // GitHub Pages deployment config
+  organizationName: 'ZandileMkontwana',
+  projectName: 'olympiad-portal',
+  trailingSlash: false,
 
   onBrokenLinks: 'throw',
 

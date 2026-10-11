@@ -152,7 +152,7 @@ A guided walkthrough of the Olympiad Portal for the Milestone 4 presentation. Th
 
 ## 8. Under the Hood (1 min)
 
-1. **CI/CD**: show the Gitea Actions workflow — lint + test on every push, auto-deploy to Netlify (docs), Render (backend), Vercel (frontend).
+1. **CI/CD**: show the Gitea Actions workflow — lint + test on every push, auto-deploy to GitHub Pages (docs), Render (backend), Vercel (frontend).
 2. **Load testing**: mention the first full-size deployed run — 565 requests, zero errors, exactly-once verified.
 3. **Test coverage**: 709 backend tests + 491 frontend tests = 1,200 total, all passing, above coverage thresholds.
 
@@ -160,9 +160,9 @@ A guided walkthrough of the Olympiad Portal for the Milestone 4 presentation. Th
 
 ## 9. Documentation Site
 
-1. Open `https://olympiad-portal-docs.netlify.app`.
+1. Open `https://zandilemkontwana.github.io/olympiad-portal/`.
 2. Show the features page, API reference, database schema, known limitations, third-party code documentation.
-3. Mention it's built with Docusaurus and auto-deployed to Netlify on every push to `main`.
+3. Mention it's built with Docusaurus and auto-deployed to GitHub Pages on every push to `main`.
 
 ---
 
