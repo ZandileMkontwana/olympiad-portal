@@ -60,13 +60,14 @@ function RoundViewContent() {
   const loadSubmissions = useCallback(async () => {
     if (!roundId) return;
     try {
-      const data = await listRoundSubmissions(roundId);
+      const token = await getToken();
+      const data = await listRoundSubmissions(roundId, token);
       setSubmissions(data);
       setSubmissionsStatus('ready');
     } catch {
       setSubmissionsStatus('error');
     }
-  }, [roundId]);
+  }, [roundId, getToken]);
 
   useEffect(() => {
     if (!roundId) return;
@@ -269,10 +270,8 @@ function RoundViewContent() {
         throw new Error(data.error || 'Failed to fetch paper');
       }
 
-      // External API URL (paper file download), not an internal Next.js route,
-      // so window.location is intentional here.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = `${process.env.NEXT_PUBLIC_API_BASE_URL}${data.fileUrl}`;
+      // fileUrl is already a full Supabase URL, so use it directly
+      window.location.href = data.fileUrl;
     } catch (error) {
       setDownloadError(error.message);
     }
@@ -724,7 +723,13 @@ function RoundViewContent() {
 }
 export default function RoundViewPage() {
   return (
-    <Suspense fallback={<div className="round-page"><p style={{ color: 'var(--c-t-6d667c)', fontSize: '14px' }}>Loading round...</p></div>}>
+    <Suspense
+      fallback={
+        <div className="round-page">
+          <p style={{ color: 'var(--c-t-6d667c)', fontSize: '14px' }}>Loading round...</p>
+        </div>
+      }
+    >
       <RoundViewContent />
     </Suspense>
   );

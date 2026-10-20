@@ -957,8 +957,10 @@ export function moderateMarkingTask(taskId, moderatedScore, token) {
  * Lists submissions for a round, with result and remark request info.
  * Wired to GET /api/rounds/:id/submissions (backend/src/routes/rounds.js).
  */
-export function listRoundSubmissions(roundId) {
-  return requestJson(`/api/rounds/${roundId}/submissions`);
+export function listRoundSubmissions(roundId, token) {
+  return requestJson(`/api/rounds/${roundId}/submissions`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }
 
 /**
