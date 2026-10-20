@@ -89,6 +89,31 @@ router.post(
         create: { roundId, fileUrl, memoUrl, memoAnswers },
         update: { fileUrl, memoUrl, memoAnswers },
       });
+
+      // Auto-create Question records from the answer key so automarking works
+      // immediately. Only creates questions that don't already exist (by paperId + number),
+      // so re-uploading a paper won't overwrite manually edited questions.
+      if (memoAnswers && typeof memoAnswers === 'object') {
+        const questionsToCreate = Object.entries(memoAnswers)
+          .filter(([num, answer]) => num && answer)
+          .map(([num, answer]) => ({
+            paperId: paper.id,
+            number: parseInt(num, 10),
+            text: `Question ${num}`,
+            type: 'multiple_choice',
+            marks: 1,
+            memoAnswer: String(answer).toUpperCase(),
+          }))
+          .filter((q) => !Number.isNaN(q.number));
+
+        if (questionsToCreate.length > 0) {
+          await prisma.question.createMany({
+            data: questionsToCreate,
+            skipDuplicates: true,
+          });
+        }
+      }
+
       res.status(201).json(paper);
     } catch (err) {
       console.error(err);
