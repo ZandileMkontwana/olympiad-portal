@@ -874,7 +874,7 @@ export default function OrganiserDashboard() {
                         </div>
                       )}
 
-                      {olympiad.rounds.length === 0 && (
+                      {olympiad.rounds.length === 0 ? (
                         <div style={{ marginTop: '12px' }}>
                           <Link
                             href={`/organiser/rounds/new?olympiadId=${olympiad.id}&olympiadName=${encodeURIComponent(olympiad.name)}`}
@@ -882,6 +882,22 @@ export default function OrganiserDashboard() {
                             style={{ fontSize: '13px' }}
                           >
                             <Plus size={13} /> Add a round
+                          </Link>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: '8px' }}>
+                          <Link
+                            href={`/organiser/rounds/new?olympiadId=${olympiad.id}&olympiadName=${encodeURIComponent(olympiad.name)}`}
+                            style={{
+                              fontSize: '12px',
+                              color: 'rgba(139, 92, 246, 0.9)',
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Plus size={12} /> Add another round
                           </Link>
                         </div>
                       )}
