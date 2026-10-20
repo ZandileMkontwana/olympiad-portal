@@ -140,8 +140,8 @@ function NewRoundForm() {
         {
           olympiadId: olympiad.id,
           name: roundName.trim(),
-          openTime: new Date(openTime).toISOString(),
-          closeTime: new Date(closeTime).toISOString(),
+          openTime,
+          closeTime,
           qualifyingThreshold: qualifyingThreshold.trim() ? Number(qualifyingThreshold) : null,
         },
         token
