@@ -1020,132 +1020,122 @@ router.get('/rounds/:id/standings/schools', requireAuth, async (req, res) => {
 });
 
 // POST /rounds/:id/release-results
-router.post(
-  '/rounds/:id/release-results',
-  requireAuth,
-  ...requireRole('organiser'),
-  async (req, res) => {
-    try {
-      const user = await loadAuthUser(req);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      const round = await prisma.round.findUnique({
-        where: { id: req.params.id },
-        include: { olympiad: true },
-      });
-      if (!round) {
-        return res.status(404).json({ error: 'Round not found' });
-      }
-
-      const check = await requireOlympiadAccess(req, res, round, user);
-      if (!check) return;
-
-      if (round.state !== 'closed') {
-        return res.status(403).json({
-          error: `Results can only be released for closed rounds (currently '${round.state}')`,
-        });
-      }
-
-      const now = new Date();
-      const updated = await prisma.result.updateMany({
-        where: {
-          releasedAt: null,
-          submission: { roundId: round.id },
-        },
-        data: { releasedAt: now },
-      });
-
-      // Flipping the round to 'released' is the only path past 'closed' in the
-      // state machine — without it, certificates and released-round paper
-      // downloads stay locked forever even though results carry releasedAt.
-      // The state filter keeps the closed -> released transition atomic: if a
-      // concurrent request already moved the round on, nothing is written.
-      // Legacy closed rounds with pre-existing releasedAt stamps still
-      // converge — they remain 'closed', so the filter matches them.
-      const flipped = await prisma.round.updateMany({
-        where: { id: round.id, state: 'closed' },
-        data: { state: 'released' },
-      });
-      if (flipped.count === 0) {
-        return res.status(409).json({
-          error: 'Round state changed while releasing results - it is no longer closed',
-        });
-      }
-
-      // Calculate and update question difficulty based on this round's submissions
-      try {
-        const difficultyCount = await updateQuestionDifficulty(round.id);
-        console.log(`Updated difficulty for ${difficultyCount} questions from round ${round.id}`);
-      } catch (diffErr) {
-        // Log but don't fail the release if difficulty calculation fails
-        console.error('Failed to calculate difficulty:', diffErr);
-      }
-
-      // Live activity feed (US-4.1): results went out for this round.
-      activityBus.broadcast({
-        type: 'results_released',
-        message: `Results released for ${round.name}`,
-        roundId: round.id,
-        olympiadId: round.olympiadId,
-      });
-
-      res.json({ releasedCount: updated.count, releasedAt: now });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Could not release results' });
+router.post('/rounds/:id/release-results', requireAuth, async (req, res) => {
+  try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
+
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
+
+    if (round.state !== 'closed') {
+      return res.status(403).json({
+        error: `Results can only be released for closed rounds (currently '${round.state}')`,
+      });
+    }
+
+    const now = new Date();
+    const updated = await prisma.result.updateMany({
+      where: {
+        releasedAt: null,
+        submission: { roundId: round.id },
+      },
+      data: { releasedAt: now },
+    });
+
+    // Flipping the round to 'released' is the only path past 'closed' in the
+    // state machine — without it, certificates and released-round paper
+    // downloads stay locked forever even though results carry releasedAt.
+    // The state filter keeps the closed -> released transition atomic: if a
+    // concurrent request already moved the round on, nothing is written.
+    // Legacy closed rounds with pre-existing releasedAt stamps still
+    // converge — they remain 'closed', so the filter matches them.
+    const flipped = await prisma.round.updateMany({
+      where: { id: round.id, state: 'closed' },
+      data: { state: 'released' },
+    });
+    if (flipped.count === 0) {
+      return res.status(409).json({
+        error: 'Round state changed while releasing results - it is no longer closed',
+      });
+    }
+
+    // Calculate and update question difficulty based on this round's submissions
+    try {
+      const difficultyCount = await updateQuestionDifficulty(round.id);
+      console.log(`Updated difficulty for ${difficultyCount} questions from round ${round.id}`);
+    } catch (diffErr) {
+      // Log but don't fail the release if difficulty calculation fails
+      console.error('Failed to calculate difficulty:', diffErr);
+    }
+
+    // Live activity feed (US-4.1): results went out for this round.
+    activityBus.broadcast({
+      type: 'results_released',
+      message: `Results released for ${round.name}`,
+      roundId: round.id,
+      olympiadId: round.olympiadId,
+    });
+
+    res.json({ releasedCount: updated.count, releasedAt: now });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not release results' });
   }
-);
+});
 
 // POST /rounds/:id/unrelease-results
-router.post(
-  '/rounds/:id/unrelease-results',
-  requireAuth,
-  ...requireRole('organiser'),
-  async (req, res) => {
-    try {
-      const user = await loadAuthUser(req);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      const round = await prisma.round.findUnique({
-        where: { id: req.params.id },
-        include: { olympiad: true },
-      });
-      if (!round) {
-        return res.status(404).json({ error: 'Round not found' });
-      }
-
-      const check = await requireOlympiadAccess(req, res, round, user);
-      if (!check) return;
-
-      const updated = await prisma.result.updateMany({
-        where: {
-          releasedAt: { not: null },
-          submission: { roundId: round.id },
-        },
-        data: { releasedAt: null },
-      });
-
-      // A released round drops back to 'closed' once its results are hidden
-      // again. Rounds in any other state are left untouched.
-      if (round.state === 'released') {
-        await prisma.round.update({
-          where: { id: round.id },
-          data: { state: 'closed' },
-        });
-      }
-
-      res.json({ unreleasedCount: updated.count });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Could not unrelease results' });
+router.post('/rounds/:id/unrelease-results', requireAuth, async (req, res) => {
+  try {
+    const user = await loadAuthUser(req);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
+
+    const round = await prisma.round.findUnique({
+      where: { id: req.params.id },
+      include: { olympiad: true },
+    });
+    if (!round) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    const check = await requireOlympiadAccess(req, res, round, user);
+    if (!check) return;
+
+    const updated = await prisma.result.updateMany({
+      where: {
+        releasedAt: { not: null },
+        submission: { roundId: round.id },
+      },
+      data: { releasedAt: null },
+    });
+
+    // A released round drops back to 'closed' once its results are hidden
+    // again. Rounds in any other state are left untouched.
+    if (round.state === 'released') {
+      await prisma.round.update({
+        where: { id: round.id },
+        data: { state: 'closed' },
+      });
+    }
+
+    res.json({ unreleasedCount: updated.count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not unrelease results' });
   }
-);
+});
 
 // GET /rounds/:id/notifications
 router.get('/rounds/:id/notifications', ...requireRole('organiser'), async (req, res) => {
