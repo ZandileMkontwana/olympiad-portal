@@ -375,7 +375,7 @@ function TestsSection({ tests, rounds }) {
                 </div>
                 {item.status === 'in-progress' && (
                   <Link
-                    href={`/student/sit?id=${item.test.roundId}`}
+                    href={`/student/sit?id=${item.test.round.id}`}
                     onClick={(e) => {
                       if (!window.confirm('Continue this test? Your answers are saved.'))
                         e.preventDefault();
@@ -607,7 +607,7 @@ export default function StudentDashboard() {
 
   const completed = sittings.filter((s) => testStatus(s) === 'completed').length;
   const inProgress = sittings.filter((s) => testStatus(s) === 'in-progress');
-  const resumeHref = inProgress.length > 0 ? `/student/sit?id=${inProgress[0].roundId}` : null;
+  const resumeHref = inProgress.length > 0 ? `/student/sit?id=${inProgress[0].round.id}` : null;
   const bestScore =
     results.length > 0 ? `${Math.round(Math.max(...results.map((r) => r.score)))}%` : '\u2014';
   const avgScore =
