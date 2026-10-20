@@ -105,6 +105,10 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
         const totalQuestions = Object.keys(memo).length;
         let correctCount = 0;
 
+        console.log('[Auto-mark] Round:', roundId);
+        console.log('[Auto-mark] Memo:', memo);
+        console.log('[Auto-mark] Answers:', answers);
+
         for (const questionId in memo) {
           if (answers[questionId] === memo[questionId]) {
             correctCount++;
@@ -112,6 +116,7 @@ router.post('/rounds/:id/submissions', ...requireRole('educator'), async (req, r
         }
 
         const score = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+        console.log('[Auto-mark] Score:', `${correctCount}/${totalQuestions} = ${score}%`);
 
         result = await tx.result.create({
           data: {
