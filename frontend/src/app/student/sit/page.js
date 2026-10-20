@@ -57,9 +57,7 @@ function SitContent() {
       const token = await getToken();
 
       if (!user.entrantId) {
-        setError(
-          'Your account is not linked to a student record. Please contact your educator.'
-        );
+        setError('Your account is not linked to a student record. Please contact your educator.');
         setPhase('error');
         setServerBusy(false);
         return;
@@ -82,9 +80,7 @@ function SitContent() {
       }
       // Detect server-busy errors: 5xx responses or network failures
       // (status 0) that exhausted retries in api.js.
-      const isBusy =
-        err instanceof ApiError &&
-        (err.status === 0 || err.status >= 500);
+      const isBusy = err instanceof ApiError && (err.status === 0 || err.status >= 500);
       setServerBusy(isBusy);
       const message =
         err instanceof ApiError
@@ -104,7 +100,7 @@ function SitContent() {
   }, [checking, user, roundId, startSitting]);
 
   const questions = useMemo(
-    () => (sittingData ? sittingData.paper.questions.sort((a, b) => Number(a) - Number(b)) : []),
+    () => (sittingData ? sittingData.paper.questions.sort((a, b) => a.number - b.number) : []),
     [sittingData]
   );
 
@@ -352,7 +348,7 @@ function SitContent() {
             <div className="card" style={{ padding: '24px' }}>
               {questions.map((q) => (
                 <div
-                  key={q}
+                  key={q.id}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -361,7 +357,7 @@ function SitContent() {
                     borderBottom: '1px solid rgba(139, 92, 246, 0.15)',
                   }}
                 >
-                  <strong style={{ minWidth: '56px', fontSize: '1.15rem' }}>Q{q}</strong>
+                  <strong style={{ minWidth: '56px', fontSize: '1.15rem' }}>Q{q.number}</strong>
                   <input
                     type="text"
                     className="sit-answer"
@@ -369,8 +365,8 @@ function SitContent() {
                     autoCapitalize="characters"
                     maxLength={1}
                     placeholder="—"
-                    value={answers[q] || ''}
-                    onChange={(e) => updateAnswer(q, e.target.value)}
+                    value={answers[q.number] || ''}
+                    onChange={(e) => updateAnswer(q.number, e.target.value)}
                     disabled={timeRemaining === 'expired'}
                     style={{
                       width: '60px',
@@ -378,7 +374,7 @@ function SitContent() {
                       padding: '10px',
                       fontSize: '1.15rem',
                     }}
-                    aria-label={`Answer for question ${q}`}
+                    aria-label={`Answer for question ${q.number}`}
                   />
                 </div>
               ))}
