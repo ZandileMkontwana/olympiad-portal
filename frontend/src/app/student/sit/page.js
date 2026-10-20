@@ -217,7 +217,7 @@ function SitContent() {
     }
   }
 
-  const answeredCount = questions.filter((q) => answers[q]).length;
+  const answeredCount = questions.filter((q) => answers[q.number]).length;
 
   if (checking || !user) {
     return (
