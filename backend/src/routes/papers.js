@@ -63,12 +63,12 @@ router.post(
       return res.status(403).json({ error: 'You are not an organiser of this olympiad' });
     }
 
-    if (!req.files || !req.files.paper || !req.files.memo) {
-      return res.status(400).json({ error: 'Both paper and memo files are required' });
+    if (!req.files || !req.files.paper) {
+      return res.status(400).json({ error: 'A paper file is required' });
     }
 
     const paperFile = req.files.paper[0];
-    const memoFile = req.files.memo[0];
+    const memoFile = req.files.memo ? req.files.memo[0] : null;
 
     let memoAnswers = null;
     if (req.body.memoAnswers) {
@@ -81,7 +81,7 @@ router.post(
 
     try {
       const fileUrl = await uploadToSupabase(paperFile);
-      const memoUrl = await uploadToSupabase(memoFile);
+      const memoUrl = memoFile ? await uploadToSupabase(memoFile) : null;
 
       // Upsert so an organiser can replace a previously uploaded paper
       const paper = await prisma.paper.upsert({

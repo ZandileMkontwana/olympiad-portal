@@ -131,7 +131,7 @@ model Paper {
   id          String   @id @default(uuid())
   roundId     String   @unique
   fileUrl     String
-  memoUrl     String
+  memoUrl     String?
   uploadedAt  DateTime @default(now())
   memoAnswers Json?
   round       Round    @relation(fields: [roundId], references: [id])
