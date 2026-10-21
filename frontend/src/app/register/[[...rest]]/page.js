@@ -65,6 +65,8 @@ export default function RegisterPage() {
             routing="path"
             path="/register"
             signInUrl="/login"
+            forceRedirectUrl="/auth/check"
+            signInForceRedirectUrl="/auth/check"
             appearance={{
               baseTheme: isDark ? dark : undefined,
               variables: {

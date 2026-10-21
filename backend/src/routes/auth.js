@@ -8,61 +8,98 @@ const { requireAuth, loadAuthUser } = require('../middleware/auth');
 // Called once, after a user signs up via Clerk, to link them to our
 // app-specific data (name, school) which Clerk doesn't know about.
 router.post('/educators/complete-profile', requireAuth, async (req, res) => {
-  const { userId: clerkUserId } = req.auth();
-  const { name, schoolName } = req.body;
+  if (req.authMode !== 'clerk') {
+    return res.status(403).json({ error: 'An educator sign-in is required to complete a profile' });
+  }
+  const clerkUserId = req.authUserId;
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const schoolName = typeof req.body?.schoolName === 'string' ? req.body.schoolName.trim() : '';
 
-  if (!name || !schoolName) {
+  if (!name || !schoolName || name.length > 200 || schoolName.length > 200) {
     return res.status(400).json({ error: 'name and schoolName are required' });
   }
 
-  const existingByClerkId = await prisma.user.findUnique({ where: { clerkUserId } });
-  if (existingByClerkId) {
-    return res.status(409).json({ error: 'Profile already completed for this account' });
-  }
-
-  const clerkUser = await clerkClient.users.getUser(clerkUserId);
-  const email = clerkUser.emailAddresses[0] && clerkUser.emailAddresses[0].emailAddress;
-
-  if (!email) {
-    return res.status(400).json({ error: 'No email found on Clerk account' });
-  }
-
-  const existingByEmail = await prisma.user.findUnique({ where: { email } });
-  if (existingByEmail) {
-    return res.status(409).json({
-      error: 'An account with this email already exists. Try signing in instead.',
+  const include = { educator: { include: { school: true } } };
+  const respond = (user, status) =>
+    res.status(status).json({
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        school: user.educator?.school
+          ? { id: user.educator.school.id, name: user.educator.school.name }
+          : null,
+      },
     });
-  }
 
-  let school = await prisma.school.findFirst({
-    where: { name: { equals: schoolName, mode: 'insensitive' } },
-  });
-  if (!school) {
-    school = await prisma.school.create({
-      data: { name: schoolName, timezone: 'Africa/Johannesburg' },
+  try {
+    const existingByClerkId = await prisma.user.findUnique({ where: { clerkUserId }, include });
+    // Retried requests (including a response lost after a successful save)
+    // must return the existing profile without changing its role or school.
+    if (existingByClerkId) return respond(existingByClerkId, 200);
+
+    const clerkUser = await clerkClient.users.getUser(clerkUserId);
+    const emailRecord =
+      clerkUser.emailAddresses.find((entry) => entry.id === clerkUser.primaryEmailAddressId) ||
+      clerkUser.emailAddresses[0];
+    if (!emailRecord?.emailAddress) {
+      return res.status(400).json({ error: 'No email found on Clerk account' });
+    }
+    if (emailRecord.verification?.status !== 'verified') {
+      return res
+        .status(400)
+        .json({ error: 'Please verify your email before completing your profile' });
+    }
+    const email = emailRecord.emailAddress.trim().toLowerCase();
+
+    const existingByEmail = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      include,
     });
+    if (existingByEmail) {
+      if (existingByEmail.clerkUserId === clerkUserId) return respond(existingByEmail, 200);
+      return res.status(409).json({
+        error:
+          'An account with this email already exists. Contact your administrator to link your sign-in account.',
+      });
+    }
+
+    const user = await prisma.$transaction(async (tx) => {
+      let school = await tx.school.findFirst({
+        where: { name: { equals: schoolName, mode: 'insensitive' } },
+      });
+      if (!school) {
+        school = await tx.school.create({
+          data: { name: schoolName, timezone: 'Africa/Johannesburg' },
+        });
+      }
+      return tx.user.create({
+        data: {
+          clerkUserId,
+          email,
+          role: 'educator',
+          name,
+          educator: { create: { schoolId: school.id } },
+        },
+        include,
+      });
+    });
+
+    return respond(user, 201);
+  } catch (err) {
+    if (err.code === 'P2002') {
+      // Two tabs may submit together. The unique Clerk id keeps one profile.
+      const existing = await prisma.user.findUnique({ where: { clerkUserId }, include });
+      if (existing) return respond(existing, 200);
+      return res.status(409).json({
+        error:
+          'An account with this email already exists. Contact your administrator to link your sign-in account.',
+      });
+    }
+    console.error('Profile completion failed:', err);
+    return res.status(500).json({ error: 'Could not save your profile. Please try again.' });
   }
-
-  const user = await prisma.user.create({
-    data: {
-      clerkUserId,
-      email,
-      role: 'educator',
-      name,
-      educator: { create: { schoolId: school.id } },
-    },
-    include: { educator: { include: { school: true } } },
-  });
-
-  res.status(201).json({
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      name: user.name,
-      school: { id: user.educator.school.id, name: user.educator.school.name },
-    },
-  });
 });
 
 // GET /auth/me

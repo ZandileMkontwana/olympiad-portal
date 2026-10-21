@@ -47,7 +47,12 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      signInUrl="/login"
+      signUpUrl="/register"
+      signInFallbackRedirectUrl="/auth/check"
+      signUpForceRedirectUrl="/auth/check"
+    >
       {/* suppressHydrationWarning: the init script sets data-theme and
           color-scheme on <html> before React hydrates. */}
       <html

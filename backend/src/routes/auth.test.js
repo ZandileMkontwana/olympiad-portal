@@ -38,6 +38,7 @@ describe('Auth routes', () => {
 
   beforeEach(() => {
     vi.spyOn(prisma.user, 'findUnique');
+    vi.spyOn(prisma.user, 'findFirst').mockResolvedValue(null);
     vi.spyOn(prisma.user, 'create');
     vi.spyOn(prisma.user, 'delete');
     vi.spyOn(prisma.school, 'findFirst');
@@ -57,7 +58,8 @@ describe('Auth routes', () => {
         educator: { delete: vi.fn() },
         olympiad: { updateMany: vi.fn() },
         olympiadOrganiser: { deleteMany: vi.fn() },
-        user: { delete: vi.fn() },
+        user: { delete: vi.fn(), create: prisma.user.create },
+        school: { findFirst: prisma.school.findFirst, create: prisma.school.create },
       };
       return fn(mockTx);
     });
@@ -86,13 +88,19 @@ describe('Auth routes', () => {
       expect(res.body.error).toMatch(/required/);
     });
 
-    it('returns 409 when profile already completed', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: '1', clerkUserId: 'clerk-user-1' });
+    it('returns the existing profile when completion is retried', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: '1',
+        clerkUserId: 'clerk-user-1',
+        role: 'educator',
+      });
       const res = await request(app)
         .post('/api/educators/complete-profile')
         .send({ name: 'Test', schoolName: 'Test School' });
-      expect(res.status).toBe(409);
-      expect(res.body.error).toMatch(/already completed/);
+      expect(res.status).toBe(200);
+      expect(res.body.user.id).toBe('1');
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(mockGetUser).not.toHaveBeenCalled();
     });
 
     it('returns 400 when Clerk has no email', async () => {
@@ -108,7 +116,7 @@ describe('Auth routes', () => {
     it('creates user with existing school and returns 201', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
       mockGetUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'a@b.com' }],
+        emailAddresses: [{ emailAddress: 'a@b.com', verification: { status: 'verified' } }],
       });
       prisma.school.findFirst.mockResolvedValue({ id: 'school-1', name: 'Test School' });
       prisma.user.create.mockResolvedValue({
@@ -132,7 +140,7 @@ describe('Auth routes', () => {
     it('creates school when it does not exist', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
       mockGetUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'b@b.com' }],
+        emailAddresses: [{ emailAddress: 'b@b.com', verification: { status: 'verified' } }],
       });
       prisma.school.findFirst.mockResolvedValue(null);
       prisma.school.create.mockResolvedValue({ id: 'school-2', name: 'New School' });
@@ -152,6 +160,119 @@ describe('Auth routes', () => {
       expect(prisma.school.create).toHaveBeenCalledWith({
         data: { name: 'New School', timezone: 'Africa/Johannesburg' },
       });
+    });
+
+    it.each([
+      { name: '   ', schoolName: 'School' },
+      { name: 'Name', schoolName: {} },
+      { name: 'a'.repeat(201), schoolName: 'School' },
+    ])('rejects invalid profile fields: %j', async (body) => {
+      const res = await request(app).post('/api/educators/complete-profile').send(body);
+      expect(res.status).toBe(400);
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects student JWTs even when a Clerk session is also present', async () => {
+      const token = jwt.sign({ sub: 'student-1', role: 'student' }, 'test-secret');
+      const res = await request(app)
+        .post('/api/educators/complete-profile')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Name', schoolName: 'School' });
+      expect(res.status).toBe(403);
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('requires email verification', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      mockGetUser.mockResolvedValue({
+        emailAddresses: [
+          { emailAddress: 'test@school.com', verification: { status: 'unverified' } },
+        ],
+      });
+      const res = await request(app)
+        .post('/api/educators/complete-profile')
+        .send({ name: 'Name', schoolName: 'School' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/verify your email/);
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('uses the verified primary email and trims fields; callers cannot choose their role', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      mockGetUser.mockResolvedValue({
+        primaryEmailAddressId: 'primary',
+        emailAddresses: [
+          { id: 'secondary', emailAddress: 'other@school.com' },
+          {
+            id: 'primary',
+            emailAddress: 'Teacher@School.com',
+            verification: { status: 'verified' },
+          },
+        ],
+      });
+      prisma.school.findFirst.mockResolvedValue({ id: 'school-1' });
+      prisma.user.create.mockResolvedValue({ id: 'user-1', role: 'educator' });
+      const res = await request(app)
+        .post('/api/educators/complete-profile')
+        .send({ name: ' Teacher ', schoolName: ' School ', role: 'organiser' });
+      expect(res.status).toBe(201);
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            clerkUserId: 'clerk-user-1',
+            email: 'teacher@school.com',
+            name: 'Teacher',
+            role: 'educator',
+            educator: { create: { schoolId: 'school-1' } },
+          },
+        })
+      );
+      expect(prisma.school.findFirst).toHaveBeenCalledWith({
+        where: { name: { equals: 'School', mode: 'insensitive' } },
+      });
+    });
+
+    it('does not take over an existing account with the same email', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      mockGetUser.mockResolvedValue({
+        emailAddresses: [
+          { emailAddress: 'teacher@school.com', verification: { status: 'verified' } },
+        ],
+      });
+      prisma.user.findFirst.mockResolvedValue({ id: 'existing', role: 'organiser' });
+      const res = await request(app)
+        .post('/api/educators/complete-profile')
+        .send({ name: 'Name', schoolName: 'School' });
+      expect(res.status).toBe(409);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('recovers when another request completes the same profile concurrently', async () => {
+      prisma.user.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'winner', role: 'educator' });
+      mockGetUser.mockResolvedValue({
+        emailAddresses: [
+          { emailAddress: 'teacher@school.com', verification: { status: 'verified' } },
+        ],
+      });
+      prisma.$transaction.mockRejectedValueOnce({ code: 'P2002' });
+      const res = await request(app)
+        .post('/api/educators/complete-profile')
+        .send({ name: 'Name', schoolName: 'School' });
+      expect(res.status).toBe(200);
+      expect(res.body.user.id).toBe('winner');
+    });
+
+    it('returns a retryable error when saving fails', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      mockGetUser.mockRejectedValue(new Error('Clerk unavailable'));
+      const res = await request(app)
+        .post('/api/educators/complete-profile')
+        .send({ name: 'Name', schoolName: 'School' });
+      expect(res.status).toBe(500);
+      expect(res.body.error).toMatch(/try again/);
     });
   });
 
@@ -305,7 +426,7 @@ describe('Auth routes', () => {
 
       expect(res.status).toBe(200);
       expect(prisma.$transaction).toHaveBeenCalled();
-      
+
       // Verify the transaction callback was executed (cascade operations ran)
       const txCallback = prisma.$transaction.mock.calls[0][0];
       expect(typeof txCallback).toBe('function');
