@@ -61,6 +61,12 @@ describe('useRequireRole', () => {
     });
   });
 
+  it('sends signed-in accounts with no profile to the recovery check', async () => {
+    fetchCurrentUser.mockResolvedValue(null);
+    renderHook(() => useRequireRole('educator'));
+    await vi.waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/auth/check'));
+  });
+
   it('sets user and checking=false when role matches', async () => {
     const mockUser = { id: '1', role: 'educator', email: 'a@b.com' };
     fetchCurrentUser.mockResolvedValue(mockUser);

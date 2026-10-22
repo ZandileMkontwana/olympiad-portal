@@ -27,7 +27,7 @@ export function useRedirectIfAuthenticated() {
       if (user) {
         router.replace(dashboardPathForRole(user.role));
       } else {
-        setChecking(false);
+        router.replace('/auth/check');
       }
     }
 

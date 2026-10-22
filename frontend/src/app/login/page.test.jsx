@@ -5,10 +5,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
+const authQuery = vi.hoisted(() => ({ params: new URLSearchParams(), signOut: vi.fn() }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => authQuery.params,
 }));
 
 // Mutable Clerk state — individual tests override before rendering.
@@ -20,7 +21,7 @@ vi.mock('@clerk/nextjs', () => ({
     isSignedIn: clerkState.isSignedIn,
     getToken: vi.fn().mockResolvedValue('clerk-token'),
   }),
-  useClerk: () => ({ signOut: vi.fn() }),
+  useClerk: () => ({ signOut: authQuery.signOut }),
   SignIn: () => <div data-testid="clerk-signin">Clerk sign-in</div>,
 }));
 
@@ -55,6 +56,7 @@ describe('Login page', () => {
     clerkState.isLoaded = true;
     clerkState.isSignedIn = false;
     sessionState.session = null;
+    authQuery.params = new URLSearchParams();
   });
 
   it('has no axe accessibility violations', async () => {
@@ -62,7 +64,42 @@ describe('Login page', () => {
     await expectNoAxeViolations(container);
   });
 
+  it('keeps a role mismatch message on the login page when switching accounts', async () => {
+    clerkState.isSignedIn = true;
+    authQuery.params = new URLSearchParams(
+      'error=role_mismatch&expected=organiser&actual=educator'
+    );
+    render(<LoginPage />);
+    await waitFor(() =>
+      expect(authQuery.signOut).toHaveBeenCalledWith({
+        redirectUrl: '/login?error=role_mismatch&expected=organiser&actual=educator',
+      })
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(/registered as a educator/i);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it.each(['not_registered', 'unknown'])(
+    'keeps the Clerk session for %s errors so the account can recover',
+    (error) => {
+      clerkState.isSignedIn = true;
+      authQuery.params = new URLSearchParams({ error });
+      render(<LoginPage />);
+      expect(authQuery.signOut).not.toHaveBeenCalled();
+    }
+  );
+
   describe('Role picker', () => {
+    it('resolves an existing Clerk session when the educator role is selected', async () => {
+      clerkState.isSignedIn = true;
+      render(<LoginPage />);
+      fireEvent.click(screen.getByRole('button', { name: /educator/i }));
+      await waitFor(() =>
+        expect(mockReplace).toHaveBeenCalledWith('/auth/check?expectedRole=educator')
+      );
+      expect(screen.queryByTestId('clerk-signin')).not.toBeInTheDocument();
+    });
+
     it('shows the Student role selected by default', () => {
       render(<LoginPage />);
 

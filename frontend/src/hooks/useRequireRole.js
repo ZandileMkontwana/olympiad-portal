@@ -25,7 +25,7 @@ export function useRequireRole(requiredRole) {
       if (cancelled) return;
 
       if (!fetchedUser) {
-        router.replace('/login');
+        router.replace('/auth/check');
         return;
       }
 

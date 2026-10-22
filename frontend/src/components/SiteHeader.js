@@ -11,6 +11,7 @@ const AUTHED_PREFIXES = [
   '/archive',
   '/auth',
   '/set-password',
+  '/complete-profile',
   '/rounds',
 ];
 
