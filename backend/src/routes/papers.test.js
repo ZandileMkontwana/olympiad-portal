@@ -89,15 +89,23 @@ describe('Papers routes', () => {
         .post('/api/rounds/round-1/papers')
         .field('memoAnswers', JSON.stringify({ q1: 'A' }));
       expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/Both paper and memo/);
+      expect(res.body.error).toMatch(/A paper file is required/);
     });
 
-    it('returns 400 when only paper is provided', async () => {
+    it('returns 201 when only paper is provided (memo is optional)', async () => {
+      prisma.paper.upsert.mockResolvedValue({
+        id: 'paper-1',
+        roundId: 'round-1',
+        fileUrl: 'https://test.supabase.co/test-bucket/file.pdf',
+        memoUrl: null,
+        memoAnswers: null,
+      });
+
       const res = await request(app)
         .post('/api/rounds/round-1/papers')
         .attach('paper', Buffer.from('fake'), 'paper.pdf');
-      expect(res.status).toBe(400);
-      expect(res.body.error).toMatch(/Both paper and memo/);
+      expect(res.status).toBe(201);
+      expect(mockUpload).toHaveBeenCalledTimes(1);
     });
 
     it('returns 400 when memoAnswers is not valid JSON', async () => {
