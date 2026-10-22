@@ -16,6 +16,7 @@ import {
   uploadPaper,
   fetchArchivedPapers,
   fetchCurrentUser,
+  completeEducatorProfile,
   listSchoolEntrants,
   createEntrant,
   resendEntrantInvite,
@@ -526,6 +527,44 @@ describe('api client', () => {
   });
 
   describe('fetchCurrentUser', () => {
+    it('distinguishes a missing profile from authentication failures in strict mode', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: 'User not found' }),
+      });
+      await expect(fetchCurrentUser('token', { throwOnError: true })).resolves.toBeNull();
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: 'Not authenticated' }),
+      });
+      await expect(fetchCurrentUser('token', { throwOnError: true })).rejects.toMatchObject({
+        status: 401,
+      });
+      await expect(fetchCurrentUser(null, { throwOnError: true })).rejects.toMatchObject({
+        status: 401,
+      });
+    });
+
+    it('surfaces server failures after retries in strict mode', async () => {
+      vi.useFakeTimers();
+      try {
+        fetchMock.mockResolvedValue({
+          ok: false,
+          status: 503,
+          json: async () => ({ error: 'Server busy' }),
+        });
+        const assertion = expect(
+          fetchCurrentUser('token', { throwOnError: true })
+        ).rejects.toMatchObject({ status: 503 });
+        await vi.runAllTimersAsync();
+        await assertion;
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('returns user on success with Bearer token', async () => {
       fetchMock.mockResolvedValue({
         ok: true,
@@ -566,6 +605,22 @@ describe('api client', () => {
       const user = await fetchCurrentUser('test-token');
       expect(user).toBeNull();
     });
+  });
+
+  it('completes an educator profile using the authenticated session', async () => {
+    const user = { id: 'educator-1', role: 'educator' };
+    fetchMock.mockResolvedValue({ ok: true, status: 201, json: async () => ({ user }) });
+    await expect(
+      completeEducatorProfile('clerk-token', { name: 'Teacher', schoolName: 'School' })
+    ).resolves.toEqual(user);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:5000/api/educators/complete-profile',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer clerk-token' }),
+        body: JSON.stringify({ name: 'Teacher', schoolName: 'School' }),
+      })
+    );
   });
 
   describe('fetchArchivedPapers', () => {
@@ -1514,13 +1569,11 @@ describe('api client', () => {
     });
 
     it('retries on network failure and succeeds on the second attempt', async () => {
-      fetchMock
-        .mockRejectedValueOnce(new Error('Connection refused'))
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ data: 'recovered' }),
-        });
+      fetchMock.mockRejectedValueOnce(new Error('Connection refused')).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ data: 'recovered' }),
+      });
 
       const promise = listRounds();
       // Advance past the first retry delay (500ms * 2^0 = 500ms)
@@ -1632,7 +1685,7 @@ describe('api client', () => {
         .mockResolvedValueOnce({
           ok: false,
           status: 503,
-          headers: { get: (name) => name === 'Retry-After' ? String(retryAfterSeconds) : null },
+          headers: { get: (name) => (name === 'Retry-After' ? String(retryAfterSeconds) : null) },
           json: () => Promise.resolve({ error: 'Service unavailable' }),
         })
         .mockResolvedValueOnce({
@@ -1655,7 +1708,7 @@ describe('api client', () => {
         .mockResolvedValueOnce({
           ok: false,
           status: 503,
-          headers: { get: (name) => name === 'Retry-After' ? '9999' : null },
+          headers: { get: (name) => (name === 'Retry-After' ? '9999' : null) },
           json: () => Promise.resolve({ error: 'Service unavailable' }),
         })
         .mockResolvedValueOnce({

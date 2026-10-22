@@ -56,6 +56,12 @@ describe('useRedirectIfAuthenticated', () => {
     });
   });
 
+  it('recovers incomplete registration instead of leaving the account on the public page', async () => {
+    fetchCurrentUser.mockResolvedValue(null);
+    renderHook(() => useRedirectIfAuthenticated());
+    await vi.waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/auth/check'));
+  });
+
   it('sets checking to false when not authenticated', async () => {
     mockUseAuth.mockReturnValue({
       isLoaded: true,

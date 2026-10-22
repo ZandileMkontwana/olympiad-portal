@@ -25,6 +25,8 @@ export default function AuthRedirect() {
       if (cancelled) return;
       if (user) {
         router.replace(dashboardPathForRole(user.role));
+      } else {
+        router.replace('/auth/check');
       }
     }
 

@@ -662,16 +662,31 @@ export async function uploadPaper(roundId, { paperFile, memoFile, memoAnswers },
   return data;
 }
 
-export async function fetchCurrentUser(token) {
-  if (!token) return null;
+export async function fetchCurrentUser(token, { throwOnError = false } = {}) {
+  if (!token) {
+    if (throwOnError) throw new ApiError('Your session is not ready. Please try again.', 401);
+    return null;
+  }
   try {
     const data = await requestJson('/api/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
     return data.user;
-  } catch {
+  } catch (err) {
+    // Only a missing profile means registration is incomplete. A server or
+    // session failure must remain distinguishable in the registration flow.
+    if (throwOnError && err.status !== 404) throw err;
     return null;
   }
+}
+
+export async function completeEducatorProfile(token, { name, schoolName }) {
+  const data = await requestJson('/api/educators/complete-profile', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, schoolName }),
+  });
+  return data.user;
 }
 
 /**

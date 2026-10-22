@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SignIn, useAuth, useClerk } from '@clerk/nextjs';
-import { studentLogin, dashboardPathForRole, fetchCurrentUser } from '@/lib/api';
+import { studentLogin, dashboardPathForRole } from '@/lib/api';
 import { getStudentSession, setStudentSession } from '@/lib/studentSession';
 import '../../auth.css';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -17,7 +17,7 @@ export default function LoginPage() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const searchParams = useSearchParams();
-  const { isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const { signOut } = useClerk();
   const [role, setRole] = useState('student');
   const [email, setEmail] = useState('');
@@ -32,7 +32,7 @@ export default function LoginPage() {
       return `This account is registered as a ${actualRole}, not as a ${expectedRole}. Please select the correct role or sign in with a different account.`;
     }
     if (errorParam === 'not_registered') {
-      return 'Your account is not registered in the system yet. Please contact your administrator.';
+      return 'Your registration is incomplete. Sign in as an educator to finish your profile.';
     }
     if (errorParam === 'unknown') {
       return 'An error occurred. Please try again.';
@@ -48,17 +48,23 @@ export default function LoginPage() {
     return new URLSearchParams(window.location.search).get('deleted') === '1';
   });
 
-  // Sign out from Clerk when redirected with an auth error
+  // A role mismatch lets the user switch accounts without losing the message.
+  // Profile and server errors must not end a valid Clerk session.
   useEffect(() => {
     const errorParam = searchParams.get('error');
-    if (
-      errorParam === 'role_mismatch' ||
-      errorParam === 'not_registered' ||
-      errorParam === 'unknown'
-    ) {
-      signOut();
+    if (isLoaded && isSignedIn && errorParam === 'role_mismatch') {
+      signOut({ redirectUrl: `/login?${searchParams.toString()}` });
     }
-  }, [searchParams, signOut]);
+  }, [isLoaded, isSignedIn, searchParams, signOut]);
+
+  // Clerk's SignIn sends existing sessions to its home URL. Resolve the
+  // portal profile ourselves before mounting it for a signed-in account.
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || searchParams.get('error') === 'role_mismatch') return;
+    if (role !== 'student') {
+      router.replace(`/auth/check?expectedRole=${role}`);
+    }
+  }, [isLoaded, isSignedIn, role, router, searchParams]);
 
   // Redirect if there's already a stored student session
   useEffect(() => {
@@ -395,41 +401,46 @@ export default function LoginPage() {
                   {error}
                 </div>
               )}
-              <SignIn
-                routing="path"
-                path="/login"
-                signUpUrl="/register"
-                forceRedirectUrl={`/auth/check?expectedRole=${role}`}
-                localization={{
-                  signIn: {
-                    start: {
-                      title: 'Sign In',
+              {isLoaded && !isSignedIn ? (
+                <SignIn
+                  routing="path"
+                  path="/login"
+                  signUpUrl="/register"
+                  forceRedirectUrl={`/auth/check?expectedRole=${role}`}
+                  signUpForceRedirectUrl="/auth/check"
+                  localization={{
+                    signIn: {
+                      start: {
+                        title: 'Sign In',
+                      },
                     },
-                  },
-                }}
-                appearance={{
-                  baseTheme: isDark ? dark : undefined,
-                  variables: {
-                    colorPrimary: isDark ? '#a897f7' : '#6c4fd8',
-                    colorBackground: isDark ? '#1e1a33' : '#ffffff',
-                    borderRadius: '10px',
-                  },
-                  options: {
-                    logoImageUrl: '/tree-mark.png',
-                    socialButtonsPlacement: 'bottom',
-                  },
-                  elements: {
-                    rootBox: 'auth-clerk-root',
-                    cardBox: 'auth-clerk-cardbox',
-                    card: 'auth-clerk-card',
-                    headerTitle: 'auth-clerk-title auth-clerk-login-title',
-                    headerSubtitle: 'auth-clerk-subtitle',
-                    logoBox: 'auth-clerk-logo',
-                    formButtonPrimary: 'auth-clerk-primary',
-                    socialButtonsBlockButton: 'auth-clerk-social',
-                  },
-                }}
-              />
+                  }}
+                  appearance={{
+                    baseTheme: isDark ? dark : undefined,
+                    variables: {
+                      colorPrimary: isDark ? '#a897f7' : '#6c4fd8',
+                      colorBackground: isDark ? '#1e1a33' : '#ffffff',
+                      borderRadius: '10px',
+                    },
+                    options: {
+                      logoImageUrl: '/tree-mark.png',
+                      socialButtonsPlacement: 'bottom',
+                    },
+                    elements: {
+                      rootBox: 'auth-clerk-root',
+                      cardBox: 'auth-clerk-cardbox',
+                      card: 'auth-clerk-card',
+                      headerTitle: 'auth-clerk-title auth-clerk-login-title',
+                      headerSubtitle: 'auth-clerk-subtitle',
+                      logoBox: 'auth-clerk-logo',
+                      formButtonPrimary: 'auth-clerk-primary',
+                      socialButtonsBlockButton: 'auth-clerk-social',
+                    },
+                  }}
+                />
+              ) : (
+                <p role="status">Checking your session...</p>
+              )}
             </>
           )}
         </div>
