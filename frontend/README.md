@@ -6,7 +6,7 @@ Next.js (App Router) frontend for the Olympiad Portal. Educators manage their sc
 
 | Component | URL |
 |---|---|
-| Frontend (Vercel) | <https://frontend-two-ruby-25.vercel.app> |
+| Frontend (Vercel) | <https://olympiad-portal-iota.vercel.app> |
 | Backend API (Render) | <https://olympiad-portal-backend.onrender.com> |
 | Documentation (GitHub Pages) | <https://zandilemkontwana.github.io/olympiad-portal/> |
 

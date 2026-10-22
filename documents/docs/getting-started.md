@@ -109,7 +109,7 @@ backend/
 
 ## Getting Started — Frontend
 
-The frontend is a Next.js (App Router) app deployed at `https://frontend-two-ruby-25.vercel.app`. For local development it expects the backend on `http://localhost:5000` — start the backend first (see above), then in a second terminal:
+The frontend is a Next.js (App Router) app deployed at `https://olympiad-portal-iota.vercel.app`. For local development it expects the backend on `http://localhost:5000` — start the backend first (see above), then in a second terminal:
 
 **1. Install dependencies and run the dev server**
 ```

@@ -10,7 +10,7 @@ sidebar_position: 1
 | Component | URL |
 |---|---|
 | Backend API (Render) | <https://olympiad-portal-backend.onrender.com> |
-| Frontend (Vercel) | <https://frontend-two-ruby-25.vercel.app> |
+| Frontend (Vercel) | <https://olympiad-portal-iota.vercel.app> |
 | Documentation (GitHub Pages) | <https://zandilemkontwana.github.io/olympiad-portal/> |
 
 ## Code Coverage

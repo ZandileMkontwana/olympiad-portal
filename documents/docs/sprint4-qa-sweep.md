@@ -11,7 +11,7 @@ The full-system QA sweep for Sprint 4: both automated suites with coverage, the 
 
 | Component | Value |
 |---|---|
-| Frontend (production) | `https://frontend-two-ruby-25.vercel.app` (Vercel) |
+| Frontend (production) | `https://olympiad-portal-iota.vercel.app` (Vercel) |
 | Backend (production) | `https://olympiad-portal-backend.onrender.com` (Render) |
 | Database | Shared Supabase (production pooler) |
 | Local runner | Windows, Node 20.20.2, npm 10.8.2 (matches the CI Node 20 toolchain) |
